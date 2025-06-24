@@ -38,7 +38,8 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Gestor Financiero para Parejas",
   description: "Aplicación completa para gestionar las finanzas de pareja con informes mensuales y análisis detallados",
-    generator: 'v0.dev'
+  generator: 'Caldeix',
+
 }
 
 /**
@@ -61,6 +62,13 @@ export default function RootLayout({
     // relacionada con la inicialización del tema en el cliente, ya que el servidor
     // no sabe la preferencia de tema del usuario.
     <html lang="es" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.ico" type="image/ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
+      </head>
       {/* El <body> contiene todo el contenido visible de la página. */}
       {/* Se aplican las variables CSS de las fuentes para que Tailwind CSS pueda usarlas. */}
       <body className={`${inter.variable} ${poppins.variable}`}>

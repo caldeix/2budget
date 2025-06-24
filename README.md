@@ -89,4 +89,4 @@ Este proyecto está bajo una **Licencia Propietaria**. Queda estrictamente prohi
 ---
 
 © 2025 Caldeix. Todos los derechos reservados.
-App construida parcialmente con IA.
+Desarrollado parcialmente con IA.

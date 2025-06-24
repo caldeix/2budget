@@ -51,8 +51,6 @@ export function Footer() {
         </span>
         {/* Información de copyright y año actual. */}
         <span className="whitespace-nowrap">&copy; {currentYear} Copyright.</span>
-        {/* Nota sobre el uso de IA en la construcción de la aplicación. */}
-        <span className="text-muted-foreground whitespace-nowrap">App construida parcialmente con IA</span>
       </div>
     </footer>
   )
