@@ -2,7 +2,7 @@
 const nextConfig = {
   output: 'export',
   basePath: '/2budget',
-  assetPrefix: '/2budget/',
+  assetPrefix: '/2budget',
   eslint: {
     ignoreDuringBuilds: true,
   },
