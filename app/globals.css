@@ -1,0 +1,217 @@
+/**
+ * @file app/globals.css
+ * @description Este archivo contiene los estilos CSS globales de la aplicación.
+ *              Utiliza Tailwind CSS para la mayoría de los estilos, pero también define
+ *              variables CSS personalizadas para los colores del tema (claro y oscuro)
+ *              y otras propiedades como el radio de borde y las fuentes.
+ *              También incluye estilos para la barra de desplazamiento y animaciones.
+ */
+
+/* Directivas de Tailwind CSS: importan las capas base, componentes y utilidades. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Capa base de CSS: aquí se definen las variables CSS y estilos globales que se aplican a elementos HTML. */
+@layer base {
+  /* Definición de variables CSS para el TEMA CLARO */
+  :root {
+    /* Colores principales de la paleta */
+    --primary: 221 76% 47%; /* Azul oscuro, usado para botones principales, etc. */
+    --secondary: 216 73% 59%; /* Azul más claro, para elementos secundarios. */
+    --accent: 39 90% 64%; /* Naranja/Ámbar, para acentos o advertencias. */
+    --background: 210 10% 98%; /* Fondo general de la aplicación (casi blanco). */
+    --card: 0 0% 100%; /* Fondo de las tarjetas (blanco puro). */
+    --card-foreground: 218 28% 11%; /* Color de texto principal sobre tarjetas. */
+    --foreground: 218 28% 11%; /* Color de texto principal general. */
+    --muted-foreground: 217 9% 46%; /* Color de texto secundario o deshabilitado. */
+    --popover: 0 0% 100%; /* Fondo de popovers/dropdowns. */
+    --popover-foreground: 218 28% 11%; /* Color de texto sobre popovers. */
+
+    /* Colores de texto para elementos interactivos */
+    --primary-foreground: 210 40% 98%; /* Texto sobre el color primario (ej. botón primario). */
+    --secondary-foreground: 218 28% 11%; /* Texto sobre el color secundario. */
+    --destructive: 0 84.2% 60.2%; /* Color para acciones destructivas (ej. eliminar). */
+    --destructive-foreground: 210 40% 98%; /* Texto sobre el color destructivo. */
+    --muted: 210 40% 96%; /* Fondo para elementos "silenciados" o de bajo contraste. */
+    --accent-foreground: 218 28% 11%; /* Texto sobre el color de acento. */
+    --border: 214.3 31.8% 91.4%; /* Color de los bordes. */
+    --input: 214.3 31.8% 91.4%; /* Color de fondo de los campos de entrada. */
+    --ring: var(--primary); /* Color del anillo de enfoque (usa el color primario). */
+
+    /* Radio de borde global para elementos redondeados. */
+    --radius: 1rem; /* Equivalente a rounded-2xl de Tailwind. */
+
+    /* Colores de estado (verde, rojo, naranja, ámbar) para el tema claro. */
+    --green-50: 142 70% 95%; /* Verde muy claro. */
+    --green-100: 142 70% 90%; /* Verde claro. */
+    --green-600: 142 70% 40%; /* Verde principal (para ingresos). */
+
+    --red-50: 0 80% 95%; /* Rojo muy claro. */
+    --red-100: 0 80% 90%; /* Rojo claro. */
+    --red-600: 0 80% 40%; /* Rojo principal (para gastos). */
+
+    --orange-50: 25 80% 95%; /* Naranja muy claro. */
+    --orange-100: 25 80% 90%; /* Naranja claro. */
+    --orange-600: 25 80% 40%; /* Naranja principal (para gastos variables). */
+
+    --amber-50: 38 80% 95%; /* Ámbar muy claro. */
+    --amber-100: 38 80% 90%; /* Ámbar claro. */
+    --amber-600: 38 80% 40%; /* Ámbar principal (para advertencias). */
+    --amber-700: 38 80% 30%; /* Tono más oscuro de ámbar para hover. */
+
+    /* Colores de fondo específicos para las tarjetas de resumen en tema claro. */
+    --card-balance-bg: 216 73% 97%; /* Azul muy claro para la tarjeta de balance. */
+    --card-income-bg: 142 70% 97%; /* Verde muy claro para la tarjeta de ingresos. */
+    --card-expense-bg: 0 80% 97%; /* Rojo muy claro para la tarjeta de gastos. */
+  }
+
+  /* Definición de variables CSS para el TEMA OSCURO */
+  .dark {
+    /* Los valores HSL se ajustan para un contraste adecuado en modo oscuro. */
+    --primary: 216 73% 59%;
+    --secondary: 221 83% 53%;
+    --accent: 40 95% 56%;
+    --background: 222 47% 11%; /* Fondo oscuro principal. */
+    --card: 215 30% 18%; /* Fondo de tarjetas más oscuro. */
+    --card-foreground: 210 20% 98%;
+    --foreground: 210 20% 98%;
+    --muted-foreground: 214 19% 66%;
+    --popover: 215 30% 18%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary-foreground: 210 20% 98%;
+    --secondary-foreground: 210 20% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --muted: 215 30% 15%;
+    --accent-foreground: 210 20% 98%;
+    --border: 215 30% 25%;
+    --input: 215 30% 20%;
+    --ring: var(--primary);
+
+    /* Colores de estado para el tema oscuro. */
+    --green-50: 142 70% 12%;
+    --green-100: 142 70% 18%;
+    --green-600: 142 70% 48%;
+
+    --red-50: 0 80% 12%;
+    --red-100: 0 80% 18%;
+    --red-600: 0 80% 48%;
+
+    --orange-50: 25 80% 12%;
+    --orange-100: 25 80% 18%;
+    --orange-600: 25 80% 48%;
+
+    --amber-50: 38 80% 12%;
+    --amber-100: 38 80% 18%;
+    --amber-600: 38 80% 48%;
+    --amber-700: 38 80% 55%;
+
+    /* Colores de fondo específicos para las tarjetas de resumen en tema oscuro. */
+    --card-balance-bg: 216 73% 15%;
+    --card-income-bg: 142 70% 15%;
+    --card-expense-bg: 0 80% 15%;
+  }
+}
+
+/* Segunda capa base: estilos aplicados a elementos HTML directamente. */
+@layer base {
+  /* Aplica la propiedad de borde global a todos los elementos. */
+  * {
+    @apply border-border;
+  }
+  /* Estilos por defecto para el cuerpo de la página. */
+  body {
+    @apply bg-background text-foreground; /* Fondo y color de texto basados en variables. */
+    font-family: var(--font-inter); /* Aplica la fuente Inter a todo el texto. */
+  }
+
+  /* TIPOGRAFÍA: Aplica la fuente Poppins a todos los encabezados (h1-h6). */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-poppins);
+  }
+}
+
+/* Estilos personalizados para la barra de desplazamiento (solo Webkit). */
+::-webkit-scrollbar {
+  width: 8px; /* Ancho de la barra de desplazamiento. */
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background)); /* Color del fondo de la pista de la barra. */
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground)); /* Color del "pulgar" de la barra. */
+  border-radius: 4px; /* Bordes redondeados para el pulgar. */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--foreground)); /* Color del pulgar al pasar el ratón. */
+}
+
+/* Transiciones suaves para propiedades CSS comunes. */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
+    transform, filter, backdrop-filter;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* Función de temporización estándar. */
+  transition-duration: 150ms; /* Duración de la transición. */
+}
+
+/* Estilos de enfoque para elementos interactivos (accesibilidad). */
+.focus-visible\:ring-2:focus-visible {
+  outline: 2px solid transparent; /* Elimina el contorno por defecto del navegador. */
+  outline-offset: 2px; /* Desplazamiento del anillo de enfoque. */
+  box-shadow: 0 0 0 2px hsl(var(--ring)); /* Sombra para el anillo de enfoque. */
+}
+
+/* Animación de giro para estados de carga. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg); /* Gira 360 grados. */
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite; /* Aplica la animación de giro. */
+}
+
+/* Efectos hover personalizados para botones. */
+.hover\:scale-105:hover {
+  transform: scale(1.02); /* Escala ligeramente el elemento al pasar el ratón. */
+}
+
+/* Efecto de desenfoque para el fondo de los modales. */
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px); /* Aplica un desenfoque al fondo. */
+}
+
+/* Efectos hover para segmentos de gráficos. */
+.chart-segment:hover {
+  opacity: 0.8; /* Reduce la opacidad. */
+  transform: scale(1.02); /* Escala ligeramente. */
+}
+
+/* Ajuste de tamaño de texto responsivo para pantallas pequeñas. */
+@media (max-width: 640px) {
+  .text-responsive {
+    font-size: 0.875rem; /* Tamaño de fuente más pequeño en móviles. */
+  }
+}
+
+/* Estilos para impresión: oculta elementos no deseados y añade saltos de página. */
+@media print {
+  .no-print {
+    display: none !important; /* Oculta elementos con esta clase al imprimir. */
+  }
+
+  .print-break {
+    page-break-after: always; /* Fuerza un salto de página después de este elemento. */
+  }
+}
