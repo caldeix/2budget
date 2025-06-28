@@ -26,10 +26,11 @@ import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
+import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 
 // Importación de componentes UI de Shadcn y iconos.
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Settings, Calendar, Info, Heart } from "lucide-react"
+import { Plus, FileText, Settings, Calendar, Info, Heart, Copy } from "lucide-react"
 
 /**
  * @function HomePage
@@ -64,6 +65,11 @@ export default function HomePage() {
   // Estados para el mes y año actualmente seleccionados en la interfaz (afecta la tabla y el resumen).
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  
+  // Estados para el modal de confirmación de copia de gastos fijos
+  const [isConfirmCopyModalOpen, setIsConfirmCopyModalOpen] = useState(false)
+  const [previousMonthFixedExpenses, setPreviousMonthFixedExpenses] = useState<Transaction[]>([])
+  const [previousMonthName, setPreviousMonthName] = useState("")
 
   // Estado para el número de transacciones a mostrar en la tabla (para la carga infinita).
   const [transactionsToShow, setTransactionsToShow] = useState(5)
@@ -83,6 +89,17 @@ export default function HomePage() {
 
   // Obtiene TODAS las transacciones para el mes y año seleccionados (sin límite de 5).
   const allTransactionsForSelectedMonth = getTransactionsForMonth(selectedMonth, selectedYear)
+  
+  // Verifica si hay gastos fijos en el mes actual
+  const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(
+    (t) => t.type === "expense" && t.category === "fixed"
+  )
+  
+  // Verificar si el mes seleccionado es mayor al mes actual
+  const currentDate = new Date()
+  const isFutureMonth = 
+    selectedYear > currentDate.getFullYear() || 
+    (selectedYear === currentDate.getFullYear() && selectedMonth > currentDate.getMonth() + 1)
   // Realiza cálculos financieros sobre todas las transacciones del mes seleccionado.
   const calculations = useCalculations(allTransactionsForSelectedMonth)
 
@@ -149,6 +166,95 @@ export default function HomePage() {
     setIsTransactionFormOpen(false)
     setEditingTransaction(null)
   }
+
+  // Función para obtener el mes anterior
+  const getPreviousMonthData = useCallback((month: number, year: number) => {
+    let prevMonth = month - 1
+    let prevYear = year
+    
+    if (prevMonth === 0) {
+      prevMonth = 12
+      prevYear--
+    }
+    
+    return { prevMonth, prevYear }
+  }, [])
+
+  // Función para obtener el nombre del mes
+  const getMonthName = (month: number) => {
+    const date = new Date(2000, month, 1)
+    return date.toLocaleString('es-ES', { month: 'long' })
+  }
+
+  // Función para preparar la copia de gastos fijos
+  const prepareCopyFixedExpenses = useCallback(() => {
+    const today = new Date()
+    let prevMonth = today.getMonth()
+    let prevYear = today.getFullYear()
+
+   // Si es enero (0), el mes anterior es diciembre del año anterior
+    if (prevMonth === 0) {
+      prevMonth = 11 // Diciembre
+      prevYear--
+    } 
+
+    const prevMonthName = getMonthName(prevMonth)
+    
+    // Obtener gastos fijos del mes anterior
+    const prevMonthTransactions = getTransactionsForMonth(prevMonth, prevYear)
+    const fixedExpenses = prevMonthTransactions.filter(
+      (t) => t.type === "expense" && t.category === "fixed"
+    )
+    
+    if (fixedExpenses.length === 0) {
+      alert(`No hay gastos fijos en ${prevMonthName} ${prevYear} para copiar.`)
+      return
+    }
+    
+    setPreviousMonthFixedExpenses(fixedExpenses)
+    setPreviousMonthName(prevMonthName)
+    setIsConfirmCopyModalOpen(true)
+  }, [selectedMonth, selectedYear, getPreviousMonthData])
+
+  // Función para confirmar y copiar los gastos fijos
+  const confirmCopyFixedExpenses = useCallback(() => {
+    // Crear la fecha del primer día del mes seleccionado
+    const targetDate = new Date(selectedYear, selectedMonth, 1);
+    const formattedDate = targetDate.toISOString().split('T')[0];
+    
+    console.log(`Copiando ${previousMonthFixedExpenses.length} gastos fijos a ${formattedDate}`);
+
+    previousMonthFixedExpenses.forEach((expense) => {
+      // Crear una copia del gasto con la nueva fecha
+      const newExpense: TransactionFormData = {
+        type: expense.type,
+        category: expense.category,
+        name: `${expense.name} (copiado)`,
+        amount: expense.amount,
+        owner: expense.owner,
+        person1Percentage: expense.person1Percentage || 50,
+        person2Percentage: expense.person2Percentage || 50,
+        date: formattedDate,  // Usamos la fecha formateada
+      };
+      
+      console.log('Copiando gasto:', {
+        originalDate: expense.date,
+        newDate: formattedDate,
+        name: expense.name,
+        amount: expense.amount
+      });
+
+      // Añadir el nuevo gasto
+      addTransaction(newExpense);
+    });
+    
+    // Cerrar el modal y limpiar el estado
+    setIsConfirmCopyModalOpen(false);
+    setPreviousMonthFixedExpenses([]);
+    
+    // Mostrar feedback al usuario
+    alert(`${previousMonthFixedExpenses.length} gastos fijos copiados a ${getMonthName(selectedMonth)} ${selectedYear}`);
+  }, [previousMonthFixedExpenses, selectedMonth, selectedYear, addTransaction, getMonthName])
 
   /**
    * @function handleOpenReportModalForCurrentMonth
@@ -446,19 +552,51 @@ export default function HomePage() {
           <Plus className="h-5 w-5" />
           <span className="sr-only">Nueva Transacción</span>
         </Button>
+        
+        {/* Botón para copiar gastos fijos del mes anterior */}
+        <Button 
+          onClick={prepareCopyFixedExpenses} 
+          variant={hasFixedExpensesInCurrentMonth || isFutureMonth ? "outline" : "destructive"} 
+          size="icon" 
+          className={`shadow-lg ${!hasFixedExpensesInCurrentMonth && !isFutureMonth ? 'hover:bg-red-600' : 'opacity-50 cursor-not-allowed'}`}
+          disabled={hasFixedExpensesInCurrentMonth || isFutureMonth}
+          title={
+            hasFixedExpensesInCurrentMonth 
+              ? 'Ya hay gastos fijos este mes' 
+              : isFutureMonth 
+                ? 'No se pueden copiar gastos a meses futuros' 
+                : 'Copiar gastos fijos del mes anterior'
+          }
+        >
+          <Copy className="h-5 w-5" />
+          <span className="sr-only">Copiar gastos fijos</span>
+        </Button>
+        
         {/* Botón para alternar tema (claro/oscuro) */}
         <ThemeToggle />
+        
         {/* Botón para abrir la configuración */}
         <Button onClick={() => setIsSettingsModal(true)} variant="outline" size="icon" className="shadow-lg">
           <Settings className="h-4 w-4" />
           <span className="sr-only">Configuración</span>
         </Button>
+        
         {/* Botón para abrir la documentación */}
         <Button onClick={() => setIsDocumentationModalOpen(true)} variant="outline" size="icon" className="shadow-lg">
           <Info className="h-4 w-4" />
           <span className="sr-only">Documentación</span>
         </Button>
       </div>
+      
+      {/* Modal de confirmación para copiar gastos fijos */}
+      <ConfirmCopyModal
+        isOpen={isConfirmCopyModalOpen}
+        onClose={() => setIsConfirmCopyModalOpen(false)}
+        onConfirm={confirmCopyFixedExpenses}
+        monthName={getMonthName(selectedMonth)}
+        year={selectedYear}
+        count={previousMonthFixedExpenses.length}
+      />
 
       {/* Modales de la aplicación (renderizados condicionalmente) */}
       <TransactionForm

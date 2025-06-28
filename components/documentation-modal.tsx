@@ -168,6 +168,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
                 Hagan clic en el icono de papelera (<strong className="text-red-600">Eliminar</strong>) junto a
                 cualquier transacción para borrarla permanentemente.
               </p>
+              <h4 className="font-medium text-foreground">Copiar Gastos Fijos:</h4>
+              <p>
+                Utilice el botón de copia en la barra lateral para duplicar automáticamente los gastos fijos del mes
+                anterior al mes actual.
+              </p>
             </AccordionContent>
           </AccordionItem>
 

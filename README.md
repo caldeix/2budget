@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/Version-1.0.1-blue.svg)
 ![Author](https://img.shields.io/badge/Author-Caldeix-green.svg)
 ![License](https://img.shields.io/badge/License-Propietaria-red.svg)
 ![Build Status](https://img.shields.io/badge/Build-Passing-brightpink.svg)
@@ -27,46 +27,47 @@ Yo : [https://caldeix.github.io/me](https://caldeix.github.io/me)
 *   **Documentación Integrada**: Accede a la documentación del proyecto directamente desde la aplicación.
 *   **Diseño Responsivo**: Experiencia optimizada para dispositivos móviles y de escritorio.
 *   **Interfaz de Usuario Moderna**: Utiliza componentes de `shadcn/ui` para un diseño limpio y consistente.
+*   **Copia de Gastos Fijos**: Función para copiar automáticamente los gastos fijos del mes anterior al mes actual con un solo clic.
 
 ## 🛠️ Instalación
 
 Sigue estos pasos para configurar y ejecutar el proyecto localmente:
 
 1.  **Clona el repositorio:**
-    \`\`\`bash
+    ```bash
     git clone https://github.com/caldeix/2budget.git
     cd 2budget
-    \`\`\`
+    ```
 
 2.  **Instala las dependencias:**
-    \`\`\`bash
+    ```bash
     npm install
     # o
     yarn install
-    \`\`\`
+    ```
 
 3.  **Ejecuta la aplicación en modo desarrollo:**
-    \`\`\`bash
+    ```bash
     npm run dev
     # o
     yarn dev
-    \`\`\`
+    ```
 
     La aplicación estará disponible en `http://localhost:3000`.
 
 4.  **Para construir la aplicación para producción:**
-    \`\`\`bash
+    ```bash
     npm run build
     # o
     yarn build
-    \`\`\`
+    ```
 
 5.  **Para iniciar la aplicación en modo producción:**
-    \`\`\`bash
+    ```bash
     npm run start
     # o
     yarn start
-    \`\`\`
+    ```
 
 ## 💡 Uso
 
@@ -82,9 +83,22 @@ Una vez que la aplicación esté en funcionamiento, podrás:
 
 Desarrollado por [Caldeix](https://caldeix.github.io/links/)
 
+## 🚀 Novedades en la versión 1.0.1
+
+### Mejoras
+
+- **Nueva función de copia de gastos fijos**: Ahora puedes copiar fácilmente todos los gastos fijos del mes anterior al mes actual con un solo clic.
+- **Mejora en la experiencia de usuario**: Validación mejorada para evitar copias duplicadas en el mismo mes.
+- **Optimización de rendimiento**: Mejoras en el manejo de fechas y transacciones.
+
+### Correciones
+
+- Corregido el manejo de meses en la función de copia de gastos fijos.
+- Mejorada la consistencia en el formato de fechas en toda la aplicación.
+
 ## ⚖️ Licencia
 
-Este proyecto está bajo una **Licencia Propietaria**. Queda estrictamente prohibido el uso, la modificación o la distribución del Software sin el consentimiento previo y por escrito de Caldeix. Consulta el archivo `LICENSE` para más detalles.
+Este proyecto está bajo la Licencia Propietaria. Todos los derechos reservados.ictamente prohibido el uso, la modificación o la distribución del Software sin el consentimiento previo y por escrito de Caldeix. Consulta el archivo `LICENSE` para más detalles.
 
 ---
 
