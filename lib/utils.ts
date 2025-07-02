@@ -208,7 +208,13 @@ export function calculateCumulativeBalances(transactions: Transaction[]): {
   let person2Expenses = 0
 
   transactions.forEach((transaction) => {
-    const { amount, type, owner, person1Percentage = 0, person2Percentage = 0 } = transaction
+    const { amount, type, owner, person1Percentage = 0, person2Percentage = 0, nonComputable = false } = transaction
+    
+    // Skip non-computable expenses for cumulative balances
+    if (type === "expense" && nonComputable) {
+      return
+    }
+    
     if (type === "income") {
       totalIncome += amount
       if (owner === "person1") person1Income += amount
@@ -218,7 +224,7 @@ export function calculateCumulativeBalances(transactions: Transaction[]): {
         person2Income += (amount * person2Percentage) / 100
       }
     } else {
-      // type === "expense"
+      // type === "expense" (and not nonComputable, as we returned early if it was)
       totalExpenses += amount
       if (owner === "person1") person1Expenses += amount
       else if (owner === "person2") person2Expenses += amount

@@ -54,15 +54,16 @@ export function TransactionForm({
   person2Name,
 }: TransactionFormProps) {
   // Estado del formulario, inicializado con valores por defecto.
-  const [formData, setFormData] = useState<TransactionFormData>({
-    type: "expense", // Por defecto: gasto.
-    category: "variable", // Por defecto: variable.
-    name: "",
-    amount: 0,
-    owner: "both", // Por defecto: ambos.
-    person1Percentage: 50, // Por defecto: 50%.
-    person2Percentage: 50, // Por defecto: 50%.
-    date: new Date().toISOString().split("T")[0], // Fecha actual en formato YYYY-MM-DD.
+  const [formData, setFormData] = useState<TransactionFormData & { nonComputable: boolean }>({
+    type: transaction?.type || "expense",
+    category: transaction?.category || "variable",
+    name: transaction?.name || "",
+    amount: transaction?.amount || 0,
+    owner: transaction?.owner || "both",
+    person1Percentage: transaction?.person1Percentage || 50,
+    person2Percentage: transaction?.person2Percentage || 50,
+    date: transaction?.date || new Date().toISOString().split("T")[0],
+    nonComputable: transaction?.nonComputable || false,
   })
 
   /**
@@ -81,6 +82,7 @@ export function TransactionForm({
         person1Percentage: transaction.person1Percentage || 50, // Usa 50% si no está definido.
         person2Percentage: transaction.person2Percentage || 50, // Usa 50% si no está definido.
         date: transaction.date,
+        nonComputable: transaction.nonComputable || false,
       })
     } else {
       // Si no hay transacción (es una nueva), reinicia el formulario a sus valores por defecto.
@@ -93,6 +95,7 @@ export function TransactionForm({
         person1Percentage: 50,
         person2Percentage: 50,
         date: new Date().toISOString().split("T")[0],
+        nonComputable: false,
       })
     }
   }, [transaction, isOpen]) // Dependencias: se ejecuta cuando `transaction` o `isOpen` cambian.
@@ -172,6 +175,27 @@ export function TransactionForm({
                 <option value="variable">variable</option>
                 <option value="fixed">fijo</option>
               </select>
+            </div>
+          )}
+
+          {/* Checkbox para gastos no computables */}
+          {formData.type === "expense" && (
+            <div className="flex items-center space-x-2 mt-4">
+              <input
+                type="checkbox"
+                id="nonComputable"
+                checked={formData.nonComputable}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    nonComputable: e.target.checked,
+                  }))
+                }
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="nonComputable" className="text-sm font-medium leading-none">
+                Gasto no computable (no afecta al balance global)
+              </Label>
             </div>
           )}
         </div>

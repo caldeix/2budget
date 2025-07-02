@@ -42,6 +42,7 @@ interface SummaryCardsProps {
   person2Name: string
   selectedMonth: number
   selectedYear: number
+  nonComputableExpenses: number
 }
 
 /**
@@ -65,6 +66,7 @@ export function SummaryCards({
   person2Name,
   selectedMonth,
   selectedYear,
+  nonComputableExpenses,
 }: SummaryCardsProps) {
   return (
     <div className="space-y-6">
@@ -103,6 +105,14 @@ export function SummaryCards({
               <span className="text-muted-foreground">Gastos:</span>
               <span className="text-red-600 font-medium">{formatCurrency(totalExpenses)}</span>
             </div>
+            {nonComputableExpenses > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <span className="text-xs opacity-70">(incl. no computables)</span>
+                </span>
+                <span className="text-gray-500 font-medium">+{formatCurrency(nonComputableExpenses)}</span>
+              </div>
+            )}
           </div>
         </div>
 

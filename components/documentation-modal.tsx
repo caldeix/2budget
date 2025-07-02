@@ -196,6 +196,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
                       alquiler, suscripciones).
                     </li>
                     <li>
+                      Para <strong>Gastos No Computables</strong>: Marque esta opción para gastos que deben aparecer en el mes actual pero no afectar el balance total acumulado (ej. regalos, vacaciones).
+                    </li>
+                    <li>
                       Para <strong>Ingresos</strong>: La categoría es automáticamente "ingreso".
                     </li>
                   </ul>
@@ -246,9 +249,41 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Informes Mensuales */}
+          {/* Sección: Gastos No Computables */}
           <AccordionItem value="item-4">
-            <AccordionTrigger className="text-lg font-semibold text-primary">4. Informes Mensuales</AccordionTrigger>
+            <AccordionTrigger className="text-lg font-semibold text-primary">
+              4. Gastos No Computables
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Los <strong>Gastos No Computables</strong> son una característica que te permite registrar gastos que deben aparecer en tu balance mensual pero que no afectan tu balance total acumulado.
+              </p>
+              <h4 className="font-medium text-foreground">¿Cuándo usar Gastos No Computables?</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>Regalos o eventos especiales</strong>: Para el aniversario, cumpleaños, etc.</li>
+                <li><strong>Vacaciones o viajes</strong>: Por ejemplo ahorrar 50€ mensuales para gastar en las proximas vacaciones. Es una gasto mensual pero el dinero lo sigues teniendo.</li>
+              </ul>
+              <h4 className="font-medium text-foreground">¿Cómo funcionan?</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Se incluyen en el <strong>balance mensual</strong> del mes en que ocurrieron.</li>
+                <li>No se incluyen en el <strong>balance total acumulado</strong>.</li>
+                <li>Se muestran en la lista de transacciones con un distintivo "No computable".</li>
+                <li>Aparecen en color gris para una fácil identificación.</li>
+              </ul>
+              <h4 className="font-medium text-foreground">¿Cómo marcar un gasto como No Computable?</h4>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Al crear o editar un gasto, activa la opción "No computable".</li>
+                <li>Guarda la transacción.</li>
+                <li>Verás el gasto marcado como "No computable" en la lista.</li>
+              </ol>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Sección: Informes Mensuales */}
+          <AccordionItem value="item-5">
+            <AccordionTrigger className="text-lg font-semibold text-primary">
+              5. Informes Mensuales
+            </AccordionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 Los informes mensuales les permiten cerrar un mes, calcular ajustes y obtener un resumen detallado de

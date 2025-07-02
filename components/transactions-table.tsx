@@ -354,6 +354,14 @@ export function TransactionsTable({
    * @returns {JSX.Element} El elemento `<span>` del badge.
    */
   const getCategoryBadge = (transaction: Transaction) => {
+    if (transaction.nonComputable) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+          No computable
+        </span>
+      )
+    }
+
     if (transaction.type === "income") {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-600">
@@ -545,24 +553,45 @@ export function TransactionsTable({
               {filteredAndSortedTransactions.map((transaction) => (
                 <React.Fragment key={transaction.id}>
                   {/* Fila de escritorio (diseño de tarjeta, visible solo en pantallas grandes) */}
-                  <div className="hidden sm:grid grid-cols-[1fr_2fr_1.2fr_1.5fr_1fr_0.8fr] items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors">
+                  <div className={cn(
+                    "hidden sm:grid grid-cols-[1fr_2fr_1.2fr_1.5fr_1fr_0.8fr] items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
+                    transaction.nonComputable && "opacity-70"
+                  )}>
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-2 h-2 rounded-full ${
-                          transaction.type === "income" ? "bg-green-600" : "bg-red-600"
+                          transaction.type === "income" 
+                            ? "bg-green-600" 
+                            : transaction.nonComputable 
+                              ? "bg-gray-500" 
+                              : "bg-red-600"
                         }`}
                       />
                       <div>
-                        <div className="text-sm font-medium text-foreground">{formatDate(transaction.date)}</div>
+                        <div className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                          {formatDate(transaction.date)}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-sm font-medium text-foreground">{transaction.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("text-sm font-medium", transaction.nonComputable && "text-muted-foreground")}>
+                        {transaction.name}
+                      </span>
+                    </div>
                     <div>{getCategoryBadge(transaction)}</div>
-                    <div className="text-sm text-foreground">{getOwnerDisplay(transaction)}</div>
+                    <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                      {getOwnerDisplay(transaction)}
+                    </div>
                     <div
-                      className={`text-lg font-semibold text-right ${
-                        transaction.type === "income" ? "text-green-600" : "text-red-600"
-                      }`}
+                      className={cn(
+                        "text-lg font-semibold text-right",
+                        transaction.type === "income" 
+                          ? "text-green-600" 
+                          : transaction.nonComputable 
+                            ? "text-gray-500" 
+                            : "text-red-600",
+                        transaction.nonComputable && "italic"
+                      )}
                     >
                       {transaction.type === "income" ? "+" : "-"}
                       {formatCurrency(transaction.amount)}
@@ -602,23 +631,50 @@ export function TransactionsTable({
                           <div className="flex items-center gap-2">
                             <div
                               className={`w-2 h-2 rounded-full ${
-                                transaction.type === "income" ? "bg-green-600" : "bg-red-600"
+                                transaction.type === "income" 
+                                  ? "bg-green-600" 
+                                  : transaction.nonComputable 
+                                    ? "bg-gray-500" 
+                                    : "bg-red-600"
                               }`}
                             />
-                            <span className="text-sm font-medium text-foreground">{formatDate(transaction.date)}</span>
+                            <div>
+                              <span className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                                {formatDate(transaction.date)}
+                              </span>
+                            </div>
                           </div>
-                          <span
-                            className={`text-lg font-semibold ${
-                              transaction.type === "income" ? "text-green-600" : "text-red-600"
-                            }`}
-                          >
-                            {transaction.type === "income" ? "+" : "-"}
-                            {formatCurrency(transaction.amount)}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            <span
+                              className={cn(
+                                "text-lg font-semibold",
+                                transaction.type === "income" 
+                                  ? "text-green-600" 
+                                  : transaction.nonComputable 
+                                    ? "text-gray-500" 
+                                    : "text-red-600",
+                                transaction.nonComputable && "italic"
+                              )}
+                            >
+                              {transaction.type === "income" ? "+" : "-"}
+                              {formatCurrency(transaction.amount)}
+                            </span>
+                            {transaction.nonComputable && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                NC
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">{transaction.name}</span>
-                          <span>{getOwnerDisplay(transaction)}</span>
+                          <div className="flex items-center gap-2">
+                            <span className={cn("font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                              {transaction.name}
+                            </span>
+                          </div>
+                          <span className={transaction.nonComputable ? "text-muted-foreground" : ""}>
+                            {getOwnerDisplay(transaction)}
+                          </span>
                         </div>
                         <div className="flex justify-between items-center text-xs text-muted-foreground">
                           {getCategoryBadge(transaction)}

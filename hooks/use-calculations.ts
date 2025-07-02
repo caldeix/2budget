@@ -39,6 +39,7 @@ interface CalculationResult {
   person2Balance: number
   fixedExpenses: number
   variableExpenses: number
+  nonComputableExpenses: number
 }
 
 /**
@@ -74,6 +75,7 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
       person2Balance: 0,
       fixedExpenses: 0,
       variableExpenses: 0,
+      nonComputableExpenses: 0,
     }
 
     // Itera sobre cada transacción para acumular los valores.
@@ -98,7 +100,14 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
       }
       // Lógica para gastos
       else if (type === "expense") {
+        // Para gastos computables, los sumamos a los totales
         result.totalExpenses += amount // Suma al total de gastos
+
+        // Si es un gasto no computable, lo registramos por separado
+        // pero lo incluimos en los totales mensuales
+        if (transaction.nonComputable) {
+          result.nonComputableExpenses += amount
+        }
 
         // Clasificación por categoría de gasto
         if (category === "fixed") {
@@ -114,8 +123,10 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
           result.person2Expenses += amount
         } else if (owner === "both") {
           // Si es de ambos, distribuye según los porcentajes
-          result.person1Expenses += (amount * person1Percentage) / 100
-          result.person2Expenses += (amount * person2Percentage) / 100
+          const p1Amount = (amount * person1Percentage) / 100
+          const p2Amount = (amount * person2Percentage) / 100
+          result.person1Expenses += p1Amount
+          result.person2Expenses += p2Amount
         }
       }
     })

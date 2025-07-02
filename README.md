@@ -83,11 +83,12 @@ Una vez que la aplicación esté en funcionamiento, podrás:
 
 Desarrollado por [Caldeix](https://caldeix.github.io/links/)
 
-## 🚀 Novedades en la versión 1.0.1
+## 🚀 Novedades en la versión 1.0.2
 
 ### Mejoras
 
-- **Nueva función de copia de gastos fijos**: Ahora puedes copiar fácilmente todos los gastos fijos del mes anterior al mes actual con un solo clic.
+- [1.0.2] **Nuevo: Gastos No Computables**: Ahora puedes marcar gastos como "No computables" para que se incluyan en el balance mensual pero no afecten el balance total acumulado. Ideal para gastos puntuales como regalos o vacaciones.
+- [1.0.1] **Nueva función de copia de gastos fijos**: Ahora puedes copiar fácilmente todos los gastos fijos del mes anterior al mes actual con un solo clic.
 - **Mejora en la experiencia de usuario**: Validación mejorada para evitar copias duplicadas en el mismo mes.
 - **Optimización de rendimiento**: Mejoras en el manejo de fechas y transacciones.
 

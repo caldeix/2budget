@@ -429,6 +429,7 @@ export default function HomePage() {
           person2Name={data.config.person2Name}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
+          nonComputableExpenses={calculations.nonComputableExpenses}
         />
 
         {/* Contenedor flexible para la tabla de transacciones y la barra lateral de informes.

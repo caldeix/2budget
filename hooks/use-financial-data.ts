@@ -63,6 +63,7 @@ export function useFinancialData() {
         ...transaction,
         id: generateId(), // Genera un ID único.
         createdAt: new Date().toISOString(), // Fecha de creación en formato ISO.
+        nonComputable: transaction.nonComputable || false, // Asegura que siempre tenga un valor booleano
       }
       // Crea un nuevo estado de datos, añadiendo la nueva transacción al principio del array.
       const newData = {

@@ -43,6 +43,7 @@ export interface Transaction {
   person2Percentage?: number
   date: string
   createdAt: string
+  nonComputable: boolean
 }
 
 /**
@@ -118,6 +119,7 @@ export interface AppData {
  * @property {number} person1Percentage - Porcentaje de la Persona 1.
  * @property {number} person2Percentage - Porcentaje de la Persona 2.
  * @property {string} date - Fecha de la transacción.
+ * @property {boolean} [nonComputable] - Indica si el gasto no debe afectar al balance global.
  */
 export interface TransactionFormData {
   type: "income" | "expense"
@@ -128,6 +130,7 @@ export interface TransactionFormData {
   person1Percentage: number
   person2Percentage: number
   date: string
+  nonComputable?: boolean
 }
 
 /**
