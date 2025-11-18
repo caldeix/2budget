@@ -7,6 +7,8 @@
 
 ## 🚀 Live
 
+**ESTA APP HA SIDO CREADA PARCIALMENTE CON IA**
+
 Puedes ver la aplicación en vivo aquí: [https://caldeix.github.io/2budget](https://caldeix.github.io/2budget)
 
 Mis Links : [https://caldeix.github.io/links](https://caldeix.github.io/links)
