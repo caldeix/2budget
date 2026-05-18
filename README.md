@@ -1,109 +1,98 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.0.1-blue.svg)
-![Author](https://img.shields.io/badge/Author-Caldeix-green.svg)
+![Version](https://img.shields.io/badge/Version-1.1.0-gold.svg)
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
+![Deployed on GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-222?logo=github&logoColor=white)
 ![License](https://img.shields.io/badge/License-Propietaria-red.svg)
-![Build Status](https://img.shields.io/badge/Build-Passing-brightpink.svg)
 
-## 🚀 Live
+## Live
 
-**ESTA APP HA SIDO CREADA PARCIALMENTE CON IA**
+[https://caldeix.github.io/2budget](https://caldeix.github.io/2budget)
 
-Puedes ver la aplicación en vivo aquí: [https://caldeix.github.io/2budget](https://caldeix.github.io/2budget)
+---
 
-Mis Links : [https://caldeix.github.io/links](https://caldeix.github.io/links)
+## Descripción
 
-Yo : [https://caldeix.github.io/me](https://caldeix.github.io/me)
+**2Budget** es una aplicación web de gestión financiera para parejas. Permite llevar un control detallado de ingresos y gastos compartidos, ver balances por persona y generar informes mensuales. Sin servidor — todos los datos se persisten en el navegador vía `localStorage`.
 
-## ✨ Descripción
+---
 
-**2Budget** es una aplicación de gestión financiera intuitiva y moderna diseñada para ayudarte a llevar un control detallado de tus transacciones y finanzas en pareja. Construida con Next.js, React y Tailwind CSS, ofrece una experiencia de usuario fluida y responsiva, adaptándose tanto a dispositivos de escritorio como móviles.
+## Características
 
-## 🌟 Características
+- **Transacciones** — Añade, edita y elimina ingresos/gastos con asignación por persona o porcentaje compartido
+- **Resumen mensual** — Tarjetas de balance total y desglose por persona para el mes seleccionado
+- **Balance acumulado** — Seguimiento del saldo total a lo largo del tiempo (excluye gastos no computables)
+- **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
+- **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
+- **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic
+- **Importar / Exportar** — Backup y restauración en JSON
+- **Tema oscuro / claro** — Paleta premium Gold × Violet con soporte automático del sistema
+- **Diseño responsivo** — Optimizado para móvil y escritorio
 
-*   **Gestión de Transacciones**: Añade, edita y elimina tus ingresos y gastos fácilmente.
-*   **Resumen Mensual**: Visualiza un resumen claro de tus finanzas por mes y año.
-*   **Balance Acumulado**: Mantén un seguimiento de tu balance general a lo largo del tiempo.
-*   **Modo Oscuro/Claro**: Alterna entre temas de interfaz para una experiencia visual personalizada.
-*   **Desplazamiento Infinito**: Carga transacciones de forma eficiente a medida que te desplazas.
-*   **Documentación Integrada**: Accede a la documentación del proyecto directamente desde la aplicación.
-*   **Diseño Responsivo**: Experiencia optimizada para dispositivos móviles y de escritorio.
-*   **Interfaz de Usuario Moderna**: Utiliza componentes de `shadcn/ui` para un diseño limpio y consistente.
-*   **Copia de Gastos Fijos**: Función para copiar automáticamente los gastos fijos del mes anterior al mes actual con un solo clic.
+---
 
-## 🛠️ Instalación
+## Tech Stack
 
-Sigue estos pasos para configurar y ejecutar el proyecto localmente:
+![Next.js](https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![shadcn/ui](https://img.shields.io/badge/shadcn%2Fui-000000?style=for-the-badge&logo=shadcnui&logoColor=white)
+![Zod](https://img.shields.io/badge/Zod-3E67B1?style=for-the-badge&logo=zod&logoColor=white)
+![React Hook Form](https://img.shields.io/badge/React_Hook_Form-EC5990?style=for-the-badge&logo=reacthookform&logoColor=white)
+![Recharts](https://img.shields.io/badge/Recharts-22B5BF?style=for-the-badge&logo=recharts&logoColor=white)
 
-1.  **Clona el repositorio:**
-    ```bash
-    git clone https://github.com/caldeix/2budget.git
-    cd 2budget
-    ```
+---
 
-2.  **Instala las dependencias:**
-    ```bash
-    npm install
-    # o
-    yarn install
-    ```
+## Instalación
 
-3.  **Ejecuta la aplicación en modo desarrollo:**
-    ```bash
-    npm run dev
-    # o
-    yarn dev
-    ```
+```bash
+git clone https://github.com/caldeix/2budget.git
+cd 2budget
+npm install
+npm run dev        # http://localhost:3000
+```
 
-    La aplicación estará disponible en `http://localhost:3000`.
+### Producción
 
-4.  **Para construir la aplicación para producción:**
-    ```bash
-    npm run build
-    # o
-    yarn build
-    ```
+```bash
+npm run build      # Genera exportación estática en /out
+npm run deploy     # Build + push a GitHub Pages
+```
 
-5.  **Para iniciar la aplicación en modo producción:**
-    ```bash
-    npm run start
-    # o
-    yarn start
-    ```
+---
 
-## 💡 Uso
+## Changelog
 
-Una vez que la aplicación esté en funcionamiento, podrás:
+### v1.1.0 — Refactorización integral + nueva paleta UI
 
-*   Navegar por los meses para ver tus transacciones.
-*   Añadir nuevas transacciones usando el formulario.
-*   Editar o eliminar transacciones existentes.
-*   Cambiar el tema de la aplicación (claro/oscuro).
-*   Acceder a la documentación del proyecto a través del botón de información.
+- **Nueva paleta premium** — tema oscuro Gold (#D4AF37) × Violet (#8A2BE2) con efectos glow en botones
+- **Tema oscuro por defecto** — `defaultTheme` actualizado a `"dark"`
+- **Refactorización de `page.tsx`** — eliminado estado muerto `reportsListKey` y su `useEffect`, eliminados `console.log` de producción, eliminado callback `getPreviousMonthData` sin uso, deduplicada lógica `isFutureMonth`
+- **`getMonthName` extraída** del componente como función pura de módulo
+- **`globals.css` limpio** — eliminados ~150 líneas de comentarios JSDoc de bloque, paleta oscura actualizada con variables HSL mapeadas al nuevo sistema de diseño
+- **`tailwind.config.ts` y `layout.tsx` limpios** — eliminados comentarios de bloque
+- **Nuevas sombras Tailwind** — `shadow-glow-gold` y `shadow-glow-purple`
+- **SemVer**: `1.0.1` → `1.1.0` (MINOR: nuevas funcionalidades estéticas, sin breaking changes)
 
-## 👤 Autor
+### v1.0.2
 
-Desarrollado por [Caldeix](https://caldeix.github.io/links/)
+- **Gastos No Computables** — excluidos del balance acumulado total (ideal para regalos, vacaciones)
 
-## 🚀 Novedades en la versión 1.0.2
+### v1.0.1
 
-### Mejoras
+- **Copia de gastos fijos** — duplica los gastos fijos del mes anterior al mes actual con un clic
+- Validación mejorada para evitar copias duplicadas en el mismo mes
 
-- [1.0.2] **Nuevo: Gastos No Computables**: Ahora puedes marcar gastos como "No computables" para que se incluyan en el balance mensual pero no afecten el balance total acumulado. Ideal para gastos puntuales como regalos o vacaciones.
-- [1.0.1] **Nueva función de copia de gastos fijos**: Ahora puedes copiar fácilmente todos los gastos fijos del mes anterior al mes actual con un solo clic.
-- **Mejora en la experiencia de usuario**: Validación mejorada para evitar copias duplicadas en el mismo mes.
-- **Optimización de rendimiento**: Mejoras en el manejo de fechas y transacciones.
+---
 
-### Correciones
+## Autor
 
-- Corregido el manejo de meses en la función de copia de gastos fijos.
-- Mejorada la consistencia en el formato de fechas en toda la aplicación.
-
-## ⚖️ Licencia
-
-Este proyecto está bajo la Licencia Propietaria. Todos los derechos reservados.ictamente prohibido el uso, la modificación o la distribución del Software sin el consentimiento previo y por escrito de Caldeix. Consulta el archivo `LICENSE` para más detalles.
+Desarrollado por [Caldeix](https://caldeix.github.io/links/) · Creado parcialmente con IA
 
 ---
 
 © 2025 Caldeix. Todos los derechos reservados.
-Desarrollado parcialmente con IA.
