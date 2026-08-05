@@ -31,6 +31,8 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   size?: "sm" | "md" | "lg" | "xl"
+  /** Si es `false`, el modal no se puede cerrar con Escape, clic en el fondo ni botón X (modal forzado). Por defecto `true`. */
+  dismissible?: boolean
 }
 
 /**
@@ -40,7 +42,7 @@ interface ModalProps {
  * @param {ModalProps} props - Propiedades del componente.
  * @returns {JSX.Element | null} El componente modal si `isOpen` es `true`, de lo contrario `null`.
  */
-export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = "md", dismissible = true }: ModalProps) {
   /**
    * `useEffect` para controlar el scroll del cuerpo de la página.
    * Cuando el modal está abierto (`isOpen` es `true`), el scroll del `body` se oculta (`overflow = "hidden"`).
@@ -68,8 +70,8 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
    */
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose() // Llama a la función `onClose` si se presiona 'Escape'.
+      if (e.key === "Escape" && dismissible) {
+        onClose() // Cierra con 'Escape' salvo que el modal sea forzado (dismissible=false).
       }
     }
 
@@ -81,7 +83,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
     return () => {
       document.removeEventListener("keydown", handleEscape)
     }
-  }, [isOpen, onClose]) // Dependencias: se ejecuta cuando `isOpen` o `onClose` cambian.
+  }, [isOpen, onClose, dismissible]) // Se re-ejecuta si cambian isOpen, onClose o dismissible.
 
   // Si el modal no está abierto, no renderiza nada.
   if (!isOpen) return null
@@ -101,7 +103,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
     // Contenedor principal del modal: fija la posición y centra el contenido.
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Fondo oscuro semitransparente que cierra el modal al hacer clic. */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={dismissible ? onClose : undefined} />
       {/* Contenedor del contenido del modal. */}
       <div
         className={cn(
@@ -112,13 +114,15 @@ export function Modal({ isOpen, onClose, title, children, size = "md" }: ModalPr
         {/* Cabecera del modal: título y botón de cierre. */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          <button
-            onClick={onClose} // Cierra el modal al hacer clic.
-            className="p-2 hover:bg-muted rounded-full transition-colors"
-            aria-label="Cerrar modal" // Etiqueta para accesibilidad.
-          >
-            <X className="w-5 h-5" /> {/* Icono de cierre. */}
-          </button>
+          {dismissible && (
+            <button
+              onClick={onClose} // Cierra el modal al hacer clic.
+              className="p-2 hover:bg-muted rounded-full transition-colors"
+              aria-label="Cerrar modal" // Etiqueta para accesibilidad.
+            >
+              <X className="w-5 h-5" /> {/* Icono de cierre. */}
+            </button>
+          )}
         </div>
         {/* Cuerpo del modal: donde se renderiza el `children`.
             Permite scroll interno si el contenido es demasiado largo. */}

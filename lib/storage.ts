@@ -44,6 +44,7 @@ function normalizeTransaction(t: Transaction): Transaction {
   return {
     ...t,
     nonComputable: Boolean(t.nonComputable),
+    paid: Boolean(t.paid),
   }
 }
 
@@ -173,4 +174,41 @@ export function clearAllData(): void {
   if (typeof window === "undefined") return
   // Elimina el elemento con la clave `STORAGE_KEY` de localStorage.
   localStorage.removeItem(STORAGE_KEY)
+}
+
+/**
+ * @constant {string} LAST_SEEN_MONTH_KEY
+ * @description Clave de localStorage con el último mes real ("YYYY-MM") en que se abrió la app.
+ *              Sirve para detectar el cambio de mes de calendario y disparar la reconciliación de pagados.
+ */
+const LAST_SEEN_MONTH_KEY = "2budget:last-seen-month"
+
+/**
+ * @function getLastSeenMonth
+ * @description Devuelve el último mes visto ("YYYY-MM") o `null` si no hay registro.
+ * @returns {string | null}
+ */
+export function getLastSeenMonth(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    return localStorage.getItem(LAST_SEEN_MONTH_KEY)
+  } catch (error) {
+    console.error("Error reading last seen month:", error)
+    return null
+  }
+}
+
+/**
+ * @function setLastSeenMonth
+ * @description Guarda el último mes visto ("YYYY-MM").
+ * @param {string} monthKey - Clave de mes en formato "YYYY-MM".
+ * @returns {void}
+ */
+export function setLastSeenMonth(monthKey: string): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(LAST_SEEN_MONTH_KEY, monthKey)
+  } catch (error) {
+    console.error("Error saving last seen month:", error)
+  }
 }

@@ -6,6 +6,7 @@ import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financi
 import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import { generateSampleData } from "@/lib/sample-data"
+import { getLastSeenMonth, setLastSeenMonth } from "@/lib/storage"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -17,6 +18,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
+import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy } from "lucide-react"
@@ -34,6 +36,7 @@ export default function HomePage() {
     isLoading,
     addTransaction,
     updateTransaction,
+    setTransactionsPaid,
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
@@ -54,6 +57,10 @@ export default function HomePage() {
 
   const [isConfirmCopyModalOpen, setIsConfirmCopyModalOpen] = useState(false)
   const [previousMonthFixedExpenses, setPreviousMonthFixedExpenses] = useState<Transaction[]>([])
+
+  const [isPaidReconcileOpen, setIsPaidReconcileOpen] = useState(false)
+  const [reconcileExpenses, setReconcileExpenses] = useState<Transaction[]>([])
+  const [reconcileLabel, setReconcileLabel] = useState<{ monthName: string; year: number }>({ monthName: "", year: 0 })
 
   const [transactionsToShow, setTransactionsToShow] = useState(5)
 
@@ -201,6 +208,68 @@ export default function HomePage() {
     setTransactionsToShow((prev) => prev + 5)
   }, [])
 
+  // Marca el mes real actual como "visto" en localStorage.
+  const markCurrentMonthSeen = useCallback(() => {
+    const now = new Date()
+    setLastSeenMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+  }, [])
+
+  const finishReconcile = useCallback(() => {
+    markCurrentMonthSeen()
+    setIsPaidReconcileOpen(false)
+    setReconcileExpenses([])
+  }, [markCurrentMonthSeen])
+
+  // "Marcar todas": todos los gastos del mes que se cierra quedan pagados.
+  const handleReconcileMarkAll = () => {
+    setTransactionsPaid(
+      reconcileExpenses.map((e) => e.id),
+      true,
+    )
+    finishReconcile()
+  }
+
+  // "Guardar": los IDs marcados quedan pagados; el resto del mes, sin pagar.
+  const handleReconcileSave = (paidIds: string[]) => {
+    const paidSet = new Set(paidIds)
+    const toPaid = reconcileExpenses.filter((e) => paidSet.has(e.id)).map((e) => e.id)
+    const toUnpaid = reconcileExpenses.filter((e) => !paidSet.has(e.id)).map((e) => e.id)
+    if (toPaid.length) setTransactionsPaid(toPaid, true)
+    if (toUnpaid.length) setTransactionsPaid(toUnpaid, false)
+    finishReconcile()
+  }
+
+  // Detección de cambio de mes real: al abrir la app en un mes de calendario nuevo,
+  // ofrece reconciliar (marcar pagados) los gastos del mes que se acaba de cerrar.
+  useEffect(() => {
+    const now = new Date()
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    const lastSeen = getLastSeenMonth()
+
+    if (!lastSeen) {
+      // Primer uso: registra el mes actual sin mostrar nada (evita avalancha con el histórico).
+      setLastSeenMonth(currentKey)
+      return
+    }
+
+    if (lastSeen !== currentKey) {
+      const { month: prevMonth, year: prevYear } = getPreviousMonthYear(getCurrentMonth(), getCurrentYear())
+      const prevExpenses = getTransactionsForMonth(prevMonth, prevYear).filter((t) => t.type === "expense")
+      const hasUnpaid = prevExpenses.some((t) => !t.paid)
+
+      if (prevExpenses.length > 0 && hasUnpaid) {
+        setReconcileExpenses(prevExpenses)
+        setReconcileLabel({ monthName: getMonthName(prevMonth - 1), year: prevYear })
+        setIsPaidReconcileOpen(true)
+      } else {
+        // Nada pendiente del mes anterior: solo actualiza el marcador.
+        setLastSeenMonth(currentKey)
+      }
+    }
+    // Se ejecuta una sola vez al montar para comprobar el cambio de mes real.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -334,6 +403,7 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               onEdit={handleEditTransaction}
               onDelete={deleteTransaction}
+              onTogglePaid={(id, paid) => updateTransaction(id, { paid })}
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onMonthChange={setSelectedMonth}
@@ -390,6 +460,15 @@ export default function HomePage() {
         monthName={getMonthName(selectedMonth - 1)}
         year={selectedYear}
         count={previousMonthFixedExpenses.length}
+      />
+
+      <PaidReconciliationModal
+        isOpen={isPaidReconcileOpen}
+        monthName={reconcileLabel.monthName}
+        year={reconcileLabel.year}
+        expenses={reconcileExpenses}
+        onMarkAll={handleReconcileMarkAll}
+        onSave={handleReconcileSave}
       />
 
       <TransactionForm
