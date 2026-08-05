@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
 import { useCalculations } from "@/hooks/use-calculations"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances } from "@/lib/utils"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import { generateSampleData } from "@/lib/sample-data"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -22,8 +22,10 @@ import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy } from "lucide-react"
 
 // Pure helper — kept outside component to avoid stale-closure issues in callbacks.
+// Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
 function getMonthName(month: number): string {
-  return new Date(2000, month, 1).toLocaleString("es-ES", { month: "long" })
+  const name = new Date(2000, month, 1).toLocaleString("es-ES", { month: "long" })
+  return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 export default function HomePage() {
@@ -52,7 +54,6 @@ export default function HomePage() {
 
   const [isConfirmCopyModalOpen, setIsConfirmCopyModalOpen] = useState(false)
   const [previousMonthFixedExpenses, setPreviousMonthFixedExpenses] = useState<Transaction[]>([])
-  const [previousMonthName, setPreviousMonthName] = useState("")
 
   const [transactionsToShow, setTransactionsToShow] = useState(5)
 
@@ -103,34 +104,26 @@ export default function HomePage() {
   }
 
   const prepareCopyFixedExpenses = useCallback(() => {
-    const today = new Date()
-    let prevMonth = today.getMonth()
-    let prevYear = today.getFullYear()
-
-    if (prevMonth === 0) {
-      prevMonth = 11
-      prevYear--
-    }
-
-    const prevMonthName = getMonthName(prevMonth)
-    const prevMonthTransactions = getTransactionsForMonth(prevMonth, prevYear)
-    const fixedExpenses = prevMonthTransactions.filter(
+    // El origen es el mes ANTERIOR al mes seleccionado (no al mes real de hoy).
+    const { month: sourceMonth, year: sourceYear } = getPreviousMonthYear(selectedMonth, selectedYear)
+    const sourceMonthName = getMonthName(sourceMonth - 1)
+    const sourceTransactions = getTransactionsForMonth(sourceMonth, sourceYear)
+    const fixedExpenses = sourceTransactions.filter(
       (t) => t.type === "expense" && t.category === "fixed"
     )
 
     if (fixedExpenses.length === 0) {
-      alert(`No hay gastos fijos en ${prevMonthName} ${prevYear} para copiar.`)
+      alert(`No hay gastos fijos en ${sourceMonthName} ${sourceYear} para copiar.`)
       return
     }
 
     setPreviousMonthFixedExpenses(fixedExpenses)
-    setPreviousMonthName(prevMonthName)
     setIsConfirmCopyModalOpen(true)
-  }, [getTransactionsForMonth])
+  }, [selectedMonth, selectedYear, getTransactionsForMonth])
 
   const confirmCopyFixedExpenses = useCallback(() => {
-    const targetDate = new Date(selectedYear, selectedMonth, 1)
-    const formattedDate = targetDate.toISOString().split("T")[0]
+    // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
+    const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
 
     previousMonthFixedExpenses.forEach((expense) => {
       const newExpense: TransactionFormData = {
@@ -139,8 +132,8 @@ export default function HomePage() {
         name: `${expense.name} (copiado)`,
         amount: expense.amount,
         owner: expense.owner,
-        person1Percentage: expense.person1Percentage || 50,
-        person2Percentage: expense.person2Percentage || 50,
+        person1Percentage: expense.person1Percentage ?? 50,
+        person2Percentage: expense.person2Percentage ?? 50,
         date: formattedDate,
       }
       addTransaction(newExpense)

@@ -6,7 +6,7 @@
  *              Utiliza JSON para serializar y deserializar los datos.
  */
 
-import type { AppData, AppConfig } from "@/types"
+import type { AppData, AppConfig, Transaction } from "@/types"
 
 /**
  * @constant {string} STORAGE_KEY
@@ -31,6 +31,20 @@ const defaultData: AppData = {
   transactions: [],
   reports: [],
   config: defaultConfig,
+}
+
+/**
+ * @function normalizeTransaction
+ * @description Rellena campos que pueden faltar en transacciones antiguas o importadas,
+ *              garantizando un valor por defecto consistente (evita discrepancias tipo/runtime).
+ * @param {Transaction} t - La transacción a normalizar.
+ * @returns {Transaction} La transacción con los campos garantizados.
+ */
+function normalizeTransaction(t: Transaction): Transaction {
+  return {
+    ...t,
+    nonComputable: Boolean(t.nonComputable),
+  }
 }
 
 /**
@@ -62,6 +76,8 @@ export function loadData(): AppData {
     return {
       ...defaultData, // Empieza con la estructura por defecto
       ...data, // Sobrescribe con los datos cargados
+      // Normaliza cada transacción para garantizar campos por defecto en datos antiguos.
+      transactions: Array.isArray(data.transactions) ? data.transactions.map(normalizeTransaction) : [],
       config: { ...defaultConfig, ...data.config }, // Fusiona la configuración
     }
   } catch (error) {
@@ -128,7 +144,7 @@ export function importData(jsonString: string): boolean {
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
     const imported: AppData = {
-      transactions: Array.isArray(raw.transactions) ? raw.transactions : [],
+      transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
       reports: Array.isArray(raw.reports) ? raw.reports : [],
       config: {
         ...defaultConfig, // Empieza con la configuración por defecto
