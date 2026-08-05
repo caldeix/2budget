@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.1.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.2.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -53,6 +53,13 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.2.0 — Marcado de gastos como pagados
+
+- **Marcar gastos como pagados** — cada gasto (incluidos los no computables) se marca como pagado/pendiente con un clic; es un indicador visual y no afecta a ningún cálculo
+- **Cierre de mes** — al empezar un mes de calendario nuevo, un modal recuerda reconciliar los gastos del mes anterior: marcar los pagados o «Marcar todas». Los gastos del nuevo mes empiezan sin pagar
+- **Arreglos de lógica** — corregido el desfase de fechas por zona horaria, la copia de gastos fijos (mes correcto, sin duplicados en enero) y las tarjetas «Filtradas», que ahora respetan los filtros activos
+- **SemVer**: `1.1.0` → `1.2.0` (MINOR: nueva funcionalidad, sin breaking changes)
 
 ### v1.1.0 — Refactorización integral + nueva paleta UI
 
