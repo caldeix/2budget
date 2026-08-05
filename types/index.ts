@@ -44,6 +44,8 @@ export interface Transaction {
   date: string
   createdAt: string
   nonComputable: boolean
+  /** Indica si el gasto ya se ha pagado/ejecutado este mes. Es visual; no afecta a ningún cálculo. */
+  paid?: boolean
 }
 
 /**

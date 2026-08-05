@@ -28,6 +28,8 @@ import {
   TrendingDown,
   Calendar,
   DollarSign,
+  CheckCircle2,
+  Circle,
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 
@@ -53,6 +55,7 @@ interface TransactionsTableProps {
   person2Name: string
   onEdit: (transaction: Transaction) => void
   onDelete: (id: string) => void
+  onTogglePaid: (id: string, paid: boolean) => void
   selectedMonth: number
   selectedYear: number
   onMonthChange: (month: number) => void
@@ -87,6 +90,7 @@ export function TransactionsTable({
   person2Name,
   onEdit,
   onDelete,
+  onTogglePaid,
   selectedMonth,
   selectedYear,
   onMonthChange,
@@ -601,7 +605,24 @@ export function TransactionsTable({
                       {transaction.type === "income" ? "+" : "-"}
                       {formatCurrency(transaction.amount)}
                     </div>
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1">
+                      {transaction.type === "expense" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
+                          className={cn(
+                            "h-8 w-8 p-0",
+                            transaction.paid
+                              ? "text-green-600 hover:text-green-700 hover:bg-green-600/10"
+                              : "text-muted-foreground hover:text-foreground",
+                          )}
+                          title={transaction.paid ? "Pagado — clic para marcar pendiente" : "Marcar como pagado"}
+                        >
+                          {transaction.paid ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
+                          <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -668,6 +689,19 @@ export function TransactionsTable({
                               <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
                                 NC
                               </span>
+                            )}
+                            {transaction.type === "expense" && (
+                              <button
+                                type="button"
+                                onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
+                                className={cn(
+                                  "ml-1 p-0.5",
+                                  transaction.paid ? "text-green-600" : "text-muted-foreground",
+                                )}
+                                aria-label={transaction.paid ? "Pagado" : "Marcar como pagado"}
+                              >
+                                {transaction.paid ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                              </button>
                             )}
                           </div>
                         </div>

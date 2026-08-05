@@ -64,6 +64,7 @@ export function useFinancialData() {
         id: generateId(), // Genera un ID único.
         createdAt: new Date().toISOString(), // Fecha de creación en formato ISO.
         nonComputable: transaction.nonComputable || false, // Asegura que siempre tenga un valor booleano
+        paid: false, // Los gastos nuevos nacen sin pagar.
       }
       // Crea un nuevo estado de datos, añadiendo la nueva transacción al principio del array.
       const newData = {
@@ -87,6 +88,25 @@ export function useFinancialData() {
       const newData = {
         ...prevData,
         transactions: prevData.transactions.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      }
+      saveData(newData)
+      return newData
+    })
+  }, [])
+
+  /**
+   * @function setTransactionsPaid
+   * @description Marca (o desmarca) como pagadas varias transacciones a la vez, en un solo guardado.
+   *              Útil para la reconciliación de cierre de mes.
+   * @param {string[]} ids - IDs de las transacciones a actualizar.
+   * @param {boolean} paid - Estado de pagado a aplicar.
+   */
+  const setTransactionsPaid = useCallback((ids: string[], paid: boolean) => {
+    const idSet = new Set(ids)
+    setData((prevData) => {
+      const newData = {
+        ...prevData,
+        transactions: prevData.transactions.map((t) => (idSet.has(t.id) ? { ...t, paid } : t)),
       }
       saveData(newData)
       return newData
@@ -265,6 +285,7 @@ export function useFinancialData() {
     isLoading,
     addTransaction,
     updateTransaction,
+    setTransactionsPaid,
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
