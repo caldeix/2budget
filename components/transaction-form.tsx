@@ -60,8 +60,8 @@ export function TransactionForm({
     name: transaction?.name || "",
     amount: transaction?.amount || 0,
     owner: transaction?.owner || "both",
-    person1Percentage: transaction?.person1Percentage || 50,
-    person2Percentage: transaction?.person2Percentage || 50,
+    person1Percentage: transaction?.person1Percentage ?? 50,
+    person2Percentage: transaction?.person2Percentage ?? 50,
     date: transaction?.date || new Date().toISOString().split("T")[0],
     nonComputable: transaction?.nonComputable || false,
   })
@@ -79,8 +79,8 @@ export function TransactionForm({
         name: transaction.name,
         amount: transaction.amount,
         owner: transaction.owner,
-        person1Percentage: transaction.person1Percentage || 50, // Usa 50% si no está definido.
-        person2Percentage: transaction.person2Percentage || 50, // Usa 50% si no está definido.
+        person1Percentage: transaction.person1Percentage ?? 50, // Usa 50% si no está definido.
+        person2Percentage: transaction.person2Percentage ?? 50, // Usa 50% si no está definido.
         date: transaction.date,
         nonComputable: transaction.nonComputable || false,
       })

@@ -13,7 +13,7 @@
 import { useState, useEffect, useCallback } from "react"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
 import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
-import { generateId, calculateReportTotals } from "@/lib/utils" // Utilidades para generar IDs y calcular totales.
+import { generateId, calculateReportTotals, parseLocalDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales y parsear fechas locales.
 
 /**
  * @function useFinancialData
@@ -153,40 +153,30 @@ export function useFinancialData() {
       adjustmentsToCreate: Omit<Transaction, "id" | "createdAt">[],
       existingReportId?: string,
     ) => {
-      console.log("=== CREATE/UPDATE REPORT ATOMIC START ===")
-      console.log("Base data (excluding calculated totals):", reportBaseData)
-      console.log("Adjustments to create:", adjustmentsToCreate)
-      console.log("Existing ID:", existingReportId)
-
       setData((prevData) => {
-        console.log("Executing atomic update. Previous transaction count:", prevData.transactions.length)
         // 1. Crea nuevas transacciones de ajuste con IDs y fechas de creación.
         const newAdjustmentTransactions: Transaction[] = adjustmentsToCreate.map((adj) => ({
           ...adj,
           id: generateId(),
           createdAt: new Date().toISOString(),
         }))
-        console.log("New adjustment transactions with IDs:", newAdjustmentTransactions)
 
         // 2. Combina las nuevas transacciones de ajuste con las transacciones existentes.
         //    Las nuevas se añaden al principio para que aparezcan primero si se ordenan por fecha de creación.
         const allTransactions = [...newAdjustmentTransactions, ...prevData.transactions]
-        console.log("New total transaction count:", allTransactions.length)
 
         // 3. Obtiene TODAS las transacciones para el mes del informe de la lista *recién actualizada*.
         const finalReportTransactions = allTransactions.filter((t) => {
-          const transactionDate = new Date(t.date)
+          const transactionDate = parseLocalDate(t.date)
           return (
             transactionDate.getMonth() + 1 === reportBaseData.month &&
             transactionDate.getFullYear() === reportBaseData.year
           )
         })
-        console.log("Final transaction count for this report:", finalReportTransactions.length)
 
         // 4. RECALCULA los totales del informe basándose en `finalReportTransactions`.
         //    Esto asegura que los ajustes recién añadidos se incluyan en los totales del informe.
         const finalCalculations = calculateReportTotals(finalReportTransactions)
-        console.log("Recalculated totals for report:", finalCalculations)
 
         let finalReportsList: MonthlyReport[]
         if (existingReportId) {
@@ -200,7 +190,6 @@ export function useFinancialData() {
             createdAt: prevData.reports.find((r) => r.id === existingReportId)?.createdAt || new Date().toISOString(),
           }
           finalReportsList = prevData.reports.map((r) => (r.id === existingReportId ? updatedReport : r))
-          console.log("Updated report object:", updatedReport)
         } else {
           // Si no hay ID, crea un nuevo informe.
           const newReport: MonthlyReport = {
@@ -211,7 +200,6 @@ export function useFinancialData() {
             createdAt: new Date().toISOString(),
           }
           finalReportsList = [newReport, ...prevData.reports] // Añade el nuevo informe al principio.
-          console.log("Created new report object:", newReport)
         }
 
         // 5. Construye el objeto de estado final y completo.
@@ -222,9 +210,7 @@ export function useFinancialData() {
         }
 
         // 6. Guarda el nuevo estado en localStorage y lo devuelve.
-        console.log("Saving new state to localStorage.")
         saveData(newData)
-        console.log("=== CREATE/UPDATE REPORT ATOMIC END ===")
         return newData
       })
     },
@@ -241,7 +227,7 @@ export function useFinancialData() {
   const getTransactionsForMonth = useCallback(
     (month: number, year: number) => {
       return data.transactions.filter((t) => {
-        const transactionDate = new Date(t.date)
+        const transactionDate = parseLocalDate(t.date)
         return transactionDate.getMonth() + 1 === month && transactionDate.getFullYear() === year
       })
     },

@@ -107,10 +107,8 @@ export function SummaryCards({
             </div>
             {nonComputableExpenses > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <span className="text-xs opacity-70">(incl. no computables)</span>
-                </span>
-                <span className="text-gray-500 font-medium">+{formatCurrency(nonComputableExpenses)}</span>
+                <span className="text-muted-foreground text-xs opacity-70">De los cuales no computables:</span>
+                <span className="text-gray-500 font-medium">{formatCurrency(nonComputableExpenses)}</span>
               </div>
             )}
           </div>

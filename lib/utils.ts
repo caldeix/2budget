@@ -37,6 +37,20 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+ * @function parseLocalDate
+ * @description Parsea una cadena "YYYY-MM-DD" como fecha en la zona horaria LOCAL (no UTC).
+ *              `new Date("2026-08-01")` se interpreta como medianoche UTC, lo que en zonas
+ *              UTC-negativas desplaza el día/mes al anterior. Esta función lo evita construyendo
+ *              la fecha con los componentes locales.
+ * @param {string} date - La cadena de fecha en formato "YYYY-MM-DD".
+ * @returns {Date} Un objeto Date a medianoche en hora local.
+ */
+export function parseLocalDate(date: string): Date {
+  const [year, month, day] = date.slice(0, 10).split("-").map(Number)
+  return new Date(year, (month || 1) - 1, day || 1)
+}
+
+/**
  * @function formatDate
  * @description Formatea una cadena de fecha (YYYY-MM-DD) a un formato legible en español.
  * @param {string} date - La cadena de fecha en formato ISO (ej. "2023-10-26").
@@ -47,7 +61,7 @@ export function formatDate(date: string): string {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(date))
+  }).format(parseLocalDate(date))
 }
 
 /**
@@ -95,18 +109,6 @@ export function getCurrentMonth(): number {
  */
 export function getCurrentYear(): number {
   return new Date().getFullYear()
-}
-
-/**
- * @function isCurrentMonth
- * @description Comprueba si un mes y año dados corresponden al mes y año actuales del sistema.
- * @param {number} month - El mes a comprobar (1-12).
- * @param {number} year - El año a comprobar.
- * @returns {boolean} `true` si es el mes y año actuales, `false` en caso contrario.
- */
-export function isCurrentMonth(month: number, year: number): boolean {
-  const now = new Date()
-  return month === now.getMonth() + 1 && now.getFullYear() === year
 }
 
 /**

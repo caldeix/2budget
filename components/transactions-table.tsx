@@ -247,21 +247,26 @@ export function TransactionsTable({
   }, [hasMore, onLoadMore]) // Dependencias: se ejecuta cuando `hasMore` o `onLoadMore` cambian.
 
   /**
-   * `useMemo` para filtrar, ordenar y limitar las transacciones a mostrar.
-   * Este es un cálculo costoso, por lo que se memoriza para optimizar el rendimiento.
+   * `useMemo` que filtra las transacciones por búsqueda, tipo y categoría (SIN paginar).
+   * Es la base tanto de la lista como de las tarjetas de resumen "Filtradas".
    */
-  const filteredAndSortedTransactions = useMemo(() => {
-    // 1. Filtrar: aplica los filtros de búsqueda, tipo y categoría a la lista COMPLETA de transacciones.
-    const filtered = transactions.filter((transaction) => {
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((transaction) => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesType = filterType === "all" || transaction.type === filterType
       const matchesCategory = filterCategory === "all" || transaction.category === filterCategory
 
       return matchesSearch && matchesType && matchesCategory
     })
+  }, [transactions, searchTerm, filterType, filterCategory])
 
-    // 2. Ordenar: crea una copia del array filtrado y lo ordena según el campo y la dirección seleccionados.
-    const sorted = [...filtered].sort((a, b) => {
+  /**
+   * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
+   * Este es el listado que realmente se renderiza.
+   */
+  const filteredAndSortedTransactions = useMemo(() => {
+    // Ordena una copia del conjunto filtrado según el campo y la dirección seleccionados.
+    const sorted = [...filteredTransactions].sort((a, b) => {
       let aValue: any
       let bValue: any
 
@@ -292,10 +297,9 @@ export function TransactionsTable({
       return 0
     })
 
-    // 3. Limitar: devuelve solo el número de transacciones que deben mostrarse actualmente.
-    // Esto es clave para la carga infinita.
+    // Limita al número de transacciones a mostrar actualmente (clave para la carga infinita).
     return sorted.slice(0, transactionsToShowCount)
-  }, [transactions, searchTerm, sortField, sortDirection, filterType, filterCategory, transactionsToShowCount]) // Dependencias.
+  }, [filteredTransactions, sortField, sortDirection, transactionsToShowCount]) // Dependencias.
 
   /**
    * @function handleSort
@@ -341,7 +345,7 @@ export function TransactionsTable({
     if (transaction.owner === "person2") return person2Name
     if (transaction.owner === "both") {
       // Muestra los nombres y porcentajes redondeados a 0 decimales.
-      return `${person1Name} (${transaction.person1Percentage.toFixed(0)}%) \n ${person2Name} (${transaction.person2Percentage.toFixed(0)}%)`
+      return `${person1Name} (${(transaction.person1Percentage ?? 0).toFixed(0)}%) \n ${person2Name} (${(transaction.person2Percentage ?? 0).toFixed(0)}%)`
     }
     return "Desconocido"
   }
@@ -388,9 +392,10 @@ export function TransactionsTable({
     )
   }
 
-  // Calcula los ingresos y gastos totales del mes (basado en la lista COMPLETA de transacciones, no solo las mostradas).
-  const totalIncome = transactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
-  const totalExpenses = transactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0)
+  // Calcula ingresos y gastos del conjunto FILTRADO (búsqueda/tipo/categoría), no de la lista completa,
+  // para que las tarjetas "Filtradas" reflejen realmente los filtros activos.
+  const totalIncome = filteredTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
+  const totalExpenses = filteredTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0)
 
   return (
     <div className="bg-card rounded-2xl shadow-lg border">
