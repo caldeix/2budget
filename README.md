@@ -26,6 +26,7 @@
 - **Resumen mensual** — Tarjetas de balance total y desglose por persona para el mes seleccionado
 - **Balance acumulado** — Seguimiento del saldo total a lo largo del tiempo (excluye gastos no computables)
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
+- **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente; al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic
 - **Importar / Exportar** — Backup y restauración en JSON
