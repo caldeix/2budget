@@ -7,6 +7,7 @@
  */
 
 import { Heart } from "lucide-react" // Importa el icono de corazón de Lucide React.
+import { version } from "@/package.json" // Version actual, leida de package.json para que nunca quede obsoleta.
 
 /**
  * @function Footer
@@ -51,6 +52,8 @@ export function Footer() {
         </span>
         {/* Información de copyright y año actual. */}
         <span className="whitespace-nowrap">&copy; {currentYear} Copyright.</span>
+        {/* Version actual de la aplicacion. */}
+        <span className="whitespace-nowrap text-muted-foreground">v{version}</span>
       </div>
     </footer>
   )
