@@ -14,9 +14,10 @@ import { useEffect, useState, useMemo } from "react"
 import type { MonthlyReport, Transaction } from "@/types"
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
-import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
-import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
+import { formatCurrency, formatMonthYear, getLastDateOfMonth } from "@/lib/utils" // Utilidades de formato y fecha.
+import { isZeroMoney, subtractMoney } from "@/lib/money" // Aritmética monetaria exacta.
+import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
 import { useCalculations } from "@/hooks/use-calculations" // Hook para cálculos financieros.
 import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos.
 
@@ -100,8 +101,10 @@ export function MonthlyReportModal({
   const person2CalculatedBalance = calculations.person2Balance
 
   // Ajustes calculados: diferencia entre el dinero real y el balance calculado.
-  const person1Adjustment = person1RealMoney - person1CalculatedBalance
-  const person2Adjustment = person2RealMoney - person2CalculatedBalance
+  // Resta exacta: el operador nativo daría p.ej. 234.56999999999994 y ese valor acaba
+  // persistido como `amount` de la transaccion de ajuste.
+  const person1Adjustment = subtractMoney(person1RealMoney, person1CalculatedBalance)
+  const person2Adjustment = subtractMoney(person2RealMoney, person2CalculatedBalance)
 
   /**
    * @function createAdjustmentTransactions
@@ -111,12 +114,11 @@ export function MonthlyReportModal({
    */
   const createAdjustmentTransactions = (): Omit<Transaction, "id" | "createdAt">[] => {
     const adjustmentTransactionsArray: Omit<Transaction, "id" | "createdAt">[] = []
-    // Calcula el último día del mes para la fecha de las transacciones de ajuste.
-    const lastDayOfMonth = new Date(year, month, 0).getDate()
-    const adjustmentDate = `${year}-${month.toString().padStart(2, "0")}-${lastDayOfMonth.toString().padStart(2, "0")}`
+    // Las transacciones de ajuste se fechan el último día del mes que se cierra.
+    const adjustmentDate = getLastDateOfMonth(month, year)
 
     // Si el ajuste de la Persona 1 es significativo (mayor o igual a 0.01), crea una transacción de ajuste.
-    if (Math.abs(person1Adjustment) >= 0.01) {
+    if (!isZeroMoney(person1Adjustment)) {
       adjustmentTransactionsArray.push({
         type: person1Adjustment > 0 ? "income" : "expense", // Si el ajuste es positivo, es un ingreso; si es negativo, un gasto.
         category: person1Adjustment > 0 ? "income" : "variable", // Categoría según el tipo de ajuste.
@@ -125,12 +127,13 @@ export function MonthlyReportModal({
         owner: "person1", // Atribuido a la Persona 1.
         person1Percentage: 100, // 100% para Persona 1.
         person2Percentage: 0, // 0% para Persona 2.
+        nonComputable: false, // Un ajuste de cierre siempre computa.
         date: adjustmentDate, // Fecha de la transacción de ajuste.
       })
     }
 
     // Si el ajuste de la Persona 2 es significativo, crea una transacción de ajuste.
-    if (Math.abs(person2Adjustment) >= 0.01) {
+    if (!isZeroMoney(person2Adjustment)) {
       adjustmentTransactionsArray.push({
         type: person2Adjustment > 0 ? "income" : "expense",
         category: person2Adjustment > 0 ? "income" : "variable",
@@ -139,6 +142,7 @@ export function MonthlyReportModal({
         owner: "person2",
         person1Percentage: 0,
         person2Percentage: 100,
+        nonComputable: false, // Un ajuste de cierre siempre computa.
         date: adjustmentDate,
       })
     }
@@ -265,24 +269,20 @@ export function MonthlyReportModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="person1Money">{person1Name} (€)</Label>
-              <Input
+              <AmountInput
                 id="person1Money"
-                type="number"
-                step="0.01"
                 value={person1RealMoney}
-                onChange={(e) => setPerson1RealMoney(Number.parseFloat(e.target.value) || 0)}
+                onValueChange={setPerson1RealMoney}
                 required
                 disabled={isSubmitting} // Deshabilita el input mientras se envía el formulario.
               />
             </div>
             <div>
               <Label htmlFor="person2Money">{person2Name} (€)</Label>
-              <Input
+              <AmountInput
                 id="person2Money"
-                type="number"
-                step="0.01"
                 value={person2RealMoney}
-                onChange={(e) => setPerson2RealMoney(Number.parseFloat(e.target.value) || 0)}
+                onValueChange={setPerson2RealMoney}
                 required
                 disabled={isSubmitting}
               />
@@ -292,7 +292,7 @@ export function MonthlyReportModal({
 
         {/* Sección de ajustes calculados y previsualización de transacciones de ajuste */}
         {/* Solo se muestra si hay ajustes significativos para alguna de las personas. */}
-        {(Math.abs(person1Adjustment) >= 0.01 || Math.abs(person2Adjustment) >= 0.01) && (
+        {(!isZeroMoney(person1Adjustment) || !isZeroMoney(person2Adjustment)) && (
           <div className="bg-secondary/10 rounded-2xl p-4">
             <h3 className="font-semibold text-foreground mb-4">Ajustes calculados</h3>
             <div className="grid grid-cols-2 gap-4 text-sm mb-4">

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react"
 import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
 import { useCalculations } from "@/hooks/use-calculations"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
+import { subtractMoney } from "@/lib/money"
 import { generateSampleData } from "@/lib/sample-data"
 import { getLastSeenMonth, setLastSeenMonth } from "@/lib/storage"
 
@@ -383,10 +384,7 @@ export default function HomePage() {
                           </div>
                           <div className="text-sm text-muted-foreground mt-1">
                             Balance:{" "}
-                            {new Intl.NumberFormat("es-ES", {
-                              style: "currency",
-                              currency: "EUR",
-                            }).format(report.totalIncome - report.totalExpenses)}
+                            {formatCurrency(subtractMoney(report.totalIncome, report.totalExpenses))}
                           </div>
                         </button>
                       ))}
@@ -403,7 +401,7 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               onEdit={handleEditTransaction}
               onDelete={deleteTransaction}
-              onTogglePaid={(id, paid) => updateTransaction(id, { paid })}
+              onTogglePaid={(id, paid) => setTransactionsPaid([id], paid)}
               selectedMonth={selectedMonth}
               selectedYear={selectedYear}
               onMonthChange={setSelectedMonth}

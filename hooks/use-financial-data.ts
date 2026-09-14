@@ -13,7 +13,8 @@
 import { useState, useEffect, useCallback } from "react"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
 import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
-import { generateId, calculateReportTotals, parseLocalDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales y parsear fechas locales.
+import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
+import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 
 /**
  * @function useFinancialData
@@ -62,6 +63,7 @@ export function useFinancialData() {
       const newTransaction: Transaction = {
         ...transaction,
         id: generateId(), // Genera un ID único.
+        amount: roundMoney(transaction.amount), // Ningún importe entra con más de 2 decimales.
         createdAt: new Date().toISOString(), // Fecha de creación en formato ISO.
         nonComputable: transaction.nonComputable || false, // Asegura que siempre tenga un valor booleano
         paid: false, // Los gastos nuevos nacen sin pagar.
@@ -84,10 +86,15 @@ export function useFinancialData() {
    */
   const updateTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
     setData((prevData) => {
+      // NOTA: esta función no gestiona `paid`. Para marcar o desmarcar usa
+      // `setTransactionsPaid`, que además aplica la regla de refechado.
+      const safeUpdates =
+        updates.amount === undefined ? updates : { ...updates, amount: roundMoney(updates.amount) }
+
       // Mapea las transacciones, actualizando la que coincide con el ID.
       const newData = {
         ...prevData,
-        transactions: prevData.transactions.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        transactions: prevData.transactions.map((t) => (t.id === id ? { ...t, ...safeUpdates } : t)),
       }
       saveData(newData)
       return newData
@@ -97,16 +104,44 @@ export function useFinancialData() {
   /**
    * @function setTransactionsPaid
    * @description Marca (o desmarca) como pagadas varias transacciones a la vez, en un solo guardado.
-   *              Útil para la reconciliación de cierre de mes.
+   *              Es el ÚNICO punto del código autorizado a escribir `paid`: lo usan tanto el
+   *              toggle individual de la tabla como la reconciliación de cierre de mes.
+   *
+   *              EFECTO SOBRE `date`: al marcar como pagado, y SOLO en la transición
+   *              `no pagado -> pagado`, la transacción se refecha con `resolvePaidDate`
+   *              (hoy si es del mes en curso, el último día de su mes en cualquier otro caso).
+   *              El MES nunca cambia.
+   *
+   *              Por qué solo en la transición: el modal de cierre premarca los gastos que ya
+   *              estaban pagados, así que refechar siempre que `paid === true` sobrescribiría
+   *              la fecha real de un gasto que el usuario ya marcó dentro de su mes (un pago
+   *              del día 10 pasaría a día 31 sin que él hiciera nada). Además hace la
+   *              operación idempotente.
+   *
+   *              Desmarcar NO toca la fecha: al volver a marcar será otra transición y se
+   *              recalculará entonces.
    * @param {string[]} ids - IDs de las transacciones a actualizar.
    * @param {boolean} paid - Estado de pagado a aplicar.
    */
   const setTransactionsPaid = useCallback((ids: string[], paid: boolean) => {
     const idSet = new Set(ids)
     setData((prevData) => {
+      // Un único "hoy" para todo el lote: un lote que cruce la medianoche no se parte en dos fechas.
+      const today = new Date()
+
       const newData = {
         ...prevData,
-        transactions: prevData.transactions.map((t) => (idSet.has(t.id) ? { ...t, paid } : t)),
+        transactions: prevData.transactions.map((t) => {
+          if (!idSet.has(t.id)) return t
+          // `paid` solo tiene sentido en gastos; un ingreso jamás se refecha.
+          if (t.type !== "expense") return t
+          // Desmarcar: la fecha se queda como está.
+          if (!paid) return t.paid ? { ...t, paid: false } : t
+          // Ya estaba pagado: no se refecha (ver nota de arriba).
+          if (t.paid) return t
+          // Transición no pagado -> pagado: única rama que escribe `date`.
+          return { ...t, paid: true, date: resolvePaidDate(t.date, today) }
+        }),
       }
       saveData(newData)
       return newData
@@ -178,6 +213,7 @@ export function useFinancialData() {
         const newAdjustmentTransactions: Transaction[] = adjustmentsToCreate.map((adj) => ({
           ...adj,
           id: generateId(),
+          amount: roundMoney(adj.amount), // El ajuste es un valor derivado: se persiste ya redondeado.
           createdAt: new Date().toISOString(),
         }))
 

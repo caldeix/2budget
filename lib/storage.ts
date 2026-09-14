@@ -6,13 +6,24 @@
  *              Utiliza JSON para serializar y deserializar los datos.
  */
 
-import type { AppData, AppConfig, Transaction } from "@/types"
+import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
+import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
 
 /**
  * @constant {string} STORAGE_KEY
  * @description Clave utilizada para almacenar los datos de la aplicación en localStorage.
  */
 const STORAGE_KEY = "financial-manager-data"
+
+/**
+ * Versión del esquema de datos persistido.
+ * v2 = todos los importes redondeados a 2 decimales y porcentajes coherentes.
+ *
+ * La versión es solo una marca de "ya reescrito", NO un requisito de corrección: la
+ * normalización en lectura se aplica siempre y es idempotente, así que un JSON antiguo
+ * importado mañana queda igual de protegido. Solo evita el guardado redundante en cada arranque.
+ */
+const DATA_VERSION = 2
 
 /**
  * @constant {AppConfig} defaultConfig
@@ -41,10 +52,43 @@ const defaultData: AppData = {
  * @returns {Transaction} La transacción con los campos garantizados.
  */
 function normalizeTransaction(t: Transaction): Transaction {
+  // El porcentaje de la Persona 2 se deriva del de la Persona 1 para que un dato
+  // incoherente (p. ej. 30/60) no rompa el cuadre de los repartos.
+  const person1Percentage = normalizePercentage(t.person1Percentage ?? 50)
   return {
     ...t,
+    amount: roundMoney(t.amount),
+    person1Percentage,
+    person2Percentage: 100 - person1Percentage,
     nonComputable: Boolean(t.nonComputable),
     paid: Boolean(t.paid),
+  }
+}
+
+/**
+ * @function normalizeReport
+ * @description Normaliza los importes de un informe archivado. Se redondea campo a campo y
+ *              NO se recalcula desde sus transacciones: un informe es el documento de lo que
+ *              se cerró en su día, y recalcularlo podría mover cifras históricas de forma no
+ *              acotada si los datos antiguos eran incoherentes. El redondeo campo a campo
+ *              nunca mueve un valor más de medio céntimo.
+ * @param {MonthlyReport} r - El informe a normalizar.
+ * @returns {MonthlyReport} El informe con todos sus importes a 2 decimales.
+ */
+function normalizeReport(r: MonthlyReport): MonthlyReport {
+  return {
+    ...r,
+    person1RealMoney: roundMoney(r.person1RealMoney),
+    person2RealMoney: roundMoney(r.person2RealMoney),
+    person1Adjustment: roundMoney(r.person1Adjustment),
+    person2Adjustment: roundMoney(r.person2Adjustment),
+    totalIncome: roundMoney(r.totalIncome),
+    totalExpenses: roundMoney(r.totalExpenses),
+    person1Income: roundMoney(r.person1Income),
+    person2Income: roundMoney(r.person2Income),
+    person1Expenses: roundMoney(r.person1Expenses),
+    person2Expenses: roundMoney(r.person2Expenses),
+    transactions: Array.isArray(r.transactions) ? r.transactions.map(normalizeTransaction) : [],
   }
 }
 
@@ -74,13 +118,24 @@ export function loadData(): AppData {
      * en futuras versiones, los datos antiguos sigan siendo compatibles y tengan valores por defecto.
      * La configuración también se fusiona para mantener los nombres personalizados.
      */
-    return {
+    const normalized: AppData = {
       ...defaultData, // Empieza con la estructura por defecto
       ...data, // Sobrescribe con los datos cargados
+      version: DATA_VERSION,
       // Normaliza cada transacción para garantizar campos por defecto en datos antiguos.
       transactions: Array.isArray(data.transactions) ? data.transactions.map(normalizeTransaction) : [],
+      reports: Array.isArray(data.reports) ? data.reports.map(normalizeReport) : [],
       config: { ...defaultConfig, ...data.config }, // Fusiona la configuración
     }
+
+    // Migración de un solo disparo: deja el localStorage ya limpio y evita repetir la
+    // reescritura en cada arranque. La app es correcta aunque esto no llegue a ejecutarse,
+    // porque la normalización en lectura de arriba se aplica siempre.
+    if (data.version !== DATA_VERSION) {
+      saveData(normalized)
+    }
+
+    return normalized
   } catch (error) {
     // Si ocurre un error al cargar o parsear los datos (ej. JSON corrupto),
     // se registra el error y se devuelven los datos por defecto para evitar que la aplicación falle.
@@ -145,8 +200,10 @@ export function importData(jsonString: string): boolean {
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
     const imported: AppData = {
+      version: DATA_VERSION,
       transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
-      reports: Array.isArray(raw.reports) ? raw.reports : [],
+      // Los informes importados también se normalizan: pueden traer importes sin redondear.
+      reports: Array.isArray(raw.reports) ? raw.reports.map(normalizeReport) : [],
       config: {
         ...defaultConfig, // Empieza con la configuración por defecto
         ...(typeof raw.config === "object" && raw.config !== null ? raw.config : {}), // Fusiona la configuración importada

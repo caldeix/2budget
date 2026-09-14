@@ -10,6 +10,8 @@
 
 import { useMemo } from "react"
 import type { Transaction } from "@/types"
+import { aggregateTransactions } from "@/lib/aggregations"
+import { subtractMoney } from "@/lib/money"
 
 /**
  * @interface CalculationResult
@@ -62,80 +64,17 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
    * Esto evita cálculos innecesarios en cada renderizado del componente, mejorando el rendimiento.
    */
   return useMemo(() => {
-    // Inicializa el objeto de resultados con todos los valores en cero.
-    const result: CalculationResult = {
-      totalIncome: 0,
-      totalExpenses: 0,
-      balance: 0,
-      person1Income: 0,
-      person2Income: 0,
-      person1Expenses: 0,
-      person2Expenses: 0,
-      person1Balance: 0,
-      person2Balance: 0,
-      fixedExpenses: 0,
-      variableExpenses: 0,
-      nonComputableExpenses: 0,
+    // Los gastos no computables SÍ entran en los totales del mes y además se contabilizan
+    // aparte en `nonComputableExpenses` (comportamiento histórico de este hook).
+    const totals = aggregateTransactions(transactions)
+
+    return {
+      ...totals,
+      // Restas monetarias exactas: el operador `-` nativo reintroduce error de coma
+      // flotante incluso con operandos de 2 decimales limpios.
+      balance: subtractMoney(totals.totalIncome, totals.totalExpenses),
+      person1Balance: subtractMoney(totals.person1Income, totals.person1Expenses),
+      person2Balance: subtractMoney(totals.person2Income, totals.person2Expenses),
     }
-
-    // Itera sobre cada transacción para acumular los valores.
-    transactions.forEach((transaction) => {
-      // Desestructuración para obtener las propiedades relevantes de cada transacción.
-      const { amount, type, category, owner, person1Percentage = 0, person2Percentage = 0 } = transaction
-
-      // Lógica para ingresos
-      if (type === "income") {
-        result.totalIncome += amount // Suma al total de ingresos
-
-        // Distribución de ingresos según el propietario
-        if (owner === "person1") {
-          result.person1Income += amount
-        } else if (owner === "person2") {
-          result.person2Income += amount
-        } else if (owner === "both") {
-          // Si es de ambos, distribuye según los porcentajes
-          result.person1Income += (amount * person1Percentage) / 100
-          result.person2Income += (amount * person2Percentage) / 100
-        }
-      }
-      // Lógica para gastos
-      else if (type === "expense") {
-        // Para gastos computables, los sumamos a los totales
-        result.totalExpenses += amount // Suma al total de gastos
-
-        // Si es un gasto no computable, lo registramos por separado
-        // pero lo incluimos en los totales mensuales
-        if (transaction.nonComputable) {
-          result.nonComputableExpenses += amount
-        }
-
-        // Clasificación por categoría de gasto
-        if (category === "fixed") {
-          result.fixedExpenses += amount
-        } else if (category === "variable") {
-          result.variableExpenses += amount
-        }
-
-        // Distribución de gastos según el propietario
-        if (owner === "person1") {
-          result.person1Expenses += amount
-        } else if (owner === "person2") {
-          result.person2Expenses += amount
-        } else if (owner === "both") {
-          // Si es de ambos, distribuye según los porcentajes
-          const p1Amount = (amount * person1Percentage) / 100
-          const p2Amount = (amount * person2Percentage) / 100
-          result.person1Expenses += p1Amount
-          result.person2Expenses += p2Amount
-        }
-      }
-    })
-
-    // Calcula los balances finales después de procesar todas las transacciones.
-    result.balance = result.totalIncome - result.totalExpenses
-    result.person1Balance = result.person1Income - result.person1Expenses
-    result.person2Balance = result.person2Income - result.person2Expenses
-
-    return result
   }, [transactions]) // Dependencia: el cálculo se ejecuta solo si 'transactions' cambia.
 }

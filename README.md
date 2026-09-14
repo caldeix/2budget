@@ -26,7 +26,7 @@
 - **Resumen mensual** — Tarjetas de balance total y desglose por persona para el mes seleccionado
 - **Balance acumulado** — Seguimiento del saldo total a lo largo del tiempo (excluye gastos no computables)
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
-- **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente; al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
+- **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic
 - **Importar / Exportar** — Backup y restauración en JSON
@@ -54,6 +54,15 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.3.0 — Fecha real de pago y decimales exactos
+
+- **La fecha refleja cuándo pagaste** — al marcar un gasto como pagado, su fecha pasa al día de hoy si es del mes en curso, o al último día de su mes si estás revisando otro mes. El mes de un gasto nunca cambia. Desmarcar no toca la fecha; al volver a marcar se recalcula. El modal de cierre de mes respeta la fecha de los gastos que ya habías marcado dentro de su mes
+- **Redondeo unificado a 2 decimales** — toda la aritmética monetaria pasa por un único módulo que opera en céntimos enteros. Los repartos por porcentaje cuadran siempre (`parte1 + parte2 = total`), los balances por persona suman exactamente el total, y desaparecen los `-0,00 €` en rojo
+- **El importe no admite un tercer decimal** — el campo lo rechaza al teclear, al pegar y con separador coma o punto
+- **Migración automática** — los importes ya guardados se normalizan a 2 decimales la primera vez que abres esta versión
+- **Arreglo de zona horaria** — la fecha por defecto del formulario usaba UTC y devolvía el día anterior si añadías un gasto de madrugada
+- SemVer: 1.2.0 → 1.3.0 (MINOR: cambia comportamiento y normaliza datos guardados)
 
 ### v1.2.0 — Marcado de gastos como pagados
 

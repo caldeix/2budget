@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button" // Componente de botón.
 import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
+import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
+import { getTodayDate } from "@/lib/utils" // Fecha de hoy en local (no UTC).
 
 /**
  * @interface TransactionFormProps
@@ -62,7 +64,7 @@ export function TransactionForm({
     owner: transaction?.owner || "both",
     person1Percentage: transaction?.person1Percentage ?? 50,
     person2Percentage: transaction?.person2Percentage ?? 50,
-    date: transaction?.date || new Date().toISOString().split("T")[0],
+    date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
   })
 
@@ -94,7 +96,7 @@ export function TransactionForm({
         owner: "both",
         person1Percentage: 50,
         person2Percentage: 50,
-        date: new Date().toISOString().split("T")[0],
+        date: getTodayDate(),
         nonComputable: false,
       })
     }
@@ -217,14 +219,12 @@ export function TransactionForm({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="amount">Importe (€)</Label>
-            <Input
+            <AmountInput
               id="amount"
-              type="number"
-              step="0.01" // Permite valores decimales.
-              min="0" // El importe no puede ser negativo.
               value={formData.amount}
-              onChange={(e) => setFormData((prev) => ({ ...prev, amount: Number.parseFloat(e.target.value) || 0 }))}
-              required
+              onValueChange={(amount) => setFormData((prev) => ({ ...prev, amount }))}
+              emptyWhenZero
+              placeholder="0,00"
             />
           </div>
 

@@ -107,6 +107,11 @@ export interface AppData {
   transactions: Transaction[]
   reports: MonthlyReport[]
   config: AppConfig
+  /**
+   * Versión del esquema persistido. Opcional para que los JSON exportados antes de
+   * introducirla sigan siendo válidos al importarlos.
+   */
+  version?: number
 }
 
 /**

@@ -13,6 +13,7 @@ import type { MonthlyReport } from "@/types"
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { PieChart } from "@/components/ui/chart" // Componente de gráfico de pastel.
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
+import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 
 /**
  * @interface ReportDetailModalProps
@@ -102,9 +103,9 @@ export function ReportDetailModal({ isOpen, onClose, report, person1Name, person
           <div className="bg-primary/10 rounded-2xl p-4">
             <h3 className="font-semibold text-primary mb-2">Balance</h3>
             <p
-              className={`text-2xl font-bold ${(report.totalIncome - report.totalExpenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+              className={`text-2xl font-bold ${subtractMoney(report.totalIncome, report.totalExpenses) >= 0 ? "text-green-600" : "text-red-600"}`}
             >
-              {formatCurrency(report.totalIncome - report.totalExpenses)}
+              {formatCurrency(subtractMoney(report.totalIncome, report.totalExpenses))}
             </p>
           </div>
         </div>
@@ -140,9 +141,9 @@ export function ReportDetailModal({ isOpen, onClose, report, person1Name, person
               <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Balance calculado:</span>
                 <span
-                  className={`font-medium ${(report.person1Income - report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`font-medium ${subtractMoney(report.person1Income, report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {formatCurrency(report.person1Income - report.person1Expenses)}
+                  {formatCurrency(subtractMoney(report.person1Income, report.person1Expenses))}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -173,9 +174,9 @@ export function ReportDetailModal({ isOpen, onClose, report, person1Name, person
               <div className="flex justify-between border-t pt-2">
                 <span className="text-muted-foreground">Balance calculado:</span>
                 <span
-                  className={`font-medium ${(report.person2Income - report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`font-medium ${subtractMoney(report.person2Income, report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {formatCurrency(report.person2Income - report.person2Expenses)}
+                  {formatCurrency(subtractMoney(report.person2Income, report.person2Expenses))}
                 </span>
               </div>
               <div className="flex justify-between">

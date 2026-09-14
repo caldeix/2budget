@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
+import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
+import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
   Edit,
@@ -398,8 +400,10 @@ export function TransactionsTable({
 
   // Calcula ingresos y gastos del conjunto FILTRADO (búsqueda/tipo/categoría), no de la lista completa,
   // para que las tarjetas "Filtradas" reflejen realmente los filtros activos.
-  const totalIncome = filteredTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0)
-  const totalExpenses = filteredTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0)
+  const filteredTotals = useMemo(() => aggregateTransactions(filteredTransactions), [filteredTransactions])
+  const totalIncome = filteredTotals.totalIncome
+  const totalExpenses = filteredTotals.totalExpenses
+  const filteredBalance = subtractMoney(totalIncome, totalExpenses)
 
   return (
     <div className="bg-card rounded-2xl shadow-lg border">
@@ -496,9 +500,9 @@ export function TransactionsTable({
               <div>
                 <p className="text-sm text-muted-foreground">Balance Filtrado</p>
                 <p
-                  className={`text-lg font-semibold ${(totalIncome - totalExpenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {formatCurrency(totalIncome - totalExpenses)}
+                  {formatCurrency(filteredBalance)}
                 </p>
               </div>
             </div>

@@ -43,3 +43,8 @@ next-env.d.ts
 # Documentación interactiva generada (generate-app-flow)
 /app-flow/
 .claude
+
+# Tests locales (Vitest) - no se suben al repo
+*.test.ts
+*.test.tsx
+vitest.config.*

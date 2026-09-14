@@ -10,6 +10,7 @@
 
 import { useMemo } from "react"
 import { useTheme } from "next-themes" // Importa el hook `useTheme` para acceder al tema actual.
+import { formatCurrency } from "@/lib/money" // Formato monetario canónico (redondea antes de formatear).
 
 /**
  * @interface ChartData
@@ -160,10 +161,7 @@ export function PieChart({ data, size = 200, className }: PieChartProps) {
             <div className="text-right">
               {/* Valor formateado como moneda */}
               <div className="font-medium">
-                {new Intl.NumberFormat("es-ES", {
-                  style: "currency",
-                  currency: "EUR",
-                }).format(Math.abs(item.value))}
+                {formatCurrency(Math.abs(item.value))}
               </div>
               {/* Porcentaje del segmento, formateado a un decimal */}
               <div className="text-muted-foreground text-xs">{item.percentage.toFixed(1)}%</div>

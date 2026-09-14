@@ -8,6 +8,15 @@
 import { type ClassValue, clsx } from "clsx" // Utilidad para combinar clases condicionalmente.
 import { twMerge } from "tailwind-merge" // Utilidad para fusionar clases de Tailwind sin conflictos.
 import type { Transaction } from "@/types" // Importa el tipo Transaction.
+import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
+import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
+
+/**
+ * `formatCurrency` vive ahora en `@/lib/money`, junto al resto de la aritmética monetaria.
+ * Se re-exporta desde aquí para no tocar los múltiples componentes que ya la importan
+ * de `@/lib/utils`.
+ */
+export { formatCurrency } from "@/lib/money"
 
 /**
  * @function cn
@@ -24,19 +33,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * @function formatCurrency
- * @description Formatea un número como una cantidad de moneda en euros (€).
- * @param {number} amount - La cantidad numérica a formatear.
- * @returns {string} La cantidad formateada como cadena de moneda (ej. "1.234,56 €").
- */
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  }).format(amount)
-}
-
-/**
  * @function parseLocalDate
  * @description Parsea una cadena "YYYY-MM-DD" como fecha en la zona horaria LOCAL (no UTC).
  *              `new Date("2026-08-01")` se interpreta como medianoche UTC, lo que en zonas
@@ -48,6 +44,78 @@ export function formatCurrency(amount: number): string {
 export function parseLocalDate(date: string): Date {
   const [year, month, day] = date.slice(0, 10).split("-").map(Number)
   return new Date(year, (month || 1) - 1, day || 1)
+}
+
+/**
+ * @function toLocalDateString
+ * @description Convierte un `Date` a la cadena "YYYY-MM-DD" usando los componentes LOCALES.
+ *              Es la inversa exacta de `parseLocalDate`.
+ *
+ *              NO usar `toISOString()` para esto: convierte a UTC y en España (UTC+1/+2)
+ *              devuelve el DÍA ANTERIOR entre medianoche y las 01:00/02:00 locales.
+ * @param {Date} date - La fecha a convertir.
+ * @returns {string} La fecha en formato "YYYY-MM-DD".
+ */
+export function toLocalDateString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * @function getTodayDate
+ * @description Devuelve la fecha de HOY en formato "YYYY-MM-DD" y hora local.
+ * @returns {string} La fecha de hoy.
+ */
+export function getTodayDate(): string {
+  return toLocalDateString(new Date())
+}
+
+/**
+ * @function getLastDateOfMonth
+ * @description Devuelve el último día de un mes como cadena "YYYY-MM-DD"
+ *              (ej. 2026-02-28, 2024-02-29, 2026-04-30).
+ *              El mes y el año se reemiten tal cual, así que la cadena resultante
+ *              SIEMPRE pertenece al mes pedido.
+ * @param {number} month - El mes (1-12).
+ * @param {number} year - El año.
+ * @returns {string} El último día del mes.
+ */
+export function getLastDateOfMonth(month: number, year: number): string {
+  // El día 0 del mes siguiente es el último día del mes actual.
+  const lastDay = new Date(year, month, 0).getDate()
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+}
+
+/**
+ * @function resolvePaidDate
+ * @description Calcula la fecha que debe tener un gasto al marcarlo como PAGADO.
+ *
+ *              REGLA DE NEGOCIO: marcar como pagado cambia el DÍA, nunca el MES.
+ *                - Gasto del mes en curso -> la fecha de hoy (local).
+ *                - Gasto de cualquier otro mes (anterior o futuro) -> el último día de SU mes.
+ *
+ *              INVARIANTE: el mes/año de la cadena devuelta es siempre el mismo que
+ *              `parseLocalDate(date)` asigna a la transacción, que es exactamente el criterio
+ *              que usa `getTransactionsForMonth`. Por construcción, un gasto NUNCA puede
+ *              cambiar de mes al marcarse como pagado.
+ * @param {string} date - Fecha actual de la transacción ("YYYY-MM-DD").
+ * @param {Date} [today] - "Hoy" inyectable; permite fijar un único instante para todo un lote.
+ * @returns {string} La nueva fecha en formato "YYYY-MM-DD".
+ */
+export function resolvePaidDate(date: string, today: Date = new Date()): string {
+  const transactionDate = parseLocalDate(date)
+  const transactionMonth = transactionDate.getMonth() + 1
+  const transactionYear = transactionDate.getFullYear()
+
+  // Mes en curso: se fecha hoy. El guard garantiza que hoy cae en ese mismo mes.
+  if (transactionMonth === today.getMonth() + 1 && transactionYear === today.getFullYear()) {
+    return toLocalDateString(today)
+  }
+
+  // Cualquier otro mes (anterior o futuro): último día de SU mes, nunca del mes actual.
+  return getLastDateOfMonth(transactionMonth, transactionYear)
 }
 
 /**
@@ -156,36 +224,9 @@ export function calculateReportTotals(transactions: Transaction[]): {
   person1Expenses: number
   person2Expenses: number
 } {
-  let totalIncome = 0
-  let totalExpenses = 0
-  let person1Income = 0
-  let person2Income = 0
-  let person1Expenses = 0
-  let person2Expenses = 0
-
-  transactions.forEach((transaction) => {
-    const { amount, type, owner, person1Percentage = 0, person2Percentage = 0 } = transaction
-    if (type === "income") {
-      totalIncome += amount
-      if (owner === "person1") person1Income += amount
-      else if (owner === "person2") person2Income += amount
-      else {
-        // Si es de ambos, distribuye el ingreso según los porcentajes.
-        person1Income += (amount * person1Percentage) / 100
-        person2Income += (amount * person2Percentage) / 100
-      }
-    } else {
-      // type === "expense"
-      totalExpenses += amount
-      if (owner === "person1") person1Expenses += amount
-      else if (owner === "person2") person2Expenses += amount
-      else {
-        // Si es de ambos, distribuye el gasto según los porcentajes.
-        person1Expenses += (amount * person1Percentage) / 100
-        person2Expenses += (amount * person2Percentage) / 100
-      }
-    }
-  })
+  // Los gastos no computables SÍ cuentan en un informe (comportamiento histórico).
+  const { totalIncome, totalExpenses, person1Income, person2Income, person1Expenses, person2Expenses } =
+    aggregateTransactions(transactions)
   return { totalIncome, totalExpenses, person1Income, person2Income, person1Expenses, person2Expenses }
 }
 
@@ -202,44 +243,12 @@ export function calculateCumulativeBalances(transactions: Transaction[]): {
   person1TotalBalance: number
   person2TotalBalance: number
 } {
-  let totalIncome = 0
-  let totalExpenses = 0
-  let person1Income = 0
-  let person2Income = 0
-  let person1Expenses = 0
-  let person2Expenses = 0
-
-  transactions.forEach((transaction) => {
-    const { amount, type, owner, person1Percentage = 0, person2Percentage = 0, nonComputable = false } = transaction
-    
-    // Skip non-computable expenses for cumulative balances
-    if (type === "expense" && nonComputable) {
-      return
-    }
-    
-    if (type === "income") {
-      totalIncome += amount
-      if (owner === "person1") person1Income += amount
-      else if (owner === "person2") person2Income += amount
-      else {
-        person1Income += (amount * person1Percentage) / 100
-        person2Income += (amount * person2Percentage) / 100
-      }
-    } else {
-      // type === "expense" (and not nonComputable, as we returned early if it was)
-      totalExpenses += amount
-      if (owner === "person1") person1Expenses += amount
-      else if (owner === "person2") person2Expenses += amount
-      else {
-        person1Expenses += (amount * person1Percentage) / 100
-        person2Expenses += (amount * person2Percentage) / 100
-      }
-    }
-  })
+  // A diferencia del informe mensual, el acumulado EXCLUYE los gastos no computables.
+  const totals = aggregateTransactions(transactions, { excludeNonComputableExpenses: true })
 
   return {
-    totalBalance: totalIncome - totalExpenses,
-    person1TotalBalance: person1Income - person1Expenses,
-    person2TotalBalance: person2Income - person2Expenses,
+    totalBalance: subtractMoney(totals.totalIncome, totals.totalExpenses),
+    person1TotalBalance: subtractMoney(totals.person1Income, totals.person1Expenses),
+    person2TotalBalance: subtractMoney(totals.person2Income, totals.person2Expenses),
   }
 }
