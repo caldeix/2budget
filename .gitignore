@@ -42,3 +42,4 @@ next-env.d.ts
 
 # Documentación interactiva generada (generate-app-flow)
 /app-flow/
+.claude
