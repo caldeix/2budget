@@ -9,20 +9,23 @@ export function ConfirmCopyModal({
   onConfirm,
   monthName,
   year,
-  count,
+  expenseCount,
+  incomeCount,
 }: {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
   monthName: string
   year: number
-  count: number
+  expenseCount: number
+  incomeCount: number
 }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Confirmar copia de gastos fijos">
+    <Modal isOpen={isOpen} onClose={onClose} title="Confirmar copia de gastos fijos e ingresos">
       <div className="space-y-4">
         <p>
-          ¿Estás seguro de que deseas copiar los {count} gastos fijos del mes anterior a {monthName} {year}?
+          ¿Estás seguro de que deseas copiar {expenseCount} gastos fijos y {incomeCount} ingresos del mes anterior a{" "}
+          {monthName} {year}?
         </p>
         <p className="text-sm text-muted-foreground">
           Esta acción no se puede deshacer.
@@ -32,7 +35,7 @@ export function ConfirmCopyModal({
             Cancelar
           </Button>
           <Button variant="destructive" onClick={onConfirm}>
-            Copiar gastos
+            Copiar
           </Button>
         </div>
       </div>

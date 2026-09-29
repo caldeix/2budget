@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -28,7 +28,7 @@
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
-- **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic; si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
+- **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
 - **Importar / Exportar** — Backup y restauración en JSON
 - **Tema oscuro / claro** — Paleta premium Gold × Violet con soporte automático del sistema
 - **Diseño responsivo** — Optimizado para móvil y escritorio
@@ -54,6 +54,12 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.1 — Copia también de los ingresos
+
+- **Los ingresos también se copian** — el botón de copia traspasa, además de los gastos fijos, todos los ingresos del mes anterior, excepto los ajustes de cierre del informe
+- **Sin duplicados** — cada tipo se copia solo si el mes destino aún no lo tiene: si ya copiaste los gastos fijos, puedes volver a pulsar para traer solo los ingresos
+- SemVer: 1.4.0 → 1.4.1
 
 ### v1.4.0 — Preparar el mes siguiente tras cerrar el informe
 
@@ -93,7 +99,7 @@ npm run deploy     # Build + push a GitHub Pages
 
 ### v1.0.1
 
-- **Copia de gastos fijos** — duplica los gastos fijos del mes anterior al mes actual con un clic
+- **Copia de gastos fijos e ingresos** — duplica los gastos fijos y los ingresos del mes anterior al mes actual con un clic
 - Validación mejorada para evitar copias duplicadas en el mismo mes
 
 ---

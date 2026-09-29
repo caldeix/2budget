@@ -168,10 +168,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
                 Hagan clic en el icono de papelera (<strong className="text-red-600">Eliminar</strong>) junto a
                 cualquier transacción para borrarla permanentemente.
               </p>
-              <h4 className="font-medium text-foreground">Copiar Gastos Fijos:</h4>
+              <h4 className="font-medium text-foreground">Copiar Gastos Fijos e Ingresos:</h4>
               <p>
-                Utilice el botón de copia en la barra lateral para duplicar automáticamente los gastos fijos del mes
-                anterior al mes actual. Si el mes en curso ya tiene el informe cerrado, pueden navegar al mes
+                Utilice el botón de copia en la barra lateral para duplicar automáticamente los gastos fijos y los
+                ingresos del mes anterior al mes actual (los ajustes de cierre de informe no se copian). Si el mes ya
+                tiene gastos fijos o ingresos, ese tipo no se vuelve a copiar. Si el mes en curso ya tiene el informe cerrado, pueden navegar al mes
                 siguiente y copiar sus gastos fijos sin esperar al día 1.
               </p>
             </AccordionContent>

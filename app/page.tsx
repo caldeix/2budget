@@ -31,6 +31,10 @@ function getMonthName(month: number): string {
   return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
+const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
+// Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
+const isCopyableIncome = (t: Transaction) => t.type === "income" && !/^Ajuste .+ - Cierre /.test(t.name)
+
 export default function HomePage() {
   const {
     data,
@@ -57,7 +61,7 @@ export default function HomePage() {
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
 
   const [isConfirmCopyModalOpen, setIsConfirmCopyModalOpen] = useState(false)
-  const [previousMonthFixedExpenses, setPreviousMonthFixedExpenses] = useState<Transaction[]>([])
+  const [transactionsToCopy, setTransactionsToCopy] = useState<Transaction[]>([])
 
   const [isPaidReconcileOpen, setIsPaidReconcileOpen] = useState(false)
   const [reconcileExpenses, setReconcileExpenses] = useState<Transaction[]>([])
@@ -74,9 +78,10 @@ export default function HomePage() {
 
   const allTransactionsForSelectedMonth = getTransactionsForMonth(selectedMonth, selectedYear)
 
-  const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(
-    (t) => t.type === "expense" && t.category === "fixed"
-  )
+  const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(isFixedExpense)
+  const hasIncomesInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableIncome)
+  // Cada tipo se copia solo si el mes seleccionado aún no lo tiene, para no duplicar.
+  const hasNothingToCopy = hasFixedExpensesInCurrentMonth && hasIncomesInCurrentMonth
 
   const actualCurrentMonth = getCurrentMonth()
   const actualCurrentYear = getCurrentYear()
@@ -120,41 +125,46 @@ export default function HomePage() {
     const { month: sourceMonth, year: sourceYear } = getPreviousMonthYear(selectedMonth, selectedYear)
     const sourceMonthName = getMonthName(sourceMonth - 1)
     const sourceTransactions = getTransactionsForMonth(sourceMonth, sourceYear)
-    const fixedExpenses = sourceTransactions.filter(
-      (t) => t.type === "expense" && t.category === "fixed"
+    const toCopy = sourceTransactions.filter(
+      (t) =>
+        (!hasFixedExpensesInCurrentMonth && isFixedExpense(t)) || (!hasIncomesInCurrentMonth && isCopyableIncome(t))
     )
 
-    if (fixedExpenses.length === 0) {
-      alert(`No hay gastos fijos en ${sourceMonthName} ${sourceYear} para copiar.`)
+    if (toCopy.length === 0) {
+      alert(`No hay gastos fijos ni ingresos en ${sourceMonthName} ${sourceYear} para copiar.`)
       return
     }
 
-    setPreviousMonthFixedExpenses(fixedExpenses)
+    setTransactionsToCopy(toCopy)
     setIsConfirmCopyModalOpen(true)
-  }, [selectedMonth, selectedYear, getTransactionsForMonth])
+  }, [selectedMonth, selectedYear, getTransactionsForMonth, hasFixedExpensesInCurrentMonth, hasIncomesInCurrentMonth])
 
-  const confirmCopyFixedExpenses = useCallback(() => {
+  const confirmCopyTransactions = useCallback(() => {
     // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
     const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
 
-    previousMonthFixedExpenses.forEach((expense) => {
-      const newExpense: TransactionFormData = {
-        type: expense.type,
-        category: expense.category,
-        name: `${expense.name} (copiado)`,
-        amount: expense.amount,
-        owner: expense.owner,
-        person1Percentage: expense.person1Percentage ?? 50,
-        person2Percentage: expense.person2Percentage ?? 50,
+    transactionsToCopy.forEach((transaction) => {
+      const newTransaction: TransactionFormData = {
+        type: transaction.type,
+        category: transaction.category,
+        name: `${transaction.name} (copiado)`,
+        amount: transaction.amount,
+        owner: transaction.owner,
+        person1Percentage: transaction.person1Percentage ?? 50,
+        person2Percentage: transaction.person2Percentage ?? 50,
         date: formattedDate,
       }
-      addTransaction(newExpense)
+      addTransaction(newTransaction)
     })
 
+    const expenseCount = transactionsToCopy.filter(isFixedExpense).length
+    const incomeCount = transactionsToCopy.length - expenseCount
     setIsConfirmCopyModalOpen(false)
-    setPreviousMonthFixedExpenses([])
-    alert(`${previousMonthFixedExpenses.length} gastos fijos copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`)
-  }, [previousMonthFixedExpenses, selectedMonth, selectedYear, addTransaction])
+    setTransactionsToCopy([])
+    alert(
+      `${expenseCount} gastos fijos y ${incomeCount} ingresos copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`,
+    )
+  }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
     setMonthToCloseReport(actualCurrentMonth)
@@ -426,20 +436,20 @@ export default function HomePage() {
 
         <Button
           onClick={prepareCopyFixedExpenses}
-          variant={hasFixedExpensesInCurrentMonth || isCopyBlockedByFuture ? "outline" : "destructive"}
+          variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
           size="icon"
-          className={`shadow-lg ${!hasFixedExpensesInCurrentMonth && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
-          disabled={hasFixedExpensesInCurrentMonth || isCopyBlockedByFuture}
+          className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
+          disabled={hasNothingToCopy || isCopyBlockedByFuture}
           title={
-            hasFixedExpensesInCurrentMonth
-              ? "Ya hay gastos fijos este mes"
+            hasNothingToCopy
+              ? "Ya hay gastos fijos e ingresos este mes"
               : isCopyBlockedByFuture
-                ? "No se pueden copiar gastos a un mes futuro hasta cerrar el informe del mes anterior"
-                : "Copiar gastos fijos del mes anterior"
+                ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
+                : "Copiar gastos fijos e ingresos del mes anterior"
           }
         >
           <Copy className="h-5 w-5" />
-          <span className="sr-only">Copiar gastos fijos</span>
+          <span className="sr-only">Copiar gastos fijos e ingresos</span>
         </Button>
 
         <ThemeToggle />
@@ -458,10 +468,11 @@ export default function HomePage() {
       <ConfirmCopyModal
         isOpen={isConfirmCopyModalOpen}
         onClose={() => setIsConfirmCopyModalOpen(false)}
-        onConfirm={confirmCopyFixedExpenses}
+        onConfirm={confirmCopyTransactions}
         monthName={getMonthName(selectedMonth - 1)}
         year={selectedYear}
-        count={previousMonthFixedExpenses.length}
+        expenseCount={transactionsToCopy.filter(isFixedExpense).length}
+        incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
       />
 
       <PaidReconciliationModal
