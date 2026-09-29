@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.4-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.5-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,11 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.5 — Reparto exacto de los gastos compartidos
+
+- **Sin céntimos acumulados en un lado** — los importes compartidos se suman por porcentaje y se reparte el total una sola vez, en lugar de repartir cada transacción por separado. Antes, cada importe con céntimo impar al 50% le daba ese céntimo siempre a la Persona 1 (p. ej. 1.486,92 € salía 743,47 / 743,45); ahora sale 743,46 / 743,46, y como mucho queda un céntimo de diferencia por porcentaje
+- SemVer: 1.4.4 → 1.4.5 (PATCH)
 
 ### v1.4.4 — La copia conserva el «no computable»
 
