@@ -111,8 +111,9 @@ export function TransactionForm({
    */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault() // Previene el comportamiento por defecto del formulario.
-    // Validación básica: el nombre no puede estar vacío y el importe debe ser mayor que 0.
-    if (!formData.name || formData.amount <= 0) return
+    // Validación básica: el nombre no puede estar vacío y el importe no puede ser negativo.
+    // Se admite 0 € para mantener un gasto habitual que un mes no se cobra.
+    if (!formData.name || formData.amount < 0) return
 
     onSubmit(formData) // Llama a la función de envío del padre con los datos del formulario.
     onClose() // Cierra el modal.
@@ -223,7 +224,6 @@ export function TransactionForm({
               id="amount"
               value={formData.amount}
               onValueChange={(amount) => setFormData((prev) => ({ ...prev, amount }))}
-              emptyWhenZero
               placeholder="0,00"
             />
           </div>
@@ -284,7 +284,7 @@ export function TransactionForm({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={!formData.name || formData.amount <= 0}>
+          <Button type="submit" disabled={!formData.name || formData.amount < 0}>
             {transaction ? "Actualizar" : "Crear"} {/* Texto del botón cambia según si es edición o creación. */}
           </Button>
         </div>

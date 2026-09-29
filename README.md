@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.2-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.3-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,12 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.3 — Gastos de 0 €
+
+- **Se admiten importes de 0 €** — un gasto habitual que un mes no se cobra (por ejemplo, porque te lo regalan) puede guardarse a 0 € y sigue apareciendo en la lista y copiándose como fijo. Los importes negativos siguen sin admitirse
+- **El campo muestra el 0** — el importe se ve como «0,00» en lugar de quedarse vacío, para que quede claro lo que se guarda
+- SemVer: 1.4.2 → 1.4.3 (PATCH)
 
 ### v1.4.2 — Copias sin sufijo «(copiado)»
 
