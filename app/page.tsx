@@ -154,6 +154,7 @@ export default function HomePage() {
         person1Percentage: transaction.person1Percentage ?? 50,
         person2Percentage: transaction.person2Percentage ?? 50,
         date: formattedDate,
+        nonComputable: transaction.nonComputable,
       }
       addTransaction(newTransaction)
     })
