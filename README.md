@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.2-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,11 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.2 — Copias sin sufijo «(copiado)»
+
+- **Nombre original en las copias** — las transacciones copiadas mantienen su nombre tal cual, sin añadir «(copiado)»; si el origen ya lo arrastraba de versiones anteriores, se limpia al copiar
+- SemVer: 1.4.1 → 1.4.2 (PATCH)
 
 ### v1.4.1 — Copia también de los ingresos
 

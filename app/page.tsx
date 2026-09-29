@@ -147,7 +147,8 @@ export default function HomePage() {
       const newTransaction: TransactionFormData = {
         type: transaction.type,
         category: transaction.category,
-        name: `${transaction.name} (copiado)`,
+        // Se copia con el mismo nombre, limpiando el sufijo " (copiado)" que dejaban versiones anteriores.
+        name: transaction.name.replace(/( \(copiado\))+$/, ""),
         amount: transaction.amount,
         owner: transaction.owner,
         person1Percentage: transaction.person1Percentage ?? 50,
