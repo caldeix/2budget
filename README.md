@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.2.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,11 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.0 — Preparar el mes siguiente tras cerrar el informe
+
+- **Copia de gastos fijos al mes siguiente** — en cuanto el mes en curso tiene el informe cerrado, se puede navegar al mes siguiente y copiar sus gastos fijos sin esperar al día 1. Las copias se fechan el día 1 de ese mes. Si el mes anterior no está cerrado, el botón sigue bloqueado para meses futuros
+- SemVer: 1.3.0 → 1.4.0 (MINOR: nueva funcionalidad, sin breaking changes)
 
 ### v1.3.0 — Fecha real de pago y decimales exactos
 
