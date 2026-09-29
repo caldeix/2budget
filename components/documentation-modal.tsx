@@ -171,7 +171,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
               <h4 className="font-medium text-foreground">Copiar Gastos Fijos:</h4>
               <p>
                 Utilice el botón de copia en la barra lateral para duplicar automáticamente los gastos fijos del mes
-                anterior al mes actual.
+                anterior al mes actual. Si el mes en curso ya tiene el informe cerrado, pueden navegar al mes
+                siguiente y copiar sus gastos fijos sin esperar al día 1.
               </p>
             </AccordionContent>
           </AccordionItem>

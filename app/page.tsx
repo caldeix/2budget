@@ -89,6 +89,10 @@ export default function HomePage() {
   const calculations = useCalculations(allTransactionsForSelectedMonth)
   const existingReportForActualMonth = getExistingReport(actualCurrentMonth, actualCurrentYear)
   const existingReportForSelectedMonth = getExistingReport(selectedMonth, selectedYear)
+  const { month: prevOfSelectedMonth, year: prevOfSelectedYear } = getPreviousMonthYear(selectedMonth, selectedYear)
+  const isPreviousMonthClosed = !!getExistingReport(prevOfSelectedMonth, prevOfSelectedYear)
+  // Un mes futuro solo se bloquea para copiar si el mes anterior aún no tiene informe cerrado.
+  const isCopyBlockedByFuture = isSelectedMonthFuture && !isPreviousMonthClosed
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
@@ -422,15 +426,15 @@ export default function HomePage() {
 
         <Button
           onClick={prepareCopyFixedExpenses}
-          variant={hasFixedExpensesInCurrentMonth || isSelectedMonthFuture ? "outline" : "destructive"}
+          variant={hasFixedExpensesInCurrentMonth || isCopyBlockedByFuture ? "outline" : "destructive"}
           size="icon"
-          className={`shadow-lg ${!hasFixedExpensesInCurrentMonth && !isSelectedMonthFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
-          disabled={hasFixedExpensesInCurrentMonth || isSelectedMonthFuture}
+          className={`shadow-lg ${!hasFixedExpensesInCurrentMonth && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
+          disabled={hasFixedExpensesInCurrentMonth || isCopyBlockedByFuture}
           title={
             hasFixedExpensesInCurrentMonth
               ? "Ya hay gastos fijos este mes"
-              : isSelectedMonthFuture
-                ? "No se pueden copiar gastos a meses futuros"
+              : isCopyBlockedByFuture
+                ? "No se pueden copiar gastos a un mes futuro hasta cerrar el informe del mes anterior"
                 : "Copiar gastos fijos del mes anterior"
           }
         >

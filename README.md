@@ -28,7 +28,7 @@
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
-- **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic
+- **Copia de gastos fijos** — Duplica automáticamente los gastos fijos del mes anterior con un clic; si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
 - **Importar / Exportar** — Backup y restauración en JSON
 - **Tema oscuro / claro** — Paleta premium Gold × Violet con soporte automático del sistema
 - **Diseño responsivo** — Optimizado para móvil y escritorio
