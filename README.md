@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.6-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.7-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,12 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.7 — Redondeo único sobre el reparto exacto
+
+- **Un solo redondeo por mes** — la parte de cada persona se calcula sumando su parte exacta de todas las transacciones (con sus fracciones de céntimo) y redondeando una única vez, por separado para ingresos y gastos. Antes se redondeaba cada porcentaje por separado y los céntimos sobrantes podían caer todos en la misma persona (p. ej. 383,34 € al 87% y 73,99 € al 50% daban 370,51 € en vez de 370,50 €). Ahora el resultado nunca se aleja más de medio céntimo del reparto exacto
+- **Aviso** — si creaste ajustes de un céntimo en un mes cerrado para compensar el redondeo anterior, puede que ya no hagan falta: revisa ese mes y bórralos si su balance ya no cuadra
+- SemVer: 1.4.6 → 1.4.7 (PATCH)
 
 ### v1.4.6 — Meses cerrados y acumulado cuadran al céntimo
 

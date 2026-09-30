@@ -14,7 +14,7 @@
  */
 
 import type { Transaction } from "@/types"
-import { fromCents, normalizePercentage, splitCentsByPercentage, toCents } from "@/lib/money"
+import { fromCents, normalizePercentage, toCents } from "@/lib/money"
 
 /**
  * @interface TransactionTotals
@@ -52,42 +52,35 @@ export interface AggregateOptions {
 }
 
 /**
- * @function sharedPercentage
- * @description Devuelve el porcentaje de la Persona 1 si la transacción es compartida, o
- *              `null` si es de una sola persona. `owner: "both"` y cualquier valor inesperado
- *              se tratan como compartidos (50/50 por defecto).
+ * @function exactShareOfPerson1
+ * @description Parte EXACTA de la Persona 1 en una transacción, en centésimas de céntimo
+ *              (céntimos × porcentaje), sin redondear. `owner: "both"` y cualquier valor
+ *              inesperado se reparten por porcentaje (50/50 por defecto).
+ * @param {number} cents - Importe de la transacción en céntimos.
  * @param {Transaction} t - La transacción.
- * @returns {number | null} Porcentaje normalizado (0-100) o `null`.
+ * @returns {number} Entero: la parte de la Persona 1 multiplicada por 100.
  */
-function sharedPercentage(t: Transaction): number | null {
-  if (t.owner === "person1" || t.owner === "person2") return null
-  return normalizePercentage(t.person1Percentage ?? 50)
+function exactShareOfPerson1(cents: number, t: Transaction): number {
+  if (t.owner === "person1") return cents * 100
+  if (t.owner === "person2") return 0
+  return cents * normalizePercentage(t.person1Percentage ?? 50)
 }
 
 /**
- * @function splitSharedGroups
- * @description Reparte las sumas compartidas agrupadas por porcentaje.
+ * @function roundShare
+ * @description Redondea al céntimo la suma exacta de la Persona 1 (en centésimas de céntimo).
+ *              El medio céntimo exacto va a la Persona 1, como en los repartos 50/50 de siempre.
  *
- *              Se reparte la SUMA de cada grupo, no cada transacción por separado: repartir
- *              una a una acumula el céntimo sobrante de cada importe impar siempre en el
- *              mismo lado (p. ej. dos gastos de 10,01 € al 50% daban 10,02 / 10,00), mientras
- *              que repartir la suma deja como mucho un céntimo de diferencia por grupo.
- * @param {Map<number, number>} groups - Porcentaje de la Persona 1 -> suma en céntimos.
- * @returns {[number, number]} Las partes de Persona 1 y Persona 2, en céntimos.
+ *              Se redondea UNA sola vez sobre la suma de todo el conjunto, no transacción a
+ *              transacción ni por porcentaje: así las fracciones de céntimo (p. ej. 36,995 € de
+ *              un 73,99 € al 50% o 333,5058 € de un 383,34 € al 87%) no se acumulan en un lado y
+ *              el resultado nunca se aleja más de medio céntimo del reparto exacto.
+ * @param {number} exact - Suma exacta de la Persona 1, en centésimas de céntimo.
+ * @returns {number} La parte de la Persona 1 en céntimos.
  */
-function splitSharedGroups(groups: Map<number, number>): [number, number] {
-  let c1 = 0
-  let c2 = 0
-  for (const [percentage, cents] of groups) {
-    const [a, b] = splitCentsByPercentage(cents, percentage)
-    c1 += a
-    c2 += b
-  }
-  return [c1, c2]
-}
-
-function addToGroup(groups: Map<number, number>, percentage: number, cents: number): void {
-  groups.set(percentage, (groups.get(percentage) ?? 0) + cents)
+function roundShare(exact: number): number {
+  const whole = Math.floor(exact / 100)
+  return exact - whole * 100 >= 50 ? whole + 1 : whole
 }
 
 /**
@@ -106,26 +99,19 @@ export function aggregateTransactions(
   // Acumuladores en CÉNTIMOS ENTEROS: cero error de coma flotante.
   let totalIncome = 0
   let totalExpenses = 0
-  let p1Income = 0
-  let p2Income = 0
-  let p1Expenses = 0
-  let p2Expenses = 0
   let fixedExpenses = 0
   let variableExpenses = 0
   let nonComputableExpenses = 0
-  // Importes compartidos agrupados por porcentaje; se reparten al final (ver splitSharedGroups).
-  const sharedIncome = new Map<number, number>()
-  const sharedExpenses = new Map<number, number>()
+  // Parte exacta de la Persona 1 (centésimas de céntimo); se redondea al final (ver roundShare).
+  let exactIncome1 = 0
+  let exactExpenses1 = 0
 
   for (const t of transactions) {
     const cents = toCents(t.amount)
 
     if (t.type === "income") {
       totalIncome += cents
-      const percentage = sharedPercentage(t)
-      if (percentage !== null) addToGroup(sharedIncome, percentage, cents)
-      else if (t.owner === "person1") p1Income += cents
-      else p2Income += cents
+      exactIncome1 += exactShareOfPerson1(cents, t)
       continue
     }
 
@@ -135,19 +121,14 @@ export function aggregateTransactions(
     if (t.nonComputable) nonComputableExpenses += cents
     if (t.category === "fixed") fixedExpenses += cents
     else if (t.category === "variable") variableExpenses += cents
-
-    const percentage = sharedPercentage(t)
-    if (percentage !== null) addToGroup(sharedExpenses, percentage, cents)
-    else if (t.owner === "person1") p1Expenses += cents
-    else p2Expenses += cents
+    exactExpenses1 += exactShareOfPerson1(cents, t)
   }
 
-  const [sharedIncome1, sharedIncome2] = splitSharedGroups(sharedIncome)
-  p1Income += sharedIncome1
-  p2Income += sharedIncome2
-  const [sharedExpenses1, sharedExpenses2] = splitSharedGroups(sharedExpenses)
-  p1Expenses += sharedExpenses1
-  p2Expenses += sharedExpenses2
+  // La Persona 2 se deriva del total: las dos partes suman exactamente el total, siempre.
+  const p1Income = roundShare(exactIncome1)
+  const p2Income = totalIncome - p1Income
+  const p1Expenses = roundShare(exactExpenses1)
+  const p2Expenses = totalExpenses - p1Expenses
 
   return {
     totalIncome: fromCents(totalIncome),
