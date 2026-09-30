@@ -7,9 +7,9 @@
 
 import { type ClassValue, clsx } from "clsx" // Utilidad para combinar clases condicionalmente.
 import { twMerge } from "tailwind-merge" // Utilidad para fusionar clases de Tailwind sin conflictos.
-import type { Transaction } from "@/types" // Importa el tipo Transaction.
+import type { AppData, Transaction } from "@/types" // Tipos de datos de la app.
 import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
-import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
+import { fromCents, subtractMoney, toCents } from "@/lib/money" // Aritmética monetaria exacta.
 
 /**
  * `formatCurrency` vive ahora en `@/lib/money`, junto al resto de la aritmética monetaria.
@@ -231,10 +231,31 @@ export function calculateReportTotals(transactions: Transaction[]): {
 }
 
 /**
+ * @function groupByMonth
+ * @description Agrupa transacciones por mes según su fecha ("YYYY-MM").
+ * @param {Transaction[]} transactions - Las transacciones a agrupar.
+ * @returns {Map<string, Transaction[]>} Mes -> transacciones de ese mes.
+ */
+function groupByMonth(transactions: Transaction[]): Map<string, Transaction[]> {
+  const byMonth = new Map<string, Transaction[]>()
+  for (const t of transactions) {
+    const key = t.date.slice(0, 7)
+    const list = byMonth.get(key)
+    if (list) list.push(t)
+    else byMonth.set(key, [t])
+  }
+  return byMonth
+}
+
+/**
  * @function calculateCumulativeBalances
  * @description Calcula los balances acumulados totales e individuales de todas las transacciones.
  *              A diferencia de `calculateReportTotals`, esta función procesa *todas* las transacciones
  *              disponibles para dar una visión global a largo plazo.
+ *
+ *              Se calcula MES A MES y se suman los resultados: el reparto de los importes
+ *              compartidos redondea por mes, así que agregarlo todo de golpe podría diferir en
+ *              algún céntimo de la suma de los balances mensuales que se ven (y se cierran).
  * @param {Transaction[]} transactions - Un array de objetos de transacción.
  * @returns {{ totalBalance: number; person1TotalBalance: number; person2TotalBalance: number; }} Un objeto con los balances acumulados.
  */
@@ -243,12 +264,76 @@ export function calculateCumulativeBalances(transactions: Transaction[]): {
   person1TotalBalance: number
   person2TotalBalance: number
 } {
-  // A diferencia del informe mensual, el acumulado EXCLUYE los gastos no computables.
-  const totals = aggregateTransactions(transactions, { excludeNonComputableExpenses: true })
+  let p1 = 0
+  let p2 = 0
+
+  for (const monthTransactions of groupByMonth(transactions).values()) {
+    // Balance del mes tal y como lo muestran las tarjetas mensuales (con los no computables)...
+    const month = aggregateTransactions(monthTransactions)
+    // ...y, como el acumulado EXCLUYE los gastos no computables, se devuelve su parte a cada uno.
+    const nonComputable = aggregateTransactions(monthTransactions.filter((t) => t.type === "expense" && t.nonComputable))
+
+    p1 += toCents(month.person1Income) - toCents(month.person1Expenses) + toCents(nonComputable.person1Expenses)
+    p2 += toCents(month.person2Income) - toCents(month.person2Expenses) + toCents(nonComputable.person2Expenses)
+  }
 
   return {
-    totalBalance: subtractMoney(totals.totalIncome, totals.totalExpenses),
-    person1TotalBalance: subtractMoney(totals.person1Income, totals.person1Expenses),
-    person2TotalBalance: subtractMoney(totals.person2Income, totals.person2Expenses),
+    totalBalance: fromCents(p1 + p2),
+    person1TotalBalance: fromCents(p1),
+    person2TotalBalance: fromCents(p2),
   }
+}
+
+/**
+ * @function createRoundingAdjustmentsForClosedReports
+ * @description Corrección de un solo uso para los meses cerrados antes de la v1.4.5.
+ *              Sus ajustes de cierre se calcularon con el reparto antiguo (transacción a
+ *              transacción) y, con el reparto actual, algún céntimo pasa de una persona a otra
+ *              (p. ej. 1.400 / 0 pasa a 1.399,99 / 0,01).
+ *
+ *              Solo corrige cuando la diferencia es EXCLUSIVAMENTE de reparto: el total del mes
+ *              sigue cuadrando con el dinero real (d1 + d2 = 0) y lo movido no supera un
+ *              céntimo por transacción compartida. Si el mes se editó después de cerrarlo, no
+ *              se toca.
+ * @param {AppData} data - Los datos de la app.
+ * @returns {Transaction[]} Los ajustes de cierre a añadir (vacío si no hay nada que corregir).
+ */
+export function createRoundingAdjustmentsForClosedReports(data: AppData): Transaction[] {
+  const byMonth = groupByMonth(data.transactions)
+  const adjustments: Transaction[] = []
+
+  for (const report of data.reports) {
+    const monthTransactions = byMonth.get(`${report.year}-${String(report.month).padStart(2, "0")}`) ?? []
+    const totals = aggregateTransactions(monthTransactions)
+    const d1 = toCents(report.person1RealMoney) - (toCents(totals.person1Income) - toCents(totals.person1Expenses))
+    const d2 = toCents(report.person2RealMoney) - (toCents(totals.person2Income) - toCents(totals.person2Expenses))
+    const sharedCount = monthTransactions.filter((t) => t.owner !== "person1" && t.owner !== "person2").length
+
+    if (d1 === 0 || d1 + d2 !== 0 || Math.abs(d1) > sharedCount) continue
+
+    const date = getLastDateOfMonth(report.month, report.year)
+    const people = [
+      { owner: "person1" as const, name: data.config.person1Name, cents: d1 },
+      { owner: "person2" as const, name: data.config.person2Name, cents: d2 },
+    ]
+    for (const { owner, name, cents } of people) {
+      // Mismo formato que los ajustes del modal de cierre de mes.
+      adjustments.push({
+        id: generateId(),
+        type: cents > 0 ? "income" : "expense",
+        category: cents > 0 ? "income" : "variable",
+        name: `Ajuste ${name} - Cierre ${formatMonthYear(report.month, report.year)}`,
+        amount: fromCents(Math.abs(cents)),
+        owner,
+        person1Percentage: owner === "person1" ? 100 : 0,
+        person2Percentage: owner === "person1" ? 0 : 100,
+        nonComputable: false,
+        paid: true, // Apunte contable de un mes ya cerrado: no queda nada pendiente de pagar.
+        date,
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+
+  return adjustments
 }

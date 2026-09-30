@@ -8,6 +8,7 @@
 
 import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
 import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
+import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
 
 /**
  * @constant {string} STORAGE_KEY
@@ -18,12 +19,13 @@ const STORAGE_KEY = "financial-manager-data"
 /**
  * Versión del esquema de datos persistido.
  * v2 = todos los importes redondeados a 2 decimales y porcentajes coherentes.
+ * v3 = meses cerrados con el reparto antiguo corregidos con ajustes de céntimo (v1.4.5).
  *
  * La versión es solo una marca de "ya reescrito", NO un requisito de corrección: la
  * normalización en lectura se aplica siempre y es idempotente, así que un JSON antiguo
  * importado mañana queda igual de protegido. Solo evita el guardado redundante en cada arranque.
  */
-const DATA_VERSION = 2
+const DATA_VERSION = 3
 
 /**
  * @constant {AppConfig} defaultConfig
@@ -132,6 +134,11 @@ export function loadData(): AppData {
     // reescritura en cada arranque. La app es correcta aunque esto no llegue a ejecutarse,
     // porque la normalización en lectura de arriba se aplica siempre.
     if (data.version !== DATA_VERSION) {
+      // A diferencia de la normalización, esta corrección añade transacciones y solo se
+      // aplica una vez, al pasar de un esquema anterior a v3.
+      if ((data.version ?? 0) < 3) {
+        normalized.transactions = [...createRoundingAdjustmentsForClosedReports(normalized), ...normalized.transactions]
+      }
       saveData(normalized)
     }
 
@@ -200,7 +207,9 @@ export function importData(jsonString: string): boolean {
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
     const imported: AppData = {
-      version: DATA_VERSION,
+      // Se conserva la versión del archivo: al recargar, `loadData` aplica las migraciones
+      // de un solo uso que le falten (p. ej. la corrección de céntimos de v3).
+      version: typeof raw.version === "number" ? raw.version : undefined,
       transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
       // Los informes importados también se normalizan: pueden traer importes sin redondear.
       reports: Array.isArray(raw.reports) ? raw.reports.map(normalizeReport) : [],

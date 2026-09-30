@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.5-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.4.6-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -54,6 +54,13 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.4.6 — Meses cerrados y acumulado cuadran al céntimo
+
+- **Corrección automática de los meses cerrados** — los meses cerrados antes de la v1.4.5 tenían sus ajustes calculados con el reparto antiguo y, con el nuevo, algún céntimo pasaba de una persona a otra (p. ej. 1.400 / 0 salía 1.399,99 / 0,01). Al abrir la app se añade una sola vez un ajuste de cierre de céntimos en esos meses para que vuelvan a cuadrar con el dinero real. Solo se aplica si la diferencia es únicamente de reparto; un mes editado tras cerrarlo no se toca
+- **Balance total acumulado mes a mes** — el acumulado se calcula sumando el balance de cada mes, igual que las tarjetas mensuales, en lugar de agregarlo todo de golpe
+- **Importar copias antiguas** — al importar un archivo de una versión anterior también se le aplica esta corrección
+- SemVer: 1.4.5 → 1.4.6 (PATCH)
 
 ### v1.4.5 — Reparto exacto de los gastos compartidos
 
