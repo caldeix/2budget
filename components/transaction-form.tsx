@@ -30,6 +30,7 @@ import { getTodayDate } from "@/lib/utils" // Fecha de hoy en local (no UTC).
  * @property {Transaction} [transaction] - Objeto de transacción si se está editando una existente.
  * @property {string} person1Name - Nombre de la Persona 1.
  * @property {string} person2Name - Nombre de la Persona 2.
+ * @property {boolean} [singleMode] - Modo individual: oculta el propietario y el reparto.
  */
 interface TransactionFormProps {
   isOpen: boolean
@@ -38,6 +39,7 @@ interface TransactionFormProps {
   transaction?: Transaction
   person1Name: string
   person2Name: string
+  singleMode?: boolean
 }
 
 /**
@@ -54,16 +56,25 @@ export function TransactionForm({
   transaction,
   person1Name,
   person2Name,
+  singleMode = false,
 }: TransactionFormProps) {
+  // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
+  const defaultOwner = singleMode ? "person1" : "both"
+  const defaultPerson1Percentage = singleMode ? 100 : 50
+
+  // En modo individual el selector de propietario se oculta, salvo al editar una transacción
+  // antigua que no es solo de la Persona 1: así se puede ver y reasignar.
+  const showOwnerSelector = !singleMode || (transaction !== undefined && transaction.owner !== "person1")
+
   // Estado del formulario, inicializado con valores por defecto.
   const [formData, setFormData] = useState<TransactionFormData & { nonComputable: boolean }>({
     type: transaction?.type || "expense",
     category: transaction?.category || "variable",
     name: transaction?.name || "",
     amount: transaction?.amount || 0,
-    owner: transaction?.owner || "both",
-    person1Percentage: transaction?.person1Percentage ?? 50,
-    person2Percentage: transaction?.person2Percentage ?? 50,
+    owner: transaction?.owner || defaultOwner,
+    person1Percentage: transaction?.person1Percentage ?? defaultPerson1Percentage,
+    person2Percentage: transaction?.person2Percentage ?? 100 - defaultPerson1Percentage,
     date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
   })
@@ -93,14 +104,14 @@ export function TransactionForm({
         category: "variable",
         name: "",
         amount: 0,
-        owner: "both",
-        person1Percentage: 50,
-        person2Percentage: 50,
+        owner: defaultOwner,
+        person1Percentage: defaultPerson1Percentage,
+        person2Percentage: 100 - defaultPerson1Percentage,
         date: getTodayDate(),
         nonComputable: false,
       })
     }
-  }, [transaction, isOpen]) // Dependencias: se ejecuta cuando `transaction` o `isOpen` cambian.
+  }, [transaction, isOpen, defaultOwner, defaultPerson1Percentage]) // Se ejecuta al abrir, al cambiar la transacción o el modo.
 
   /**
    * @function handleSubmit
@@ -240,25 +251,27 @@ export function TransactionForm({
           </div>
         </div>
 
-        {/* Campo de Propietario */}
-        <div>
-          <Label htmlFor="owner">Propietario</Label>
-          <select
-            id="owner"
-            value={formData.owner}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, owner: e.target.value as "person1" | "person2" | "both" }))
-            }
-            className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-          >
-            <option value="person1">{person1Name}</option>
-            <option value="person2">{person2Name}</option>
-            <option value="both">Ambos</option>
-          </select>
-        </div>
+        {/* Campo de Propietario (oculto en modo individual) */}
+        {showOwnerSelector && (
+          <div>
+            <Label htmlFor="owner">Propietario</Label>
+            <select
+              id="owner"
+              value={formData.owner}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, owner: e.target.value as "person1" | "person2" | "both" }))
+              }
+              className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+            >
+              <option value="person1">{person1Name}</option>
+              <option value="person2">{person2Name}</option>
+              <option value="both">Ambos</option>
+            </select>
+          </div>
+        )}
 
         {/* Deslizador de Porcentajes (solo visible si el propietario es "Ambos") */}
-        {formData.owner === "both" && (
+        {showOwnerSelector && formData.owner === "both" && (
           <div className="space-y-4">
             <Label>Distribución de porcentajes</Label>
             <div className="flex items-center gap-4">

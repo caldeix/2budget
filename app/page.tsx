@@ -8,6 +8,7 @@ import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBa
 import { subtractMoney } from "@/lib/money"
 import { generateSampleData } from "@/lib/sample-data"
 import { getLastSeenMonth, setLastSeenMonth } from "@/lib/storage"
+import { countPerson2OpenTransactions } from "@/lib/single-mode"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -213,7 +214,7 @@ export default function HomePage() {
   }
 
   const handleLoadSampleData = () => {
-    const sampleTransactions = generateSampleData()
+    const sampleTransactions = generateSampleData(data.config.singleMode)
     replaceAllData({ ...data, transactions: sampleTransactions, reports: [] })
   }
 
@@ -330,6 +331,7 @@ export default function HomePage() {
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
           nonComputableExpenses={calculations.nonComputableExpenses}
+          singleMode={data.config.singleMode}
         />
 
         <div className="flex flex-col lg:flex-row gap-8 mt-8">
@@ -340,6 +342,7 @@ export default function HomePage() {
               person2TotalBalance={cumulativeBalances.person2TotalBalance}
               person1Name={data.config.person1Name}
               person2Name={data.config.person2Name}
+              singleMode={data.config.singleMode}
             />
 
             <div className="bg-card rounded-2xl shadow-lg border">
@@ -425,6 +428,7 @@ export default function HomePage() {
               transactionsToShowCount={transactionsToShow}
               onLoadMore={handleLoadMoreTransactions}
               hasMore={hasMoreTransactions}
+              singleMode={data.config.singleMode}
             />
           </div>
         </div>
@@ -493,6 +497,7 @@ export default function HomePage() {
         transaction={editingTransaction || undefined}
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
+        singleMode={data.config.singleMode}
       />
 
       {isReportModalOpen && (
@@ -506,6 +511,7 @@ export default function HomePage() {
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
           existingReport={getExistingReport(monthToCloseReport, yearToCloseReport)}
+          singleMode={data.config.singleMode}
         />
       )}
 
@@ -516,6 +522,7 @@ export default function HomePage() {
           report={selectedReport}
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
+          singleMode={data.config.singleMode}
         />
       )}
 
@@ -527,6 +534,7 @@ export default function HomePage() {
         onImportData={handleImportData}
         onLoadSampleData={handleLoadSampleData}
         onClearData={handleClearData}
+        person2OpenTransactionsCount={countPerson2OpenTransactions(data.transactions, data.reports)}
       />
 
       <DocumentationModal

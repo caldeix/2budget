@@ -52,6 +52,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
           alcanzar sus metas económicas juntos y disfrutar de una vida financiera más armoniosa. ¡Descubran cómo
           funciona!
         </p>
+        <p className="text-foreground leading-relaxed">
+          ¿Vas por tu cuenta? Activa el <strong>modo individual</strong> en Configuración y 2Budget funcionará para una
+          sola persona, sin propietarios ni repartos.
+        </p>
 
         {/* Componente Accordion para organizar las secciones de la documentación */}
         <Accordion type="multiple" className="w-full">
@@ -379,7 +383,18 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
                   Pueden cambiar los nombres de "Persona 1" y "Persona 2" a sus nombres reales o apodos. Estos nombres
                   se actualizarán en toda la aplicación.
                 </li>
-                <li>Hagan clic en "Guardar Nombres" para aplicar los cambios.</li>
+                <li>Hagan clic en "Guardar configuración" para aplicar los cambios.</li>
+              </ul>
+              <h4 className="font-medium text-foreground">Modo individual:</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Para usar la app sin pareja. Oculta la segunda persona: el formulario ya no pide propietario ni
+                  reparto, las tarjetas muestran solo los totales y el cierre de mes pide un único dinero real.
+                </li>
+                <li>
+                  No borra ni modifica ningún dato. Si quedan transacciones de la segunda persona o compartidas, siguen
+                  sumando en los totales y se muestran con su etiqueta. Se puede desactivar en cualquier momento.
+                </li>
               </ul>
               <h4 className="font-medium text-foreground">Gestión de datos:</h4>
               <ul className="list-disc list-inside space-y-1">

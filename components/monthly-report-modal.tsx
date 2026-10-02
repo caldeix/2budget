@@ -19,6 +19,7 @@ import { formatCurrency, formatMonthYear, getLastDateOfMonth } from "@/lib/utils
 import { isZeroMoney, subtractMoney } from "@/lib/money" // Aritmética monetaria exacta.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
 import { useCalculations } from "@/hooks/use-calculations" // Hook para cálculos financieros.
+import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos.
 
 /**
@@ -33,6 +34,7 @@ import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos
  * @property {string} person1Name - Nombre de la Persona 1.
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {MonthlyReport} [existingReport] - Objeto de informe mensual existente si se está actualizando uno.
+ * @property {boolean} [singleMode] - Modo individual: solo se pide el dinero real de la Persona 1.
  */
 interface MonthlyReportModalProps {
   isOpen: boolean
@@ -47,6 +49,7 @@ interface MonthlyReportModalProps {
   person1Name: string
   person2Name: string
   existingReport?: MonthlyReport
+  singleMode?: boolean
 }
 
 /**
@@ -66,6 +69,7 @@ export function MonthlyReportModal({
   person1Name,
   person2Name,
   existingReport,
+  singleMode,
 }: MonthlyReportModalProps) {
   // Estado para el dinero real disponible de la Persona 1.
   const [person1RealMoney, setPerson1RealMoney] = useState(0)
@@ -100,11 +104,17 @@ export function MonthlyReportModal({
   const person1CalculatedBalance = calculations.person1Balance
   const person2CalculatedBalance = calculations.person2Balance
 
+  // En modo individual la Persona 2 solo aparece si tiene movimientos este mes (datos de la etapa
+  // en pareja). Si no aparece, su dinero real es su balance calculado (0): ajuste nulo, sin
+  // transacción de ajuste.
+  const showPerson2 = shouldShowPerson2(singleMode, calculations.person2Income, calculations.person2Expenses)
+  const effectivePerson2RealMoney = showPerson2 ? person2RealMoney : person2CalculatedBalance
+
   // Ajustes calculados: diferencia entre el dinero real y el balance calculado.
   // Resta exacta: el operador nativo daría p.ej. 234.56999999999994 y ese valor acaba
   // persistido como `amount` de la transaccion de ajuste.
   const person1Adjustment = subtractMoney(person1RealMoney, person1CalculatedBalance)
-  const person2Adjustment = subtractMoney(person2RealMoney, person2CalculatedBalance)
+  const person2Adjustment = subtractMoney(effectivePerson2RealMoney, person2CalculatedBalance)
 
   /**
    * @function createAdjustmentTransactions
@@ -166,7 +176,7 @@ export function MonthlyReportModal({
       month,
       year,
       person1RealMoney,
-      person2RealMoney,
+      person2RealMoney: effectivePerson2RealMoney,
       person1Adjustment,
       person2Adjustment,
       totalIncome: calculations.totalIncome,
@@ -198,7 +208,7 @@ export function MonthlyReportModal({
     return createAdjustmentTransactions()
   }, [
     person1RealMoney,
-    person2RealMoney,
+    effectivePerson2RealMoney,
     person1CalculatedBalance,
     person2CalculatedBalance,
     month,
@@ -254,19 +264,21 @@ export function MonthlyReportModal({
                 {formatCurrency(person1CalculatedBalance)}
               </p>
             </div>
-            <div>
-              <p className="text-muted-foreground">Balance {person2Name}:</p>
-              <p className={`font-medium ${person2CalculatedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(person2CalculatedBalance)}
-              </p>
-            </div>
+            {showPerson2 && (
+              <div>
+                <p className="text-muted-foreground">Balance {person2Name}:</p>
+                <p className={`font-medium ${person2CalculatedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {formatCurrency(person2CalculatedBalance)}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Sección para introducir el dinero real disponible */}
         <div className="space-y-4">
           <h3 className="font-semibold text-foreground">Dinero real disponible al final del mes</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className={`grid gap-4 ${showPerson2 ? "grid-cols-2" : "grid-cols-1"}`}>
             <div>
               <Label htmlFor="person1Money">{person1Name} (€)</Label>
               <AmountInput
@@ -277,16 +289,18 @@ export function MonthlyReportModal({
                 disabled={isSubmitting} // Deshabilita el input mientras se envía el formulario.
               />
             </div>
-            <div>
-              <Label htmlFor="person2Money">{person2Name} (€)</Label>
-              <AmountInput
-                id="person2Money"
-                value={person2RealMoney}
-                onValueChange={setPerson2RealMoney}
-                required
-                disabled={isSubmitting}
-              />
-            </div>
+            {showPerson2 && (
+              <div>
+                <Label htmlFor="person2Money">{person2Name} (€)</Label>
+                <AmountInput
+                  id="person2Money"
+                  value={person2RealMoney}
+                  onValueChange={setPerson2RealMoney}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -302,12 +316,14 @@ export function MonthlyReportModal({
                   {formatCurrency(person1Adjustment)}
                 </p>
               </div>
-              <div>
-                <p className="text-muted-foreground">Ajuste {person2Name}:</p>
-                <p className={`font-medium ${person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(person2Adjustment)}
-                </p>
-              </div>
+              {showPerson2 && (
+                <div>
+                  <p className="text-muted-foreground">Ajuste {person2Name}:</p>
+                  <p className={`font-medium ${person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(person2Adjustment)}
+                  </p>
+                </div>
+              )}
             </div>
             {/* Muestra la lista de transacciones de ajuste si hay alguna. */}
             {previewAdjustmentTransactions.length > 0 && (

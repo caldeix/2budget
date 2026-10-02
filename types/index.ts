@@ -90,10 +90,17 @@ export interface MonthlyReport {
  * @description Define la estructura de la configuración global de la aplicación.
  * @property {string} person1Name - Nombre personalizado para la Persona 1.
  * @property {string} person2Name - Nombre personalizado para la Persona 2.
+ * @property {boolean} [singleMode] - Modo individual: oculta la segunda persona en la interfaz.
  */
 export interface AppConfig {
   person1Name: string
   person2Name: string
+  /**
+   * Modo individual (una sola persona). Es solo de interfaz: no cambia el modelo de datos.
+   * Con todo a nombre de `person1`, los cálculos de la Persona 2 dan 0 de forma natural.
+   * Opcional para que las configuraciones y JSON anteriores sigan siendo válidos.
+   */
+  singleMode?: boolean
 }
 
 /**

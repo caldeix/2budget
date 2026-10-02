@@ -1,7 +1,7 @@
 /**
  * @file components/settings-modal.tsx
  * @description Este archivo define el componente `SettingsModal`, un modal
- *              que permite al usuario configurar nombres, exportar/importar datos,
+ *              que permite al usuario configurar nombres y el modo individual, exportar/importar datos,
  *              cargar datos de prueba y eliminar todos los datos de la aplicación.
  *              Incluye un modal de confirmación para la eliminación de datos.
  *              Es un Client Component (`"use client"`) debido al uso de estados, refs y eventos.
@@ -17,8 +17,9 @@ import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
+import { Switch } from "@/components/ui/switch" // Interruptor para el modo individual.
 import { exportData, importData } from "@/lib/storage" // Funciones de gestión de datos.
-import { Download, Upload, Trash2, Database } from "lucide-react" // Iconos.
+import { Download, Upload, Trash2, Database, AlertTriangle } from "lucide-react" // Iconos.
 
 /**
  * @interface SettingsModalProps
@@ -30,6 +31,8 @@ import { Download, Upload, Trash2, Database } from "lucide-react" // Iconos.
  * @property {(success: boolean) => void} onImportData - Función de callback después de intentar importar datos.
  * @property {() => void} onLoadSampleData - Función para cargar datos de prueba.
  * @property {() => void} onClearData - Función para eliminar todos los datos.
+ * @property {number} person2OpenTransactionsCount - Transacciones `person2`/`both` de meses sin informe,
+ *           para avisar al activar el modo individual.
  */
 interface SettingsModalProps {
   isOpen: boolean
@@ -39,6 +42,7 @@ interface SettingsModalProps {
   onImportData: (success: boolean) => void
   onLoadSampleData: () => void
   onClearData: () => void
+  person2OpenTransactionsCount: number
 }
 
 /**
@@ -57,10 +61,13 @@ export function SettingsModal({
   onImportData,
   onLoadSampleData,
   onClearData,
+  person2OpenTransactionsCount,
 }: SettingsModalProps) {
   // Estados locales para los nombres de las personas, inicializados con la configuración actual.
   const [person1Name, setPerson1Name] = useState(config.person1Name)
   const [person2Name, setPerson2Name] = useState(config.person2Name)
+  // Estado local del modo individual; se guarda junto con los nombres.
+  const [singleMode, setSingleMode] = useState(Boolean(config.singleMode))
   // Estado para controlar la visibilidad del modal de confirmación de eliminación de datos.
   const [isClearDataConfirmModalOpen, setIsClearDataConfirmModalOpen] = useState(false)
   // Ref para el input de tipo archivo, permitiendo activarlo programáticamente.
@@ -68,7 +75,7 @@ export function SettingsModal({
 
   /**
    * @function handleSaveConfig
-   * @description Manejador para guardar los nombres de las personas.
+   * @description Manejador para guardar los nombres de las personas y el modo individual.
    *              Llama a la función `onUpdateConfig` del padre y cierra el modal.
    * @returns {void}
    */
@@ -76,6 +83,7 @@ export function SettingsModal({
     onUpdateConfig({
       person1Name,
       person2Name,
+      singleMode,
     })
     onClose()
   }
@@ -170,12 +178,39 @@ export function SettingsModal({
       {/* Modal principal de Configuración */}
       <Modal isOpen={isOpen} onClose={onClose} title="Configuración" size="md">
         <div className="p-6 space-y-8">
-          {/* Sección: Configuración de nombres */}
+          {/* Sección: Configuración de personas */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">Nombres de las personas</h3>
+            <h3 className="text-lg font-semibold text-foreground">{singleMode ? "Tu nombre" : "Nombres de las personas"}</h3>
+
+            {/* Interruptor del modo individual */}
+            <div className="flex items-center justify-between gap-4 rounded-2xl border p-4">
+              <div>
+                <Label htmlFor="singleMode" className="text-sm font-medium">
+                  Modo individual
+                </Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Para usar la app sin pareja: oculta la segunda persona y los repartos.
+                </p>
+              </div>
+              <Switch id="singleMode" checked={singleMode} onCheckedChange={setSingleMode} />
+            </div>
+
+            {/* Aviso: al activar el modo quedan transacciones compartidas o de la Persona 2 en meses abiertos */}
+            {singleMode && !config.singleMode && person2OpenTransactionsCount > 0 && (
+              <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-sm text-amber-600">
+                  Hay {person2OpenTransactionsCount}{" "}
+                  {person2OpenTransactionsCount === 1 ? "transacción" : "transacciones"} de {config.person2Name} o
+                  compartidas en meses sin cerrar. Seguirán sumando en los totales y se mostrarán con su etiqueta.
+                  No se borra ni se modifica ningún dato, y puedes desactivar el modo cuando quieras.
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4">
               <div>
-                <Label htmlFor="person1Name">Persona 1</Label>
+                <Label htmlFor="person1Name">{singleMode ? "Nombre" : "Persona 1"}</Label>
                 <Input
                   id="person1Name"
                   type="text"
@@ -184,19 +219,22 @@ export function SettingsModal({
                   placeholder="Nombre de la primera persona"
                 />
               </div>
-              <div>
-                <Label htmlFor="person2Name">Persona 2</Label>
-                <Input
-                  id="person2Name"
-                  type="text"
-                  value={person2Name}
-                  onChange={(e) => setPerson2Name(e.target.value)}
-                  placeholder="Nombre de la segunda persona"
-                />
-              </div>
+              {/* En modo individual el nombre de la Persona 2 no se pide, pero se conserva. */}
+              {!singleMode && (
+                <div>
+                  <Label htmlFor="person2Name">Persona 2</Label>
+                  <Input
+                    id="person2Name"
+                    type="text"
+                    value={person2Name}
+                    onChange={(e) => setPerson2Name(e.target.value)}
+                    placeholder="Nombre de la segunda persona"
+                  />
+                </div>
+              )}
             </div>
             <Button onClick={handleSaveConfig} className="w-full">
-              Guardar Nombres
+              Guardar configuración
             </Button>
           </div>
 

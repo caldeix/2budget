@@ -14,6 +14,7 @@ import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { PieChart } from "@/components/ui/chart" // Componente de gráfico de pastel.
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
+import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 
 /**
  * @interface ReportDetailModalProps
@@ -23,6 +24,7 @@ import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
  * @property {MonthlyReport} report - El objeto `MonthlyReport` que se va a mostrar.
  * @property {string} person1Name - Nombre de la Persona 1.
  * @property {string} person2Name - Nombre de la Persona 2.
+ * @property {boolean} [singleMode] - Modo individual: oculta la Persona 2 si el informe no tiene cifras suyas.
  */
 interface ReportDetailModalProps {
   isOpen: boolean
@@ -30,6 +32,7 @@ interface ReportDetailModalProps {
   report: MonthlyReport
   person1Name: string
   person2Name: string
+  singleMode?: boolean
 }
 
 /**
@@ -39,7 +42,23 @@ interface ReportDetailModalProps {
  * @param {ReportDetailModalProps} props - Propiedades del componente.
  * @returns {JSX.Element} El componente modal de detalle de informe.
  */
-export function ReportDetailModal({ isOpen, onClose, report, person1Name, person2Name }: ReportDetailModalProps) {
+export function ReportDetailModal({
+  isOpen,
+  onClose,
+  report,
+  person1Name,
+  person2Name,
+  singleMode,
+}: ReportDetailModalProps) {
+  // Un informe cerrado en pareja conserva su desglose aunque luego se active el modo individual.
+  const showPerson2 = shouldShowPerson2(
+    singleMode,
+    report.person2Income,
+    report.person2Expenses,
+    report.person2RealMoney,
+    report.person2Adjustment,
+  )
+
   /**
    * Datos para el gráfico de pastel de gastos.
    * Filtra las transacciones del informe por tipo 'expense' y categoría ('fixed' o 'variable'),
@@ -111,21 +130,23 @@ export function ReportDetailModal({ isOpen, onClose, report, person1Name, person
         </div>
 
         {/* Sección de Gráficos */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className={`grid grid-cols-1 gap-8 ${showPerson2 ? "lg:grid-cols-2" : ""}`}>
           {/* Gráfico de Distribución de Gastos */}
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-4">Distribución de Gastos</h3>
             <PieChart data={expenseChartData} size={250} />
           </div>
-          {/* Gráfico de Distribución de Ingresos */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Distribución de Ingresos</h3>
-            <PieChart data={incomeChartData} size={250} />
-          </div>
+          {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2 no aporta nada) */}
+          {showPerson2 && (
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Distribución de Ingresos</h3>
+              <PieChart data={incomeChartData} size={250} />
+            </div>
+          )}
         </div>
 
         {/* Sección de Detalles por Persona */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 gap-6 ${showPerson2 ? "md:grid-cols-2" : ""}`}>
           {/* Detalles de Persona 1 */}
           <div className="bg-muted rounded-2xl p-4">
             <h3 className="font-semibold text-foreground mb-4">{person1Name}</h3>
@@ -160,37 +181,39 @@ export function ReportDetailModal({ isOpen, onClose, report, person1Name, person
           </div>
 
           {/* Detalles de Persona 2 */}
-          <div className="bg-muted rounded-2xl p-4">
-            <h3 className="font-semibold text-foreground mb-4">{person2Name}</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ingresos:</span>
-                <span className="font-medium text-green-600">{formatCurrency(report.person2Income)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Gastos:</span>
-                <span className="font-medium text-red-600">{formatCurrency(report.person2Expenses)}</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-muted-foreground">Balance calculado:</span>
-                <span
-                  className={`font-medium ${subtractMoney(report.person2Income, report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
-                >
-                  {formatCurrency(subtractMoney(report.person2Income, report.person2Expenses))}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Dinero real:</span>
-                <span className="font-medium text-foreground">{formatCurrency(report.person2RealMoney)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ajuste:</span>
-                <span className={`font-medium ${report.person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(report.person2Adjustment)}
-                </span>
+          {showPerson2 && (
+            <div className="bg-muted rounded-2xl p-4">
+              <h3 className="font-semibold text-foreground mb-4">{person2Name}</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ingresos:</span>
+                  <span className="font-medium text-green-600">{formatCurrency(report.person2Income)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Gastos:</span>
+                  <span className="font-medium text-red-600">{formatCurrency(report.person2Expenses)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-muted-foreground">Balance calculado:</span>
+                  <span
+                    className={`font-medium ${subtractMoney(report.person2Income, report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {formatCurrency(subtractMoney(report.person2Income, report.person2Expenses))}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Dinero real:</span>
+                  <span className="font-medium text-foreground">{formatCurrency(report.person2RealMoney)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ajuste:</span>
+                  <span className={`font-medium ${report.person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(report.person2Adjustment)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Sección de Estadísticas Adicionales */}

@@ -9,6 +9,7 @@
 "use client"
 
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades para formatear moneda y fecha.
+import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Iconos.
 
 /**
@@ -27,6 +28,7 @@ import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Ic
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {number} selectedMonth - El mes actualmente seleccionado para el resumen.
  * @property {number} selectedYear - El año actualmente seleccionado para el resumen.
+ * @property {boolean} [singleMode] - Modo individual: oculta el desglose por persona si la Persona 2 no tiene cifras.
  */
 interface SummaryCardsProps {
   totalIncome: number
@@ -43,6 +45,7 @@ interface SummaryCardsProps {
   selectedMonth: number
   selectedYear: number
   nonComputableExpenses: number
+  singleMode?: boolean
 }
 
 /**
@@ -67,7 +70,11 @@ export function SummaryCards({
   selectedMonth,
   selectedYear,
   nonComputableExpenses,
+  singleMode,
 }: SummaryCardsProps) {
+  // En modo individual, el desglose por persona sobra salvo que la Persona 2 tenga cifras este mes.
+  const showPerson2 = shouldShowPerson2(singleMode, person2Income, person2Expenses)
+
   return (
     <div className="space-y-6">
       {/* Título del resumen para la vista de escritorio (oculto en móvil) */}
@@ -80,7 +87,7 @@ export function SummaryCards({
         {formatMonthYear(selectedMonth, selectedYear)}
       </h2>
       {/* Contenedor de las tarjetas, con diseño de cuadrícula responsivo. */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${showPerson2 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         {/* Tarjeta de Balance General */}
         <div className="relative bg-card-balance-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
           {/* Icono de fondo (TrendingUp si balance positivo, TrendingDown si negativo) */}
@@ -126,16 +133,18 @@ export function SummaryCards({
               <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
             </div>
           </div>
-          <div className="mt-4 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person1Name}:</span>
-              <span className="font-medium text-foreground">{formatCurrency(person1Income)}</span>
+          {showPerson2 && (
+            <div className="mt-4 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person1Name}:</span>
+                <span className="font-medium text-foreground">{formatCurrency(person1Income)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person2Name}:</span>
+                <span className="font-medium text-foreground">{formatCurrency(person2Income)}</span>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person2Name}:</span>
-              <span className="font-medium text-foreground">{formatCurrency(person2Income)}</span>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Tarjeta de Gastos Totales */}
@@ -150,45 +159,49 @@ export function SummaryCards({
               <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
             </div>
           </div>
-          <div className="mt-4 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person1Name}:</span>
-              <span className="font-medium text-foreground">{formatCurrency(person1Expenses)}</span>
+          {showPerson2 && (
+            <div className="mt-4 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person1Name}:</span>
+                <span className="font-medium text-foreground">{formatCurrency(person1Expenses)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person2Name}:</span>
+                <span className="font-medium text-foreground">{formatCurrency(person2Expenses)}</span>
+              </div>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person2Name}:</span>
-              <span className="font-medium text-foreground">{formatCurrency(person2Expenses)}</span>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Tarjeta de Balance Individual */}
-        <div className="relative bg-card-balance-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
-          {/* Icono de fondo (Users) */}
-          <div className="absolute bottom-4 right-4 text-muted-foreground opacity-10">
-            <Users className="h-24 w-24" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Balance Individual</p>
-              <p className="text-lg font-bold text-foreground">Por persona</p>
+        {/* Tarjeta de Balance Individual (oculta en modo individual si la Persona 2 no tiene cifras) */}
+        {showPerson2 && (
+          <div className="relative bg-card-balance-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
+            {/* Icono de fondo (Users) */}
+            <div className="absolute bottom-4 right-4 text-muted-foreground opacity-10">
+              <Users className="h-24 w-24" />
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Balance Individual</p>
+                <p className="text-lg font-bold text-foreground">Por persona</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person1Name}:</span>
+                <span className={`font-medium ${person1Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {formatCurrency(person1Balance)}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">{person2Name}:</span>
+                <span className={`font-medium ${person2Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {formatCurrency(person2Balance)}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="mt-4 space-y-1">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person1Name}:</span>
-              <span className={`font-medium ${person1Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(person1Balance)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{person2Name}:</span>
-              <span className={`font-medium ${person2Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(person2Balance)}
-              </span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

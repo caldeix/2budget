@@ -34,6 +34,7 @@ const DATA_VERSION = 3
 const defaultConfig: AppConfig = {
   person1Name: "Persona 1",
   person2Name: "Persona 2",
+  singleMode: false,
 }
 
 /**

@@ -14,8 +14,8 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: "Gestor Financiero para Parejas",
-  description: "Aplicación completa para gestionar las finanzas de pareja con informes mensuales y análisis detallados",
+  title: "2Budget, gestor financiero",
+  description: "Aplicación para gestionar las finanzas en pareja o en solitario, con informes mensuales y análisis detallados",
   generator: "Caldeix",
 }
 

@@ -11,9 +11,10 @@ import { type Transaction, generateId } from "@/types" // Importa el tipo Transa
  * @function generateSampleData
  * @description Genera un array de transacciones de ejemplo para los últimos 12 meses.
  *              Incluye ingresos, gastos fijos y gastos variables con montos y propietarios aleatorios.
+ * @param {boolean} [singleMode=false] - Modo individual: todo a nombre de la Persona 1 y sin el salario de la Persona 2.
  * @returns {Transaction[]} Un array de objetos de transacción.
  */
-export function generateSampleData(): Transaction[] {
+export function generateSampleData(singleMode = false): Transaction[] {
   const transactions: Transaction[] = []
   const currentYear = new Date().getFullYear() // Obtiene el año actual.
 
@@ -146,6 +147,13 @@ export function generateSampleData(): Transaction[] {
     }
   }
 
+  // En modo individual no hay segunda persona: se quita su salario y el resto pasa a la Persona 1.
+  const result = singleMode
+    ? transactions
+        .filter((t) => t.name !== "Salario Persona 2")
+        .map((t) => ({ ...t, owner: "person1" as const, person1Percentage: 100, person2Percentage: 0 }))
+    : transactions
+
   // Ordena todas las transacciones generadas por fecha de forma descendente (más recientes primero).
-  return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }

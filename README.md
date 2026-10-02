@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.4.7-gold.svg)
+![Version](https://img.shields.io/badge/Version-1.5.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -16,7 +16,7 @@
 
 ## Descripción
 
-**2Budget** es una aplicación web de gestión financiera para parejas. Permite llevar un control detallado de ingresos y gastos compartidos, ver balances por persona y generar informes mensuales. Sin servidor — todos los datos se persisten en el navegador vía `localStorage`.
+**2Budget** es una aplicación web de gestión financiera para parejas, que también puede usar una sola persona con el modo individual. Permite llevar un control detallado de ingresos y gastos compartidos, ver balances por persona y generar informes mensuales. Sin servidor — todos los datos se persisten en el navegador vía `localStorage`.
 
 ---
 
@@ -29,6 +29,7 @@
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
+- **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, tarjetas con solo los totales y un único dinero real en el cierre de mes
 - **Importar / Exportar** — Backup y restauración en JSON
 - **Tema oscuro / claro** — Paleta premium Gold × Violet con soporte automático del sistema
 - **Diseño responsivo** — Optimizado para móvil y escritorio
@@ -54,6 +55,13 @@ npm run deploy     # Build + push a GitHub Pages
 ---
 
 ## Changelog
+
+### v1.5.0 — Modo individual
+
+- **Usar la app sin pareja** — nuevo interruptor "Modo individual" en Configuración. Oculta la segunda persona: el formulario deja de pedir propietario y reparto (todo va a tu nombre), las tarjetas y el balance acumulado muestran solo los totales, la tabla pierde la columna de propietario y el cierre de mes pide un único dinero real, sin ajuste para la segunda persona
+- **Sin tocar los datos** — es solo de interfaz y reversible. Si quedan transacciones de la segunda persona o compartidas, siguen sumando y se ven con su etiqueta; al activarlo se avisa de cuántas hay en meses sin cerrar. Los informes cerrados en pareja conservan su desglose
+- **Datos de prueba** — en modo individual se generan a nombre de una sola persona
+- SemVer: 1.4.7 → 1.5.0 (MINOR)
 
 ### v1.4.7 — Redondeo único sobre el reparto exacto
 

@@ -50,6 +50,7 @@ import { TransactionMonthNavigator } from "@/components/transaction-month-naviga
  * @property {number} transactionsToShowCount - Número de transacciones a mostrar actualmente (para carga infinita).
  * @property {() => void} onLoadMore - Función de callback para cargar más transacciones.
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
+ * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -65,6 +66,7 @@ interface TransactionsTableProps {
   transactionsToShowCount: number
   onLoadMore: () => void
   hasMore: boolean
+  singleMode?: boolean
 }
 
 /**
@@ -100,7 +102,14 @@ export function TransactionsTable({
   transactionsToShowCount, // Cuántas transacciones mostrar actualmente.
   onLoadMore, // Función para cargar más.
   hasMore, // Si hay más transacciones para cargar.
+  singleMode = false,
 }: TransactionsTableProps) {
+  // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
+  // Las dos clases van completas para que Tailwind las genere.
+  const desktopGridCols = singleMode
+    ? "grid-cols-[1fr_2fr_1.2fr_1fr_0.8fr]"
+    : "grid-cols-[1fr_2fr_1.2fr_1.5fr_1fr_0.8fr]"
+
   // Estado para el término de búsqueda.
   const [searchTerm, setSearchTerm] = useState("")
   // Estado para el campo de ordenación.
@@ -344,9 +353,11 @@ export function TransactionsTable({
    * @description Formatea la visualización del propietario de una transacción.
    *              Para transacciones compartidas, muestra los nombres y porcentajes.
    * @param {Transaction} transaction - La transacción.
-   * @returns {string} La cadena formateada del propietario.
+   * @returns {string | null} La cadena formateada del propietario, o `null` si no hay que mostrarla
+   *          (en modo individual, las transacciones de la Persona 1 no llevan etiqueta).
    */
   const getOwnerDisplay = (transaction: Transaction) => {
+    if (singleMode && transaction.owner === "person1") return null
     if (transaction.owner === "person1") return person1Name
     if (transaction.owner === "person2") return person2Name
     if (transaction.owner === "both") {
@@ -528,7 +539,7 @@ export function TransactionsTable({
         ) : (
           <>
             {/* Encabezado de la tabla para escritorio (oculto en móvil) */}
-            <div className="hidden sm:grid grid-cols-[1fr_2fr_1.2fr_1.5fr_1fr_0.8fr] gap-4 px-6 py-4 bg-muted border-b border-border text-sm font-medium text-muted-foreground">
+            <div className={cn("hidden sm:grid gap-4 px-6 py-4 bg-muted border-b border-border text-sm font-medium text-muted-foreground", desktopGridCols)}>
               <button
                 onClick={() => handleSort("date")}
                 className="flex items-center gap-2 text-left hover:text-foreground"
@@ -550,7 +561,7 @@ export function TransactionsTable({
                 Categoría
                 {getSortIcon("type")}
               </button>
-              <span className="text-left">Propietario</span>
+              {!singleMode && <span className="text-left">Propietario</span>}
               <button
                 onClick={() => handleSort("amount")}
                 className="flex items-center gap-2 text-right hover:text-foreground justify-end"
@@ -567,7 +578,8 @@ export function TransactionsTable({
                 <React.Fragment key={transaction.id}>
                   {/* Fila de escritorio (diseño de tarjeta, visible solo en pantallas grandes) */}
                   <div className={cn(
-                    "hidden sm:grid grid-cols-[1fr_2fr_1.2fr_1.5fr_1fr_0.8fr] items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
+                    "hidden sm:grid items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
+                    desktopGridCols,
                     transaction.nonComputable && "opacity-70"
                   )}>
                     <div className="flex items-center gap-3">
@@ -590,11 +602,19 @@ export function TransactionsTable({
                       <span className={cn("text-sm font-medium", transaction.nonComputable && "text-muted-foreground")}>
                         {transaction.name}
                       </span>
+                      {/* Sin columna de propietario (modo individual), la etiqueta va junto al nombre si la hay. */}
+                      {singleMode && getOwnerDisplay(transaction) && (
+                        <span className="text-xs text-muted-foreground whitespace-pre-line">
+                          ({getOwnerDisplay(transaction)})
+                        </span>
+                      )}
                     </div>
                     <div>{getCategoryBadge(transaction)}</div>
-                    <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
-                      {getOwnerDisplay(transaction)}
-                    </div>
+                    {!singleMode && (
+                      <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                        {getOwnerDisplay(transaction)}
+                      </div>
+                    )}
                     <div
                       className={cn(
                         "text-lg font-semibold text-right",
@@ -715,9 +735,11 @@ export function TransactionsTable({
                               {transaction.name}
                             </span>
                           </div>
-                          <span className={transaction.nonComputable ? "text-muted-foreground" : ""}>
-                            {getOwnerDisplay(transaction)}
-                          </span>
+                          {getOwnerDisplay(transaction) && (
+                            <span className={transaction.nonComputable ? "text-muted-foreground" : ""}>
+                              {getOwnerDisplay(transaction)}
+                            </span>
+                          )}
                         </div>
                         <div className="flex justify-between items-center text-xs text-muted-foreground">
                           {getCategoryBadge(transaction)}
