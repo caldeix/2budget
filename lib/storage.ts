@@ -25,13 +25,13 @@ const STORAGE_KEY = "financial-manager-data"
  * normalización en lectura se aplica siempre y es idempotente, así que un JSON antiguo
  * importado mañana queda igual de protegido. Solo evita el guardado redundante en cada arranque.
  */
-const DATA_VERSION = 3
+export const DATA_VERSION = 3
 
 /**
  * @constant {AppConfig} defaultConfig
  * @description Configuración por defecto de la aplicación si no se encuentra ninguna en localStorage.
  */
-const defaultConfig: AppConfig = {
+export const defaultConfig: AppConfig = {
   person1Name: "Persona 1",
   person2Name: "Persona 2",
   singleMode: false,
@@ -54,7 +54,7 @@ const defaultData: AppData = {
  * @param {Transaction} t - La transacción a normalizar.
  * @returns {Transaction} La transacción con los campos garantizados.
  */
-function normalizeTransaction(t: Transaction): Transaction {
+export function normalizeTransaction(t: Transaction): Transaction {
   // El porcentaje de la Persona 2 se deriva del de la Persona 1 para que un dato
   // incoherente (p. ej. 30/60) no rompa el cuadre de los repartos.
   const person1Percentage = normalizePercentage(t.person1Percentage ?? 50)
@@ -78,7 +78,7 @@ function normalizeTransaction(t: Transaction): Transaction {
  * @param {MonthlyReport} r - El informe a normalizar.
  * @returns {MonthlyReport} El informe con todos sus importes a 2 decimales.
  */
-function normalizeReport(r: MonthlyReport): MonthlyReport {
+export function normalizeReport(r: MonthlyReport): MonthlyReport {
   return {
     ...r,
     person1RealMoney: roundMoney(r.person1RealMoney),
@@ -173,25 +173,48 @@ export function saveData(data: AppData): void {
 }
 
 /**
- * @function exportData
- * @description Exporta todos los datos de la aplicación como una cadena JSON formateada.
- *              Útil para copias de seguridad o transferir datos.
+ * @function serializeAppData
+ * @description Convierte los datos de la aplicación en una cadena JSON formateada para exportarlos.
+ *              Recibe los datos en memoria, así que sirve igual en modo local y en la nube.
+ * @param {AppData} data - Los datos a exportar.
  * @returns {string} Una cadena JSON que representa los datos de la aplicación.
  */
-export function exportData(): string {
-  // Carga los datos actuales y los convierte a una cadena JSON con formato legible (2 espacios de indentación).
-  const data = loadData()
-  return JSON.stringify(data, null, 2)
+export function serializeAppData(data: AppData): string {
+  return JSON.stringify({ ...data, version: data.version ?? DATA_VERSION }, null, 2)
 }
 
 /**
- * @function importData
- * @description Importa datos a la aplicación desde una cadena JSON.
- *              Realiza una validación básica de la estructura del JSON y fusiona los datos.
- * @param {string} jsonString - La cadena JSON que contiene los datos a importar.
- * @returns {boolean} `true` si la importación fue exitosa, `false` en caso contrario.
+ * @function downloadAppData
+ * @description Descarga los datos como un archivo JSON en el navegador (copia de seguridad).
+ * @param {AppData} data - Los datos a exportar.
+ * @returns {void}
  */
-export function importData(jsonString: string): boolean {
+export function downloadAppData(data: AppData): void {
+  // Crea un Blob (objeto de datos inmutables) con el contenido JSON.
+  const blob = new Blob([serializeAppData(data)], { type: "application/json" })
+  // Crea una URL para el Blob.
+  const url = URL.createObjectURL(blob)
+  // Crea un elemento <a> temporal para simular un clic de descarga.
+  const a = document.createElement("a")
+  a.href = url
+  // Define el nombre del archivo a descargar.
+  a.download = `financial-data-${new Date().toISOString().split("T")[0]}.json`
+  document.body.appendChild(a) // Añade el elemento al DOM.
+  a.click() // Simula un clic para iniciar la descarga.
+  document.body.removeChild(a) // Elimina el elemento temporal.
+  URL.revokeObjectURL(url) // Libera la URL del Blob para liberar memoria.
+}
+
+/**
+ * @function parseImportedData
+ * @description Lee un JSON exportado y lo convierte en un `AppData` listo para usar.
+ *              Realiza una validación básica de la estructura, normaliza importes y aplica las
+ *              migraciones de un solo uso que le falten (p. ej. la corrección de céntimos de v3).
+ *              No guarda nada: quien llama decide dónde (localStorage o la nube).
+ * @param {string} jsonString - La cadena JSON que contiene los datos a importar.
+ * @returns {AppData | null} Los datos importados, o `null` si el archivo no es válido.
+ */
+export function parseImportedData(jsonString: string): AppData | null {
   try {
     // Intenta parsear la cadena JSON.
     const raw = JSON.parse(jsonString)
@@ -208,9 +231,7 @@ export function importData(jsonString: string): boolean {
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
     const imported: AppData = {
-      // Se conserva la versión del archivo: al recargar, `loadData` aplica las migraciones
-      // de un solo uso que le falten (p. ej. la corrección de céntimos de v3).
-      version: typeof raw.version === "number" ? raw.version : undefined,
+      version: DATA_VERSION,
       transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
       // Los informes importados también se normalizan: pueden traer importes sin redondear.
       reports: Array.isArray(raw.reports) ? raw.reports.map(normalizeReport) : [],
@@ -220,15 +241,35 @@ export function importData(jsonString: string): boolean {
       },
     }
 
-    // Guarda los datos importados en localStorage.
-    saveData(imported)
-    return true // Indica que la importación fue exitosa.
+    // Un archivo de una versión anterior a v3 recibe la corrección de céntimos de los meses cerrados.
+    const fileVersion = typeof raw.version === "number" ? raw.version : 0
+    if (fileVersion < 3) {
+      imported.transactions = [...createRoundingAdjustmentsForClosedReports(imported), ...imported.transactions]
+    }
+
+    return imported
   } catch (error) {
-    // Si ocurre un error (ej. JSON inválido), registra el error y devuelve `false`.
+    // Si ocurre un error (ej. JSON inválido), registra el error y devuelve `null`.
     console.error("Error importing data:", error)
-    return false // Indica que la importación falló.
+    return null
   }
 }
+
+/**
+ * @function hasAppData
+ * @description Indica si unos datos tienen transacciones o informes (más allá de la configuración).
+ * @param {AppData} data - Los datos a comprobar.
+ * @returns {boolean} `true` si hay algo que conservar.
+ */
+export function hasAppData(data: AppData): boolean {
+  return data.transactions.length > 0 || data.reports.length > 0
+}
+
+/**
+ * @constant {AppData} emptyAppData
+ * @description Datos vacíos con la configuración por defecto (p. ej. un hogar recién creado sin subir nada).
+ */
+export const emptyAppData: AppData = { ...defaultData, version: DATA_VERSION }
 
 /**
  * @function clearAllData

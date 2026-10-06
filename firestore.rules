@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// Reglas de seguridad de 2Budget.
+// Cada usuario solo ve su perfil y el hogar del que es miembro (como mucho 2 miembros).
+// Para unirse a un hogar hace falta un código de invitación válido de ese hogar.
+// Todo se valida aquí: no hay Cloud Functions (exigirían el plan de pago Blaze).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function householdData(hid) {
+      return get(/databases/$(database)/documents/households/$(hid)).data;
+    }
+
+    function isMember(hid) {
+      return signedIn() && request.auth.uid in householdData(hid).members;
+    }
+
+    // Unirse con invitación: el usuario solo puede añadirse a sí mismo como Persona 2,
+    // a un hogar que tiene un único miembro, citando un código vigente de ese mismo hogar.
+    function isValidJoin(hid) {
+      let before = resource.data;
+      let after = request.resource.data;
+      let invite = get(/databases/$(database)/documents/invites/$(after.joinCode)).data;
+      return signedIn()
+        && !(request.auth.uid in before.members)
+        && before.members.size() == 1
+        && after.members == before.members.concat([request.auth.uid])
+        && after.diff(before).affectedKeys().hasOnly(['members', 'roles', 'memberEmails', 'joinCode'])
+        && after.roles.diff(before.roles).affectedKeys().hasOnly([request.auth.uid])
+        && after.roles[request.auth.uid] == 'person2'
+        && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid])
+        && invite.householdId == hid
+        && invite.expiresAt > request.time;
+    }
+
+    // Perfil: solo su dueño.
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /households/{hid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+
+      // Se crea con el usuario como único miembro.
+      allow create: if signedIn()
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.createdBy == request.auth.uid;
+
+      // Un miembro puede editarlo, pero no añadir miembros (solo salir o quitar).
+      // Un no miembro solo puede unirse con invitación.
+      allow update: if (signedIn()
+          && request.auth.uid in resource.data.members
+          && request.resource.data.members.hasOnly(resource.data.members))
+        || isValidJoin(hid);
+
+      // Solo se borra cuando lo deja el último miembro.
+      allow delete: if signedIn()
+        && resource.data.members == [request.auth.uid];
+
+      match /transactions/{transactionId} {
+        allow read, write: if isMember(hid);
+      }
+
+      match /reports/{reportId} {
+        allow read, write: if isMember(hid);
+      }
+    }
+
+    // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && isMember(request.resource.data.householdId);
+      allow delete: if isMember(resource.data.householdId);
+    }
+  }
+}

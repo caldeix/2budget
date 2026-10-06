@@ -11,14 +11,14 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
-import type { AppConfig } from "@/types"
+import { useState, useRef, useEffect } from "react"
+import type { AppConfig, AppData } from "@/types"
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Switch } from "@/components/ui/switch" // Interruptor para el modo individual.
-import { exportData, importData } from "@/lib/storage" // Funciones de gestión de datos.
+import { downloadAppData } from "@/lib/storage" // Descarga del JSON de copia de seguridad.
 import { Download, Upload, Trash2, Database, AlertTriangle } from "lucide-react" // Iconos.
 
 /**
@@ -28,7 +28,9 @@ import { Download, Upload, Trash2, Database, AlertTriangle } from "lucide-react"
  * @property {() => void} onClose - Función para cerrar el modal.
  * @property {AppConfig} config - El objeto de configuración actual de la aplicación.
  * @property {(config: AppConfig) => void} onUpdateConfig - Función para actualizar la configuración.
- * @property {(success: boolean) => void} onImportData - Función de callback después de intentar importar datos.
+ * @property {AppData} appData - Los datos actuales, para exportarlos.
+ * @property {(content: string) => boolean} onImportData - Importa el contenido de un JSON; devuelve si fue válido.
+ * @property {boolean} isCloud - Los datos se guardan en la nube (hogar compartido) y no solo en este navegador.
  * @property {() => void} onLoadSampleData - Función para cargar datos de prueba.
  * @property {() => void} onClearData - Función para eliminar todos los datos.
  * @property {number} person2OpenTransactionsCount - Transacciones `person2`/`both` de meses sin informe,
@@ -39,7 +41,9 @@ interface SettingsModalProps {
   onClose: () => void
   config: AppConfig
   onUpdateConfig: (config: AppConfig) => void
-  onImportData: (success: boolean) => void
+  appData: AppData
+  onImportData: (content: string) => boolean
+  isCloud: boolean
   onLoadSampleData: () => void
   onClearData: () => void
   person2OpenTransactionsCount: number
@@ -58,7 +62,9 @@ export function SettingsModal({
   onClose,
   config,
   onUpdateConfig,
+  appData,
   onImportData,
+  isCloud,
   onLoadSampleData,
   onClearData,
   person2OpenTransactionsCount,
@@ -72,6 +78,15 @@ export function SettingsModal({
   const [isClearDataConfirmModalOpen, setIsClearDataConfirmModalOpen] = useState(false)
   // Ref para el input de tipo archivo, permitiendo activarlo programáticamente.
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Al abrir, los campos parten de la configuración actual (puede haber cambiado por una
+  // importación o desde otro dispositivo del hogar).
+  useEffect(() => {
+    if (!isOpen) return
+    setPerson1Name(config.person1Name)
+    setPerson2Name(config.person2Name)
+    setSingleMode(Boolean(config.singleMode))
+  }, [isOpen, config])
 
   /**
    * @function handleSaveConfig
@@ -95,20 +110,7 @@ export function SettingsModal({
    * @returns {void}
    */
   const handleExport = () => {
-    const data = exportData() // Obtiene los datos como una cadena JSON.
-    // Crea un Blob (objeto de datos inmutables) con el contenido JSON.
-    const blob = new Blob([data], { type: "application/json" })
-    // Crea una URL para el Blob.
-    const url = URL.createObjectURL(blob)
-    // Crea un elemento <a> temporal para simular un clic de descarga.
-    const a = document.createElement("a")
-    a.href = url
-    // Define el nombre del archivo a descargar.
-    a.download = `financial-data-${new Date().toISOString().split("T")[0]}.json`
-    document.body.appendChild(a) // Añade el elemento al DOM.
-    a.click() // Simula un clic para iniciar la descarga.
-    document.body.removeChild(a) // Elimina el elemento temporal.
-    URL.revokeObjectURL(url) // Libera la URL del Blob para liberar memoria.
+    downloadAppData(appData)
   }
 
   /**
@@ -125,8 +127,7 @@ export function SettingsModal({
     const reader = new FileReader() // Crea un lector de archivos.
     reader.onload = (e) => {
       const content = e.target?.result as string // Obtiene el contenido del archivo como string.
-      const success = importData(content) // Intenta importar los datos.
-      onImportData(success) // Llama al callback del padre con el resultado.
+      const success = onImportData(content) // El padre valida y guarda los datos importados.
       if (success) {
         onClose() // Cierra el modal si la importación fue exitosa.
       }
@@ -282,7 +283,12 @@ export function SettingsModal({
           <div className="bg-muted rounded-2xl p-4">
             <h4 className="font-medium text-foreground mb-2">Información</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Los datos se guardan automáticamente en tu navegador</li>
+              <li>
+                •{" "}
+                {isCloud
+                  ? "Los datos se guardan en la nube y se sincronizan entre tus dispositivos"
+                  : "Los datos se guardan automáticamente en tu navegador"}
+              </li>
               <li>• Usa exportar/importar para hacer copias de seguridad</li>
               <li>• Los datos de prueba incluyen transacciones de ejemplo de un año completo</li>
               <li>• Eliminar datos borrará toda la información permanentemente</li>
@@ -305,6 +311,7 @@ export function SettingsModal({
           </p>
           <p className="text-sm text-muted-foreground">
             Esta acción es irreversible y borrará todas tus transacciones, informes y configuraciones.
+            {isCloud && " Se borran del hogar en la nube: también desaparecen para el resto de miembros."}
           </p>
           <div className="flex justify-center gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setIsClearDataConfirmModalOpen(false)}>

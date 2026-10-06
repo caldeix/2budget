@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
+import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
 import { subtractMoney } from "@/lib/money"
 import { generateSampleData } from "@/lib/sample-data"
-import { getLastSeenMonth, setLastSeenMonth } from "@/lib/storage"
+import { getLastSeenMonth, parseImportedData, setLastSeenMonth } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -21,9 +22,10 @@ import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
+import { AccountModal } from "@/components/account-modal"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Settings, Calendar, Info, Heart, Copy } from "lucide-react"
+import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, Cloud, CloudOff, AlertTriangle } from "lucide-react"
 
 // Pure helper — kept outside component to avoid stale-closure issues in callbacks.
 // Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
@@ -37,9 +39,16 @@ const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category ==
 const isCopyableIncome = (t: Transaction) => t.type === "income" && !/^Ajuste .+ - Cierre /.test(t.name)
 
 export default function HomePage() {
+  // Sesión en la nube: con hogar, los datos se leen y guardan en Firestore; si no, en local.
+  const session = useCloudSession()
+  const cloudTarget = useMemo(
+    () => (session.services && session.householdId ? { db: session.services.db, householdId: session.householdId } : null),
+    [session.services, session.householdId],
+  )
+
   const {
     data,
-    isLoading,
+    isLoading: isDataLoading,
     addTransaction,
     updateTransaction,
     setTransactionsPaid,
@@ -49,7 +58,10 @@ export default function HomePage() {
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
-  } = useFinancialDataContext()
+    householdInfo,
+    syncError,
+  } = useFinancialDataContext(cloudTarget)
+  const isLoading = !session.ready || isDataLoading
 
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
@@ -57,6 +69,16 @@ export default function HomePage() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+
+  // Tras iniciar sesión sin hogar, se abre la cuenta para crear uno o unirse (una vez por usuario).
+  const promptedHouseholdForUid = useRef<string | null>(null)
+  useEffect(() => {
+    const uid = session.user?.uid
+    if (!session.ready || !uid || session.householdId || promptedHouseholdForUid.current === uid) return
+    promptedHouseholdForUid.current = uid
+    setIsAccountModalOpen(true)
+  }, [session.ready, session.user, session.householdId])
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
@@ -205,12 +227,15 @@ export default function HomePage() {
     setSelectedReport(report)
   }
 
-  const handleImportData = (success: boolean) => {
-    if (success) {
-      window.location.reload()
-    } else {
+  // Importar sirve igual en local y en la nube: los datos pasan por `replaceAllData`.
+  const handleImportData = (content: string): boolean => {
+    const imported = parseImportedData(content)
+    if (!imported) {
       alert("Error al importar los datos. Verifica que el archivo sea válido.")
+      return false
     }
+    replaceAllData(imported)
+    return true
   }
 
   const handleLoadSampleData = () => {
@@ -259,7 +284,12 @@ export default function HomePage() {
 
   // Detección de cambio de mes real: al abrir la app en un mes de calendario nuevo,
   // ofrece reconciliar (marcar pagados) los gastos del mes que se acaba de cerrar.
+  // Espera a que los datos estén cargados: en la nube llegan después del primer render.
+  const hasCheckedMonthChange = useRef(false)
   useEffect(() => {
+    if (isLoading || hasCheckedMonthChange.current) return
+    hasCheckedMonthChange.current = true
+
     const now = new Date()
     const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
     const lastSeen = getLastSeenMonth()
@@ -284,9 +314,9 @@ export default function HomePage() {
         setLastSeenMonth(currentKey)
       }
     }
-    // Se ejecuta una sola vez al montar para comprobar el cambio de mes real.
+    // Se ejecuta una sola vez, cuando terminan de cargar los datos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isLoading])
 
   if (isLoading) {
     return (
@@ -303,7 +333,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-center items-center h-16">
+          <div className="relative flex justify-center items-center h-16">
             <h1 className="text-2xl font-bold text-foreground relative">
               2Budge
               <span className="relative inline-block">
@@ -311,9 +341,35 @@ export default function HomePage() {
                 <Heart className="h-3 w-3 fill-red-500 text-red-500 absolute -top-1 -right-1" />
               </span>
             </h1>
+            {/* Cuenta: nube con hogar, o modo local (solo si la build trae Firebase). */}
+            {session.enabled && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAccountModalOpen(true)}
+                className="absolute right-0 flex items-center gap-2"
+                title={session.householdId ? "Sincronizado en la nube" : "Solo en este dispositivo"}
+              >
+                {session.householdId ? (
+                  <Cloud className="h-4 w-4 text-green-600" />
+                ) : (
+                  <CloudOff className="h-4 w-4 text-muted-foreground" />
+                )}
+                <span className="hidden sm:inline max-w-[180px] truncate">{session.user?.email ?? "Entrar"}</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
+
+      {syncError && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-600">{syncError}</p>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <SummaryCards
@@ -531,10 +587,21 @@ export default function HomePage() {
         onClose={() => setIsSettingsModal(false)}
         config={data.config}
         onUpdateConfig={updateConfig}
+        appData={data}
         onImportData={handleImportData}
+        isCloud={cloudTarget !== null}
         onLoadSampleData={handleLoadSampleData}
         onClearData={handleClearData}
         person2OpenTransactionsCount={countPerson2OpenTransactions(data.transactions, data.reports)}
+      />
+
+      <AccountModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        session={session}
+        householdInfo={householdInfo}
+        person1Name={data.config.person1Name}
+        person2Name={data.config.person2Name}
       />
 
       <DocumentationModal

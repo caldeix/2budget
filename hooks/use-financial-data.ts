@@ -3,24 +3,43 @@
  * @description Este archivo define el hook personalizado `useFinancialData`,
  *              que es el corazón de la gestión de estado de la aplicación.
  *              Encapsula toda la lógica para cargar, guardar, añadir, actualizar,
- *              eliminar transacciones y gestionar informes mensuales,
- *              interactuando con el almacenamiento local del navegador.
+ *              eliminar transacciones y gestionar informes mensuales.
+ *              Los datos se guardan en el almacenamiento local del navegador o, con sesión
+ *              iniciada y un hogar, en Firestore (sincronizados entre dispositivos).
  *              Es un Client Component (`"use client"`) porque utiliza hooks de React como `useState` y `useEffect`.
  */
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import type { Firestore } from "firebase/firestore"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
 import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
+import { subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
+import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
+
+/**
+ * @interface CloudTarget
+ * @description Hogar de Firestore donde se guardan los datos.
+ */
+export interface CloudTarget {
+  db: Firestore
+  householdId: string
+}
 
 /**
  * @function useFinancialData
  * @description Hook personalizado para gestionar todos los datos financieros de la aplicación.
  *              Proporciona funciones para manipular transacciones, informes y configuración,
- *              y persiste los datos en el almacenamiento local del navegador.
+ *              y persiste los datos en el almacenamiento local del navegador o en la nube.
+ *
+ *              Cada cambio pasa por `commit`: calcula el estado nuevo a partir del actual
+ *              (`dataRef`), lo muestra al momento y lo guarda donde toque. En la nube solo se
+ *              envía la diferencia (ver `lib/cloud/diff.ts`) y los cambios del otro dispositivo
+ *              o de la pareja llegan por los listeners de Firestore.
+ * @param {CloudTarget | null} cloud - Hogar en la nube, o `null` para el modo local.
  * @returns {object} Un objeto que contiene el estado de los datos y funciones para modificarlos.
  * @property {AppData} data - El objeto `AppData` actual que contiene transacciones, informes y configuración.
  * @property {boolean} isLoading - Indica si los datos aún se están cargando (inicialmente `true`).
@@ -32,33 +51,110 @@ import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
  * @property {(month: number, year: number) => Transaction[]} getTransactionsForMonth - Obtiene todas las transacciones para un mes y año específicos.
  * @property {(month: number, year: number) => MonthlyReport | undefined} getExistingReport - Obtiene un informe mensual existente para un mes y año específicos.
  * @property {(newData: AppData) => void} replaceAllData - Reemplaza todos los datos de la aplicación (útil para importar o cargar datos de prueba).
+ * @property {HouseholdInfo | null} householdInfo - Miembros del hogar en la nube (`null` en local).
+ * @property {string | null} syncError - Último error de sincronización con la nube.
  */
-export function useFinancialData() {
+export function useFinancialData(cloud: CloudTarget | null = null) {
   /**
    * `useState` para almacenar todos los datos de la aplicación.
-   * La función de inicialización `() => loadData()` se ejecuta solo una vez
-   * durante el renderizado inicial para cargar los datos de localStorage.
+   * Se arranca con los datos de localStorage; en modo nube los sustituye el primer snapshot.
    */
   const [data, setData] = useState<AppData>(() => loadData())
-  // Estado para indicar si los datos están cargando.
-  const [isLoading, setIsLoading] = useState(true)
+  // Copia síncrona del estado: varios cambios seguidos (p. ej. copiar gastos fijos) encadenan
+  // sobre el último estado sin esperar a que React vuelva a renderizar.
+  const dataRef = useRef(data)
+  const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+
+  const db = cloud?.db ?? null
+  const householdId = cloud?.householdId ?? null
+  // Dónde se guarda cada cambio; se actualiza al cambiar de modo.
+  const targetRef = useRef<CloudTarget | null>(null)
+
+  // Origen pedido ("local" o el id del hogar) y origen cuyos datos ya están en `data`.
+  // Se compara en el mismo render: al cambiar de origen, `isLoading` es `true` desde el primer
+  // render, sin esperar a un efecto (así nadie trabaja con los datos del origen anterior).
+  const source = householdId ?? "local"
+  const [loadedSource, setLoadedSource] = useState<string | null>(null)
+  const isLoading = loadedSource !== source
 
   /**
-   * `useEffect` para indicar que la carga inicial ha terminado.
-   * Se ejecuta una vez después del primer renderizado.
+   * `useEffect` que conecta con el origen de los datos: localStorage o el hogar en Firestore.
+   * Se vuelve a ejecutar al iniciar o cerrar sesión y al entrar o salir de un hogar.
    */
   useEffect(() => {
-    setIsLoading(false)
-  }, []) // Array de dependencias vacío significa que se ejecuta solo una vez al montar.
+    setSyncError(null)
+
+    if (!db || !householdId) {
+      // Modo local: los datos de este navegador, como siempre.
+      targetRef.current = null
+      const local = loadData()
+      dataRef.current = local
+      setData(local)
+      setHouseholdInfo(null)
+      setLoadedSource("local")
+      return
+    }
+
+    // Modo nube: se espera al primer snapshot completo del hogar.
+    targetRef.current = { db, householdId }
+    return subscribeHousehold(
+      db,
+      householdId,
+      (cloudData, info) => {
+        dataRef.current = cloudData
+        setData(cloudData)
+        setHouseholdInfo(info)
+        setLoadedSource(householdId)
+      },
+      () => {
+        setHouseholdInfo(null)
+        setSyncError("Ya no tienes acceso a este hogar. Sal del hogar desde tu cuenta para seguir.")
+        setLoadedSource(householdId)
+      },
+      (error) => {
+        console.error("Error syncing household:", error)
+        setSyncError(getErrorMessage(error))
+        setLoadedSource(householdId)
+      },
+    )
+  }, [db, householdId])
+
+  /**
+   * @function commit
+   * @description Aplica un cambio: calcula el estado nuevo, lo muestra y lo guarda.
+   *              El cálculo va fuera del actualizador de `setData` para que se haga una sola
+   *              vez (en modo estricto, React ejecuta los actualizadores dos veces y se
+   *              generarían IDs distintos).
+   * @param {(prev: AppData) => AppData} compute - Función pura que devuelve el estado nuevo.
+   */
+  const commit = useCallback((compute: (prev: AppData) => AppData) => {
+    const prev = dataRef.current
+    const next = compute(prev)
+    if (next === prev) return
+    dataRef.current = next
+    setData(next)
+
+    const target = targetRef.current
+    if (!target) {
+      saveData(next) // Modo local: localStorage.
+      return
+    }
+    // Modo nube: se envía la diferencia. Sin conexión queda en la cola de Firestore.
+    writeChanges(target.db, target.householdId, prev, next).catch((error) => {
+      console.error("Error saving to the cloud:", error)
+      setSyncError(getErrorMessage(error))
+    })
+  }, [])
 
   /**
    * @function addTransaction
-   * @description Añade una nueva transacción al estado de la aplicación y la guarda en localStorage.
+   * @description Añade una nueva transacción al estado de la aplicación y la guarda.
    *              Utiliza `useCallback` para memorizar la función y evitar recrearla en cada render.
    * @param {TransactionFormData} transaction - Los datos de la nueva transacción desde el formulario.
    */
   const addTransaction = useCallback((transaction: TransactionFormData) => {
-    setData((prevData) => {
+    commit((prevData) => {
       // Crea un nuevo objeto de transacción con un ID y fecha de creación.
       const newTransaction: Transaction = {
         ...transaction,
@@ -73,10 +169,9 @@ export function useFinancialData() {
         ...prevData,
         transactions: [newTransaction, ...prevData.transactions],
       }
-      saveData(newData) // Guarda los datos actualizados en localStorage.
       return newData // Devuelve el nuevo estado.
     })
-  }, []) // Dependencias vacías: la función no depende de ningún valor del scope.
+  }, [commit]) // `commit` es estable: la función no cambia entre renders.
 
   /**
    * @function updateTransaction
@@ -85,7 +180,7 @@ export function useFinancialData() {
    * @param {Partial<Transaction>} updates - Un objeto con las propiedades a actualizar.
    */
   const updateTransaction = useCallback((id: string, updates: Partial<Transaction>) => {
-    setData((prevData) => {
+    commit((prevData) => {
       // NOTA: esta función no gestiona `paid`. Para marcar o desmarcar usa
       // `setTransactionsPaid`, que además aplica la regla de refechado.
       const safeUpdates =
@@ -96,10 +191,9 @@ export function useFinancialData() {
         ...prevData,
         transactions: prevData.transactions.map((t) => (t.id === id ? { ...t, ...safeUpdates } : t)),
       }
-      saveData(newData)
       return newData
     })
-  }, [])
+  }, [commit])
 
   /**
    * @function setTransactionsPaid
@@ -125,7 +219,7 @@ export function useFinancialData() {
    */
   const setTransactionsPaid = useCallback((ids: string[], paid: boolean) => {
     const idSet = new Set(ids)
-    setData((prevData) => {
+    commit((prevData) => {
       // Un único "hoy" para todo el lote: un lote que cruce la medianoche no se parte en dos fechas.
       const today = new Date()
 
@@ -143,10 +237,9 @@ export function useFinancialData() {
           return { ...t, paid: true, date: resolvePaidDate(t.date, today) }
         }),
       }
-      saveData(newData)
       return newData
     })
-  }, [])
+  }, [commit])
 
   /**
    * @function deleteTransaction
@@ -154,16 +247,15 @@ export function useFinancialData() {
    * @param {string} id - El ID de la transacción a eliminar.
    */
   const deleteTransaction = useCallback((id: string) => {
-    setData((prevData) => {
+    commit((prevData) => {
       // Filtra las transacciones, excluyendo la que coincide con el ID.
       const newData = {
         ...prevData,
         transactions: prevData.transactions.filter((t) => t.id !== id),
       }
-      saveData(newData)
       return newData
     })
-  }, [])
+  }, [commit])
 
   /**
    * @function updateConfig
@@ -171,15 +263,14 @@ export function useFinancialData() {
    * @param {AppConfig} config - El nuevo objeto de configuración.
    */
   const updateConfig = useCallback((config: AppConfig) => {
-    setData((prevData) => {
+    commit((prevData) => {
       const newData = {
         ...prevData,
         config, // Actualiza el objeto de configuración.
       }
-      saveData(newData)
       return newData
     })
-  }, [])
+  }, [commit])
 
   /**
    * @function createOrUpdateReport
@@ -208,7 +299,7 @@ export function useFinancialData() {
       adjustmentsToCreate: Omit<Transaction, "id" | "createdAt">[],
       existingReportId?: string,
     ) => {
-      setData((prevData) => {
+      commit((prevData) => {
         // 1. Crea nuevas transacciones de ajuste con IDs y fechas de creación.
         const newAdjustmentTransactions: Transaction[] = adjustmentsToCreate.map((adj) => ({
           ...adj,
@@ -265,12 +356,11 @@ export function useFinancialData() {
           reports: finalReportsList, // Actualiza la lista global de informes.
         }
 
-        // 6. Guarda el nuevo estado en localStorage y lo devuelve.
-        saveData(newData)
+        // 6. Devuelve el estado nuevo (`commit` lo guarda).
         return newData
       })
     },
-    [], // Dependencias vacías: la función no depende de ningún valor del scope.
+    [commit], // `commit` es estable: la función no cambia entre renders.
   )
 
   /**
@@ -310,10 +400,12 @@ export function useFinancialData() {
    *              Útil para funciones de importación o carga de datos de prueba.
    * @param {AppData} newData - El nuevo objeto `AppData` que reemplazará los datos actuales.
    */
-  const replaceAllData = useCallback((newData: AppData) => {
-    setData(newData) // Actualiza el estado con los nuevos datos.
-    saveData(newData) // Guarda los nuevos datos en localStorage.
-  }, [])
+  const replaceAllData = useCallback(
+    (newData: AppData) => {
+      commit(() => newData)
+    },
+    [commit],
+  )
 
   // Devuelve el estado y las funciones para que los componentes puedan utilizarlos.
   return {
@@ -328,5 +420,7 @@ export function useFinancialData() {
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
+    householdInfo,
+    syncError,
   }
 }
