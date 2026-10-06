@@ -4,6 +4,8 @@
  *              - `HouseholdSetup`: tras crear la cuenta, crear un hogar (subiendo los datos de
  *                este dispositivo) o unirse al de la pareja con un código de invitación.
  *              - `HouseholdManager`: miembros, generar invitación y salir del hogar.
+ *              En modo individual el hogar se presenta como "tu espacio en la nube", sin la
+ *              parte de pareja (unirse e invitar).
  *              Es un Client Component (`"use client"`) debido al uso de estados y eventos.
  */
 
@@ -24,13 +26,14 @@ import { AlertTriangle, Copy, Download, Home, LogOut, UserPlus, Users } from "lu
 interface HouseholdSetupProps {
   services: FirebaseServices
   user: User
+  singleMode?: boolean
 }
 
 /**
  * @function HouseholdSetup
  * @description Primer paso tras crear la cuenta: crear un hogar o unirse a uno.
  */
-export function HouseholdSetup({ services, user }: HouseholdSetupProps) {
+export function HouseholdSetup({ services, user, singleMode }: HouseholdSetupProps) {
   // Datos que hay en este navegador (modo local), para ofrecer subirlos.
   const [localData] = useState(() => loadData())
   const hasLocalData = hasAppData(localData)
@@ -68,16 +71,18 @@ export function HouseholdSetup({ services, user }: HouseholdSetupProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Tu hogar</h3>
+        <h3 className="text-lg font-semibold text-foreground">{singleMode ? "Tu espacio en la nube" : "Tu hogar"}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Los datos se guardan en un hogar. Créalo tú e invita a tu pareja, o únete al suyo con el código que te pase.
+          {singleMode
+            ? "Crea tu espacio en la nube para tener tus datos a salvo y usarlos desde cualquier dispositivo."
+            : "Los datos se guardan en un hogar. Créalo tú e invita a tu pareja, o únete al suyo con el código que te pase."}
         </p>
       </div>
 
       {/* Crear hogar */}
       <div className="rounded-2xl border p-4 space-y-3">
         <h4 className="font-medium text-foreground flex items-center gap-2">
-          <Home className="h-4 w-4" /> Crear un hogar
+          <Home className="h-4 w-4" /> {singleMode ? "Crear mi espacio" : "Crear un hogar"}
         </h4>
         {hasLocalData && (
           <label className="flex items-start gap-2 text-sm text-foreground">
@@ -94,28 +99,34 @@ export function HouseholdSetup({ services, user }: HouseholdSetupProps) {
           </label>
         )}
         <Button onClick={handleCreate} className="w-full" disabled={busyAction !== null}>
-          {busyAction === "create" ? "Creando y subiendo datos..." : "Crear hogar"}
+          {busyAction === "create" ? "Creando y subiendo datos..." : singleMode ? "Crear mi espacio" : "Crear hogar"}
         </Button>
       </div>
 
-      {/* Unirse a un hogar */}
-      <form onSubmit={handleJoin} className="rounded-2xl border p-4 space-y-3">
-        <h4 className="font-medium text-foreground flex items-center gap-2">
-          <UserPlus className="h-4 w-4" /> Unirme con un código
-        </h4>
-        {hasLocalData && (
-          <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
-            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-            <div className="space-y-2">
-              <p className="text-xs text-amber-600">
-                Los datos de este dispositivo no se mezclan con los del hogar: se quedan aquí, fuera de la cuenta.
-                Exporta una copia si quieres conservarlos.
-              </p>
-              <Button type="button" size="sm" variant="outline" onClick={() => downloadAppData(localData)}>
-                <Download className="h-3 w-3 mr-1" /> Exportar copia
-              </Button>
+      {/* Unirse a un hogar (no aplica en modo individual) */}
+      {singleMode ? (
+        <p className="text-xs text-muted-foreground">
+          ¿Quieres compartirlo con tu pareja? Desactiva el modo individual en Configuración y podréis usar un hogar
+          compartido.
+        </p>
+      ) : (
+        <form onSubmit={handleJoin} className="rounded-2xl border p-4 space-y-3">
+          <h4 className="font-medium text-foreground flex items-center gap-2">
+            <UserPlus className="h-4 w-4" /> Unirme con un código
+          </h4>
+          {hasLocalData && (
+            <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="space-y-2">
+                <p className="text-xs text-amber-600">
+                  Los datos de este dispositivo no se mezclan con los del hogar: se quedan aquí, fuera de la cuenta.
+                  Exporta una copia si quieres conservarlos.
+                </p>
+                <Button type="button" size="sm" variant="outline" onClick={() => downloadAppData(localData)}>
+                  <Download className="h-3 w-3 mr-1" /> Exportar copia
+                </Button>
+              </div>
             </div>
-          </div>
         )}
         <div>
           <Label htmlFor="invite-code">Código de invitación</Label>
@@ -134,6 +145,7 @@ export function HouseholdSetup({ services, user }: HouseholdSetupProps) {
           {busyAction === "join" ? "Uniéndome..." : "Unirme al hogar"}
         </Button>
       </form>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
@@ -147,13 +159,22 @@ interface HouseholdManagerProps {
   info: HouseholdInfo | null
   person1Name: string
   person2Name: string
+  singleMode?: boolean
 }
 
 /**
  * @function HouseholdManager
  * @description Hogar ya creado: miembros, invitación para la pareja y salir del hogar.
  */
-export function HouseholdManager({ services, user, householdId, info, person1Name, person2Name }: HouseholdManagerProps) {
+export function HouseholdManager({
+  services,
+  user,
+  householdId,
+  info,
+  person1Name,
+  person2Name,
+  singleMode,
+}: HouseholdManagerProps) {
   const [invite, setInvite] = useState<{ code: string; expiresAt: Date } | null>(null)
   const [copied, setCopied] = useState(false)
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false)
@@ -162,6 +183,8 @@ export function HouseholdManager({ services, user, householdId, info, person1Nam
 
   const members = info?.members ?? []
   const isAlone = members.length <= 1
+  // En modo individual, con un solo miembro, el hogar es "tu espacio" y no se invita a nadie.
+  const isPersonalSpace = Boolean(singleMode) && isAlone
 
   const handleInvite = async () => {
     setError(null)
@@ -200,26 +223,31 @@ export function HouseholdManager({ services, user, householdId, info, person1Nam
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-        <Users className="h-5 w-5" /> Tu hogar
+        <Users className="h-5 w-5" /> {isPersonalSpace ? "Tu espacio en la nube" : "Tu hogar"}
       </h3>
+      {isPersonalSpace && (
+        <p className="text-sm text-muted-foreground">Tus datos se guardan en la nube y se sincronizan entre tus dispositivos.</p>
+      )}
 
       {/* Miembros */}
-      <ul className="space-y-2">
-        {members.map((uid) => (
-          <li key={uid} className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-sm">
-            <span className="text-foreground truncate">
-              {info?.memberEmails[uid] ?? "Miembro"}
-              {uid === user.uid && <span className="text-muted-foreground"> (tú)</span>}
-            </span>
-            <span className="text-xs text-muted-foreground shrink-0 ml-2">
-              {info?.roles[uid] === "person2" ? person2Name : person1Name}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {!isPersonalSpace && (
+        <ul className="space-y-2">
+          {members.map((uid) => (
+            <li key={uid} className="flex items-center justify-between rounded-xl bg-muted px-3 py-2 text-sm">
+              <span className="text-foreground truncate">
+                {info?.memberEmails[uid] ?? "Miembro"}
+                {uid === user.uid && <span className="text-muted-foreground"> (tú)</span>}
+              </span>
+              <span className="text-xs text-muted-foreground shrink-0 ml-2">
+                {info?.roles[uid] === "person2" ? person2Name : person1Name}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {/* Invitación (solo mientras falta el segundo miembro) */}
-      {isAlone && (
+      {/* Invitación (solo mientras falta el segundo miembro, y no en modo individual) */}
+      {isAlone && !isPersonalSpace && (
         <div className="rounded-2xl border p-4 space-y-3">
           <p className="text-sm text-muted-foreground">
             Invita a tu pareja: genera un código y pásaselo. Lo usa una sola vez, en las próximas 48 horas.
@@ -242,16 +270,18 @@ export function HouseholdManager({ services, user, householdId, info, person1Nam
       {isConfirmingLeave ? (
         <div className="rounded-2xl border border-destructive/40 p-4 space-y-3">
           <p className="text-sm text-foreground">
-            {isAlone
-              ? "Eres el único miembro: al salir se borra el hogar con todos sus datos. Exporta una copia antes si la quieres conservar."
-              : "Saldrás del hogar y dejarás de ver sus datos. Tu pareja los conserva."}
+            {isPersonalSpace
+              ? "Se borrará tu espacio en la nube con todos sus datos. Exporta una copia antes si la quieres conservar."
+              : isAlone
+                ? "Eres el único miembro: al salir se borra el hogar con todos sus datos. Exporta una copia antes si la quieres conservar."
+                : "Saldrás del hogar y dejarás de ver sus datos. Tu pareja los conserva."}
           </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsConfirmingLeave(false)} disabled={isBusy}>
               Cancelar
             </Button>
             <Button type="button" variant="destructive" size="sm" onClick={handleLeave} disabled={isBusy}>
-              {isBusy ? "Saliendo..." : "Salir del hogar"}
+              {isBusy ? "Saliendo..." : isPersonalSpace ? "Borrar mi espacio" : "Salir del hogar"}
             </Button>
           </div>
         </div>
@@ -262,7 +292,7 @@ export function HouseholdManager({ services, user, householdId, info, person1Nam
           className="w-full text-destructive hover:bg-destructive/10"
           onClick={() => setIsConfirmingLeave(true)}
         >
-          <LogOut className="h-4 w-4 mr-2" /> Salir del hogar
+          <LogOut className="h-4 w-4 mr-2" /> {isPersonalSpace ? "Borrar mi espacio en la nube" : "Salir del hogar"}
         </Button>
       )}
 

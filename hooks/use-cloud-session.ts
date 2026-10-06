@@ -2,15 +2,18 @@
  * @file hooks/use-cloud-session.ts
  * @description Estado de la sesión en la nube: usuario de Firebase Auth y su perfil
  *              (`users/{uid}`), que dice a qué hogar pertenece.
+ *              Hasta que el usuario verifica su email no se lee ni se escribe nada en la nube
+ *              (las reglas de Firestore también lo exigen).
  *              Sin configuración de Firebase en la build, la sesión queda desactivada y la app
  *              funciona solo en local, como antes.
  */
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { getFirebase, isCloudConfigured, type FirebaseServices } from "@/lib/cloud/firebase"
+import { refreshVerification } from "@/lib/cloud/auth"
 import { ensureUserProfile, subscribeUserProfile, type UserProfile } from "@/lib/cloud/repository"
 
 /**
@@ -18,6 +21,8 @@ import { ensureUserProfile, subscribeUserProfile, type UserProfile } from "@/lib
  * @property {boolean} enabled - La build trae configuración de Firebase.
  * @property {boolean} ready - Ya se sabe si hay sesión y, si la hay, su perfil.
  * @property {User | null} user - Usuario con sesión iniciada.
+ * @property {boolean} emailVerified - El usuario ha verificado su email (requisito para usar la nube).
+ * @property {() => Promise<boolean>} refreshUser - Vuelve a comprobar si el email ya está verificado.
  * @property {UserProfile | null} profile - Perfil del usuario.
  * @property {string | null} householdId - Hogar del usuario; `null` = modo local.
  * @property {FirebaseServices | null} services - Servicios de Firebase.
@@ -26,6 +31,8 @@ export interface CloudSession {
   enabled: boolean
   ready: boolean
   user: User | null
+  emailVerified: boolean
+  refreshUser: () => Promise<boolean>
   profile: UserProfile | null
   householdId: string | null
   services: FirebaseServices | null
@@ -37,6 +44,9 @@ export function useCloudSession(): CloudSession {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [profileLoaded, setProfileLoaded] = useState(false)
+  // `user.reload()` actualiza el mismo objeto `User`: este contador fuerza el nuevo render.
+  const [, setUserVersion] = useState(0)
+  const emailVerified = user?.emailVerified ?? false
 
   // Sesión de Firebase Auth.
   useEffect(() => {
@@ -50,11 +60,19 @@ export function useCloudSession(): CloudSession {
     })
   }, [services])
 
+  const refreshUser = useCallback(async () => {
+    if (!user) return false
+    const verified = await refreshVerification(user)
+    setUserVersion((v) => v + 1)
+    return verified
+  }, [user])
+
   // Perfil del usuario: se crea si no existe y se escucha para saber su hogar.
+  // Solo con el email verificado: antes, las reglas no dejan tocar la nube.
   useEffect(() => {
     setProfile(null)
     setProfileLoaded(false)
-    if (!services || !user) return
+    if (!services || !user || !emailVerified) return
 
     if (user.email) {
       ensureUserProfile(services.db, user.uid, user.email).catch((error) =>
@@ -75,14 +93,16 @@ export function useCloudSession(): CloudSession {
         setProfileLoaded(true)
       },
     )
-  }, [services, user])
+  }, [services, user, emailVerified])
 
   return {
     enabled: services !== null,
-    ready: authKnown && (!user || profileLoaded),
+    ready: authKnown && (!user || !emailVerified || profileLoaded),
     user,
+    emailVerified,
+    refreshUser,
     profile,
-    householdId: profile?.householdId ?? null,
+    householdId: emailVerified ? (profile?.householdId ?? null) : null,
     services,
   }
 }

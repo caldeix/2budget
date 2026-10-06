@@ -2,6 +2,7 @@
  * @file components/account-modal.tsx
  * @description Modal de la cuenta en la nube. Según el estado de la sesión muestra:
  *              - sin sesión: el formulario de acceso (`AuthForm`);
+ *              - con sesión y el email sin verificar: aviso para verificarlo (`VerifyEmailPanel`);
  *              - con sesión y sin hogar: crear o unirse a un hogar (`HouseholdSetup`);
  *              - con hogar: miembros e invitación (`HouseholdManager`), cambiar el email,
  *                cerrar sesión y eliminar la cuenta.
@@ -11,7 +12,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,8 +21,14 @@ import { AuthForm } from "@/components/auth-form"
 import { HouseholdManager, HouseholdSetup } from "@/components/household-panel"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import type { HouseholdInfo } from "@/lib/cloud/repository"
-import { deleteAccount, getErrorMessage, requestEmailChange, signOut } from "@/lib/cloud/auth"
-import { LogOut, Mail, Trash2 } from "lucide-react"
+import {
+  deleteAccount,
+  getErrorMessage,
+  requestEmailChange,
+  resendVerificationEmail,
+  signOut,
+} from "@/lib/cloud/auth"
+import { LogOut, Mail, MailCheck, Trash2 } from "lucide-react"
 
 /**
  * @interface AccountModalProps
@@ -29,6 +36,7 @@ import { LogOut, Mail, Trash2 } from "lucide-react"
  * @property {HouseholdInfo | null} householdInfo - Miembros del hogar actual.
  * @property {string} person1Name - Nombre de la Persona 1 (rol de quien crea el hogar).
  * @property {string} person2Name - Nombre de la Persona 2 (rol de quien se une).
+ * @property {boolean} [singleMode] - Modo individual: el hogar se presenta como "tu espacio en la nube".
  */
 interface AccountModalProps {
   isOpen: boolean
@@ -37,9 +45,18 @@ interface AccountModalProps {
   householdInfo: HouseholdInfo | null
   person1Name: string
   person2Name: string
+  singleMode?: boolean
 }
 
-export function AccountModal({ isOpen, onClose, session, householdInfo, person1Name, person2Name }: AccountModalProps) {
+export function AccountModal({
+  isOpen,
+  onClose,
+  session,
+  householdInfo,
+  person1Name,
+  person2Name,
+  singleMode,
+}: AccountModalProps) {
   const { services, user, profile, householdId } = session
   if (!services) return null
 
@@ -48,6 +65,8 @@ export function AccountModal({ isOpen, onClose, session, householdInfo, person1N
       <div className="p-6 space-y-8">
         {!user ? (
           <AuthForm auth={services.auth} />
+        ) : !session.emailVerified ? (
+          <VerifyEmailPanel session={session} />
         ) : (
           <>
             {householdId ? (
@@ -58,15 +77,96 @@ export function AccountModal({ isOpen, onClose, session, householdInfo, person1N
                 info={householdInfo}
                 person1Name={person1Name}
                 person2Name={person2Name}
+                singleMode={singleMode}
               />
             ) : (
-              <HouseholdSetup services={services} user={user} />
+              <HouseholdSetup services={services} user={user} singleMode={singleMode} />
             )}
             <AccountSettings session={session} pendingEmail={profile?.pendingEmail ?? null} />
           </>
         )}
       </div>
     </Modal>
+  )
+}
+
+/**
+ * @function VerifyEmailPanel
+ * @description Cuenta creada pero sin verificar: hasta pulsar el enlace del email no se puede
+ *              crear ni unirse a un hogar. Se vuelve a comprobar al volver a la pestaña.
+ */
+function VerifyEmailPanel({ session }: { session: CloudSession }) {
+  const { services, user, refreshUser } = session
+  const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
+  const [isBusy, setIsBusy] = useState(false)
+
+  // Al volver a la app tras pulsar el enlace (en otra pestaña o en el móvil), se comprueba sola.
+  useEffect(() => {
+    const onFocus = () => {
+      refreshUser().catch(() => undefined)
+    }
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [refreshUser])
+
+  if (!services || !user) return null
+
+  const run = async (action: () => Promise<void>) => {
+    setError(null)
+    setInfo(null)
+    setIsBusy(true)
+    try {
+      await action()
+    } catch (err) {
+      setError(getErrorMessage(err))
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  const handleResend = () =>
+    run(async () => {
+      await resendVerificationEmail(user)
+      setInfo("Te hemos enviado otro email. Revisa también la carpeta de spam.")
+    })
+
+  const handleCheck = () =>
+    run(async () => {
+      const verified = await refreshUser()
+      if (!verified) setInfo("Todavía no consta como verificado. Pulsa el enlace del email y vuelve a probar.")
+    })
+
+  return (
+    <div className="space-y-4 text-center">
+      <MailCheck className="h-12 w-12 text-primary mx-auto" />
+      <h3 className="text-lg font-semibold text-foreground">Revisa tu correo</h3>
+      <p className="text-sm text-muted-foreground">
+        Te hemos enviado un enlace a <strong className="text-foreground">{user.email}</strong> para verificar tu
+        cuenta. Púlsalo y vuelve aquí para crear tu hogar o unirte al de tu pareja.
+      </p>
+
+      {info && <p className="text-sm text-green-600">{info}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="grid grid-cols-1 gap-3">
+        <Button type="button" onClick={() => void handleCheck()} disabled={isBusy}>
+          Ya lo he verificado
+        </Button>
+        <Button type="button" variant="outline" onClick={() => void handleResend()} disabled={isBusy}>
+          Reenviar email
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="flex items-center gap-2"
+          onClick={() => void run(() => signOut(services))}
+          disabled={isBusy}
+        >
+          <LogOut className="h-4 w-4" /> Cerrar sesión
+        </Button>
+      </div>
+    </div>
   )
 }
 

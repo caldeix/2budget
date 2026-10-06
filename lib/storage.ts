@@ -320,3 +320,37 @@ export function setLastSeenMonth(monthKey: string): void {
     console.error("Error saving last seen month:", error)
   }
 }
+
+/**
+ * @function hasAccountPromptBeenShown
+ * @description Indica si ya se abrió sola la ventana de Cuenta para este usuario y etapa
+ *              ("verify" = verificar el email, "household" = crear o unirse a un hogar).
+ *              Así solo se abre una vez, no en cada recarga.
+ * @param {string} uid - Usuario de Firebase.
+ * @param {"verify" | "household"} stage - Etapa pendiente.
+ * @returns {boolean}
+ */
+export function hasAccountPromptBeenShown(uid: string, stage: "verify" | "household"): boolean {
+  if (typeof window === "undefined") return true
+  try {
+    return localStorage.getItem(`2budget:account-prompt:${uid}:${stage}`) === "1"
+  } catch {
+    return false
+  }
+}
+
+/**
+ * @function markAccountPromptShown
+ * @description Recuerda que ya se abrió sola la ventana de Cuenta para este usuario y etapa.
+ * @param {string} uid - Usuario de Firebase.
+ * @param {"verify" | "household"} stage - Etapa pendiente.
+ * @returns {void}
+ */
+export function markAccountPromptShown(uid: string, stage: "verify" | "household"): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(`2budget:account-prompt:${uid}:${stage}`, "1")
+  } catch (error) {
+    console.error("Error saving account prompt flag:", error)
+  }
+}

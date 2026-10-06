@@ -148,6 +148,26 @@
   transition-duration: 150ms;
 }
 
+/* Los menús, selectores y avisos flotantes (Radix) se colocan moviendo `transform`: sin esto,
+   la transición global de arriba los hace viajar por la pantalla hasta su sitio. */
+[data-radix-popper-content-wrapper] {
+  transition: none !important;
+}
+
+/* Aparición sin movimiento: el elemento ya está en su sitio y solo pasa de opacidad 0 a 1. */
+@keyframes fade-in-place {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in-place[data-state="open"] {
+  animation: fade-in-place 300ms ease-out;
+}
+
 .focus-visible\:ring-2:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;

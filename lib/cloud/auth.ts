@@ -9,6 +9,7 @@ import {
   deleteUser,
   EmailAuthProvider,
   reauthenticateWithCredential,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -33,6 +34,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "auth/network-request-failed": "No hay conexión. Comprueba tu red y vuelve a probar.",
   "auth/requires-recent-login": "Por seguridad, vuelve a escribir tu contraseña.",
   "auth/operation-not-allowed": "Este tipo de acceso no está activado en Firebase.",
+  "auth/quota-exceeded": "Se ha alcanzado el límite de envíos de Firebase. Vuelve a probar más tarde.",
+  "auth/unauthorized-continue-uri": "Este dominio no está autorizado en Firebase (Authentication → Configuración → Dominios autorizados).",
+  "auth/invalid-continue-uri": "La dirección de vuelta del enlace no es válida.",
+  "auth/unauthorized-domain": "Este dominio no está autorizado en Firebase (Authentication → Configuración → Dominios autorizados).",
+  "auth/user-token-expired": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
   "permission-denied": "No tienes permiso para hacer esto.",
   unavailable: "No hay conexión con el servidor. Vuelve a probar en un momento.",
 }
@@ -46,7 +52,9 @@ export function getErrorMessage(error: unknown): string {
   if (code && AUTH_ERROR_MESSAGES[code]) return AUTH_ERROR_MESSAGES[code]
   if (error instanceof Error && error.name === "HouseholdError") return error.message
   if (error instanceof Error && !code) return error.message
-  return "Ha ocurrido un error inesperado. Vuelve a probar."
+  // Error no previsto: se deja en la consola y se muestra su código para poder diagnosticarlo.
+  console.error("Unexpected Firebase error:", error)
+  return `Ha ocurrido un error inesperado${code ? ` (${code})` : ""}. Vuelve a probar.`
 }
 
 /** URL a la que vuelven los enlaces de los emails de Firebase (dominio autorizado). */
@@ -58,8 +66,34 @@ export function signIn(auth: Auth, email: string, password: string) {
   return signInWithEmailAndPassword(auth, email.trim(), password)
 }
 
-export function signUp(auth: Auth, email: string, password: string) {
-  return createUserWithEmailAndPassword(auth, email.trim(), password)
+/**
+ * @function signUp
+ * @description Crea la cuenta y envía el email de verificación. Hasta pulsar el enlace no se
+ *              puede usar la nube (lo exigen también las reglas de Firestore).
+ */
+export async function signUp(auth: Auth, email: string, password: string): Promise<void> {
+  const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password)
+  await sendEmailVerification(user, { url: continueUrl() })
+}
+
+/**
+ * @function resendVerificationEmail
+ * @description Vuelve a enviar el email de verificación.
+ */
+export function resendVerificationEmail(user: User) {
+  return sendEmailVerification(user, { url: continueUrl() })
+}
+
+/**
+ * @function refreshVerification
+ * @description Comprueba si el email ya está verificado. Tras verificarlo hay que renovar el
+ *              token de sesión: las reglas de Firestore leen `email_verified` del token, no del usuario.
+ * @returns {Promise<boolean>} `true` si ya está verificado.
+ */
+export async function refreshVerification(user: User): Promise<boolean> {
+  await user.reload()
+  if (user.emailVerified) await user.getIdToken(true)
+  return user.emailVerified
 }
 
 export function resetPassword(auth: Auth, email: string) {

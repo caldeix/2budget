@@ -8,7 +8,13 @@ import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
 import { subtractMoney } from "@/lib/money"
 import { generateSampleData } from "@/lib/sample-data"
-import { getLastSeenMonth, parseImportedData, setLastSeenMonth } from "@/lib/storage"
+import {
+  getLastSeenMonth,
+  hasAccountPromptBeenShown,
+  markAccountPromptShown,
+  parseImportedData,
+  setLastSeenMonth,
+} from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -23,9 +29,10 @@ import { DocumentationModal } from "@/components/documentation-modal"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
+import { CloudStatus } from "@/components/cloud-status"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, Cloud, CloudOff, AlertTriangle } from "lucide-react"
+import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
 
 // Pure helper — kept outside component to avoid stale-closure issues in callbacks.
 // Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
@@ -71,14 +78,16 @@ export default function HomePage() {
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
 
-  // Tras iniciar sesión sin hogar, se abre la cuenta para crear uno o unirse (una vez por usuario).
-  const promptedHouseholdForUid = useRef<string | null>(null)
+  // Tras iniciar sesión (o verificar el email) sin hogar, la cuenta se abre sola UNA vez por
+  // usuario y etapa, no en cada recarga. Después, el aviso amarillo de la cabecera lo recuerda.
   useEffect(() => {
     const uid = session.user?.uid
-    if (!session.ready || !uid || session.householdId || promptedHouseholdForUid.current === uid) return
-    promptedHouseholdForUid.current = uid
+    if (!session.ready || !uid || session.householdId) return
+    const stage = session.emailVerified ? "household" : "verify"
+    if (hasAccountPromptBeenShown(uid, stage)) return
+    markAccountPromptShown(uid, stage)
     setIsAccountModalOpen(true)
-  }, [session.ready, session.user, session.householdId])
+  }, [session.ready, session.user, session.emailVerified, session.householdId])
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
@@ -343,20 +352,11 @@ export default function HomePage() {
             </h1>
             {/* Cuenta: nube con hogar, o modo local (solo si la build trae Firebase). */}
             {session.enabled && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAccountModalOpen(true)}
-                className="absolute right-0 flex items-center gap-2"
-                title={session.householdId ? "Sincronizado en la nube" : "Solo en este dispositivo"}
-              >
-                {session.householdId ? (
-                  <Cloud className="h-4 w-4 text-green-600" />
-                ) : (
-                  <CloudOff className="h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="hidden sm:inline max-w-[180px] truncate">{session.user?.email ?? "Entrar"}</span>
-              </Button>
+              <CloudStatus
+                session={session}
+                singleMode={data.config.singleMode}
+                onOpenAccount={() => setIsAccountModalOpen(true)}
+              />
             )}
           </div>
         </div>
@@ -602,6 +602,7 @@ export default function HomePage() {
         householdInfo={householdInfo}
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
+        singleMode={data.config.singleMode}
       />
 
       <DocumentationModal
