@@ -24,6 +24,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  increment,
   getDocs,
   onSnapshot,
   setDoc,
@@ -57,6 +58,7 @@ import {
 } from "@/lib/cloud/crypto"
 import { saveCachedDek } from "@/lib/cloud/vault-cache"
 import type { MasterCheckState } from "@/lib/cloud/master-check"
+import type { UsageState } from "@/lib/cloud/usage"
 
 /** Rol de cada miembro en el hogar: quien lo crea es la Persona 1 y quien se une, la Persona 2. */
 export type MemberRole = "person1" | "person2"
@@ -65,7 +67,7 @@ export type MemberRole = "person1" | "person2"
  * @interface UserProfile
  * @description Perfil de un usuario en `users/{uid}`.
  */
-export interface UserProfile extends MasterCheckState {
+export interface UserProfile extends MasterCheckState, UsageState {
   householdId: string | null
   email: string
   /** Email nuevo pendiente de confirmar por enlace (ver `requestEmailChange`). */
@@ -198,6 +200,17 @@ export async function ensureUserProfile(db: Firestore, uid: string, email: strin
  */
 export async function setPendingEmail(db: Firestore, uid: string, pendingEmail: string | null): Promise<void> {
   await updateDoc(userRef(db, uid), { pendingEmail })
+}
+
+/**
+ * @function recordVisit
+ * @description Registra una visita (un día de uso): actualiza `lastSeenAt` y suma uno a
+ *              `visitDays`. Si falla (p. ej. sin conexión), no afecta al uso de la app.
+ */
+export function recordVisit(db: Firestore, uid: string): void {
+  setDoc(userRef(db, uid), { lastSeenAt: new Date().toISOString(), visitDays: increment(1) }, { merge: true }).catch(
+    (error) => console.error("Error recording visit:", error),
+  )
 }
 
 /** Campos del perfil que marcan una comprobación correcta de la contraseña maestra. */

@@ -10,11 +10,12 @@
 
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { getFirebase, isCloudConfigured, type FirebaseServices } from "@/lib/cloud/firebase"
 import { refreshVerification } from "@/lib/cloud/auth"
-import { ensureUserProfile, subscribeUserProfile, type UserProfile } from "@/lib/cloud/repository"
+import { ensureUserProfile, recordVisit, subscribeUserProfile, type UserProfile } from "@/lib/cloud/repository"
+import { shouldRecordVisit } from "@/lib/cloud/usage"
 
 /**
  * @interface CloudSession
@@ -47,6 +48,9 @@ export function useCloudSession(): CloudSession {
   // `user.reload()` actualiza el mismo objeto `User`: este contador fuerza el nuevo render.
   const [, setUserVersion] = useState(0)
   const emailVerified = user?.emailVerified ?? false
+  // Usuario cuya visita de hoy ya se ha registrado en esta carga (evita repetir la escritura
+  // mientras llega el snapshot con la fecha nueva).
+  const visitRecordedFor = useRef<string | null>(null)
 
   // Sesión de Firebase Auth.
   useEffect(() => {
@@ -101,6 +105,11 @@ export function useCloudSession(): CloudSession {
         (nextProfile) => {
           setProfile(nextProfile)
           setProfileLoaded(true)
+          // Registro de uso: como mucho una vez al día por usuario.
+          if (nextProfile && visitRecordedFor.current !== user.uid && shouldRecordVisit(nextProfile.lastSeenAt, new Date())) {
+            visitRecordedFor.current = user.uid
+            recordVisit(services.db, user.uid)
+          }
         },
         (error) => {
           // Sin perfil accesible, la app sigue en modo local.
