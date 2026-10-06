@@ -33,6 +33,9 @@ import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
 import { VaultUnlock } from "@/components/vault-unlock"
 import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
+import { MasterCheckDialog } from "@/components/master-check-dialog"
+import { isMasterCheckDue } from "@/lib/cloud/master-check"
+import { recordMasterCheck } from "@/lib/cloud/repository"
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
@@ -90,6 +93,16 @@ export default function HomePage() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
   // Código de recuperación recién generado: se muestra una sola vez.
   const [recoveryCodeToShow, setRecoveryCodeToShow] = useState<string | null>(null)
+
+  // Comprobación mensual de la contraseña maestra (solo con el hogar desbloqueado).
+  const profile = session.profile
+  const isMasterCheckOpen =
+    vault.status === "unlocked" && profile !== null && !recoveryCodeToShow && isMasterCheckDue(profile, new Date())
+  // Perfiles sin fecha (creados antes de esta comprobación): se registra la de ahora sin preguntar.
+  useEffect(() => {
+    if (vault.status !== "unlocked" || !profile || profile.lastMasterCheckAt || !session.services || !session.user) return
+    recordMasterCheck(session.services.db, session.user.uid)
+  }, [vault.status, profile, session.services, session.user])
 
   // Tras iniciar sesión (o verificar el email) sin hogar, la cuenta se abre sola UNA vez por
   // usuario y etapa, no en cada recarga. Después, el aviso amarillo de la cabecera lo recuerda.
@@ -624,6 +637,13 @@ export default function HomePage() {
           setIsAccountModalOpen(false)
           setRecoveryCodeToShow(code)
         }}
+      />
+
+      <MasterCheckDialog
+        isOpen={isMasterCheckOpen}
+        session={session}
+        vault={vault}
+        onRecoveryCode={setRecoveryCodeToShow}
       />
 
       <RecoveryCodeDialog

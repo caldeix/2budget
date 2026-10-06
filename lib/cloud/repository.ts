@@ -56,6 +56,7 @@ import {
   type WrappedKey,
 } from "@/lib/cloud/crypto"
 import { saveCachedDek } from "@/lib/cloud/vault-cache"
+import type { MasterCheckState } from "@/lib/cloud/master-check"
 
 /** Rol de cada miembro en el hogar: quien lo crea es la Persona 1 y quien se une, la Persona 2. */
 export type MemberRole = "person1" | "person2"
@@ -64,7 +65,7 @@ export type MemberRole = "person1" | "person2"
  * @interface UserProfile
  * @description Perfil de un usuario en `users/{uid}`.
  */
-export interface UserProfile {
+export interface UserProfile extends MasterCheckState {
   householdId: string | null
   email: string
   /** Email nuevo pendiente de confirmar por enlace (ver `requestEmailChange`). */
@@ -199,6 +200,30 @@ export async function setPendingEmail(db: Firestore, uid: string, pendingEmail: 
   await updateDoc(userRef(db, uid), { pendingEmail })
 }
 
+/** Campos del perfil que marcan una comprobación correcta de la contraseña maestra. */
+function masterCheckFields(): MasterCheckState {
+  return { lastMasterCheckAt: new Date().toISOString(), masterCheckSnoozedUntil: null }
+}
+
+/**
+ * @function recordMasterCheck
+ * @description Registra que se acaba de escribir bien la contraseña maestra (reinicia el mes).
+ *              Si falla (p. ej. sin conexión), no interrumpe la operación que la pidió.
+ */
+export function recordMasterCheck(db: Firestore, uid: string): void {
+  setDoc(userRef(db, uid), masterCheckFields(), { merge: true }).catch((error) =>
+    console.error("Error recording master password check:", error),
+  )
+}
+
+/**
+ * @function snoozeMasterCheck
+ * @description Pospone la comprobación mensual hasta la fecha indicada.
+ */
+export async function snoozeMasterCheck(db: Firestore, uid: string, until: Date): Promise<void> {
+  await setDoc(userRef(db, uid), { masterCheckSnoozedUntil: until.toISOString() }, { merge: true })
+}
+
 // ---------------------------------------------------------------------------
 // Clave del hogar (contraseña maestra)
 // ---------------------------------------------------------------------------
@@ -224,7 +249,18 @@ export async function getOwnWrappedKey(db: Firestore, hid: string, uid: string):
 export async function unlockHousehold(db: Firestore, hid: string, uid: string, masterPassword: string): Promise<CryptoKey> {
   const dek = await unwrapDek(await getOwnWrappedKey(db, hid, uid), masterPassword, false)
   await saveCachedDek(uid, hid, dek)
+  recordMasterCheck(db, uid)
   return dek
+}
+
+/**
+ * @function verifyMasterPassword
+ * @description Comprueba la contraseña maestra (comprobación mensual) sin cambiar nada más.
+ *              Lanza `WrongPasswordError` si no es la correcta.
+ */
+export async function verifyMasterPassword(db: Firestore, hid: string, uid: string, masterPassword: string): Promise<void> {
+  await unwrapDek(await getOwnWrappedKey(db, hid, uid), masterPassword, false)
+  recordMasterCheck(db, uid)
 }
 
 /**
@@ -233,7 +269,9 @@ export async function unlockHousehold(db: Firestore, hid: string, uid: string, m
  *              (invitar, cambiar la contraseña maestra). Exige la contraseña maestra.
  */
 export async function unlockExtractableDek(db: Firestore, hid: string, uid: string, masterPassword: string): Promise<CryptoKey> {
-  return unwrapDek(await getOwnWrappedKey(db, hid, uid), masterPassword, true)
+  const dek = await unwrapDek(await getOwnWrappedKey(db, hid, uid), masterPassword, true)
+  recordMasterCheck(db, uid)
+  return dek
 }
 
 /**
@@ -317,6 +355,7 @@ export async function recoverWithCode(
   const batch = writeBatch(db)
   batch.set(keyRef(db, hid, uid), await wrapDek(dek, newMasterPassword, MASTER_KDF_ITERATIONS))
   batch.set(recoveryRef(db, hid, uid), recovery.wrapped)
+  batch.set(userRef(db, uid), masterCheckFields(), { merge: true })
   await batch.commit()
 
   const localDek = await toNonExtractable(dek)
@@ -551,7 +590,7 @@ export async function createHousehold(
   })
   batch.set(keyRef(db, hid, uid), ownKey)
   batch.set(recoveryRef(db, hid, uid), recovery.wrapped)
-  batch.set(userRef(db, uid), { householdId: hid }, { merge: true })
+  batch.set(userRef(db, uid), { householdId: hid, ...masterCheckFields() }, { merge: true })
   await batch.commit()
 
   // 2. Los datos, cifrados y en lotes (pueden ser cientos de transacciones).
@@ -646,7 +685,7 @@ export async function joinHousehold(
   const batch = writeBatch(db)
   batch.set(keyRef(db, householdId, uid), await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS))
   batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
-  batch.set(userRef(db, uid), { householdId }, { merge: true })
+  batch.set(userRef(db, uid), { householdId, ...masterCheckFields() }, { merge: true })
   batch.delete(inviteRef(db, id))
   await batch.commit()
   return { householdId, recoveryCode: recovery.code }
