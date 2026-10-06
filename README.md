@@ -47,10 +47,15 @@ npm run dev        # http://localhost:3000
 
 ### Producción
 
+La web se publica sola: cada push a la rama `production` lanza el workflow `.github/workflows/deploy.yml`, que compila la exportación estática y la sube a GitHub Pages.
+
 ```bash
-npm run build      # Genera exportación estática en /out
-npm run deploy     # Build + push a GitHub Pages
+git checkout production
+git merge development
+git push           # Dispara el despliegue
 ```
+
+Para compilar en local: `npm run build` (genera la exportación estática en `/out`).
 
 ---
 
