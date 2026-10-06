@@ -4,9 +4,11 @@
  *              La configuración llega por variables `NEXT_PUBLIC_FIREBASE_*` (ver `.env.example`):
  *              son públicas por diseño, la seguridad está en `firestore.rules`.
  *              Si faltan, `getFirebase()` devuelve `null` y la app funciona solo en local.
+ *              Con `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, además se activa App Check.
  */
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app"
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check"
 import {
   browserLocalPersistence,
   getAuth,
@@ -30,6 +32,9 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 }
+
+/** Clave del sitio de reCAPTCHA v3 para App Check (pública). Sin ella, App Check no se activa. */
+const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
 
 /** `true` si la build trae la configuración de Firebase; si no, la app es solo local. */
 export const isCloudConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId)
@@ -58,6 +63,21 @@ export function getFirebase(): FirebaseServices | null {
 
   const alreadyInitialized = getApps().length > 0
   const app = alreadyInitialized ? getApp() : initializeApp(firebaseConfig)
+
+  // App Check: cada petición a Auth y Firestore lleva un token que demuestra que viene de esta
+  // app (reCAPTCHA v3, invisible). Así nadie puede usar el proyecto desde scripts propios y
+  // gastar la cuota. Va antes que Auth y Firestore para que sus primeras peticiones ya lo lleven.
+  if (!alreadyInitialized && recaptchaSiteKey) {
+    // En local, reCAPTCHA no valida: se usa un token de depuración. La primera vez, el SDK lo
+    // escribe en la consola del navegador y hay que registrarlo en Firebase → App Check.
+    if (window.location.hostname === "localhost") {
+      ;(self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true
+    }
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+  }
 
   const auth = alreadyInitialized
     ? getAuth(app)
