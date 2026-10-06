@@ -1,8 +1,8 @@
 /**
  * @file components/cloud-status.tsx
  * @description Botón de la cuenta en la cabecera (nube verde = sincronizado, nube tachada =
- *              solo en este dispositivo) y, con sesión pero sin datos en la nube, un aviso
- *              amarillo que explica por qué y lleva a resolverlo.
+ *              solo en este dispositivo) y, sin hogar en la nube, un aviso amarillo que explica
+ *              por qué los datos solo están en el dispositivo y lleva a resolverlo.
  *              El aviso se abre al pasar el ratón (ordenador) o al tocarlo (móvil y tablet). El
  *              hover solo cuenta con ratón real: en táctil, el toque también genera eventos de
  *              puntero y abriría y cerraría el aviso a la vez.
@@ -36,24 +36,17 @@ export function CloudStatus({ session, singleMode, onOpenAccount }: CloudStatusP
     if (pointerType !== "mouse") return
     closeTimer.current = setTimeout(() => setIsWarningOpen(false), 150)
   }
-  const { user, emailVerified, householdId } = session
+  const { user, householdId } = session
 
-  // Sin sesión no se avisa: usar la app solo en local es una opción válida.
-  const warning = !user
+  // La app solo se ve con la cuenta verificada: el aviso es para quien aún no tiene hogar.
+  const warning = householdId
     ? null
-    : !emailVerified
-      ? {
-          text: "Tus datos solo están en este dispositivo. Verifica tu email para poder guardarlos en la nube.",
-          action: "Verificar email",
-        }
-      : !householdId
-        ? {
-            text: singleMode
-              ? "Tus datos solo están en este dispositivo. Crea tu espacio en la nube para tenerlos a salvo y usarlos desde cualquier dispositivo."
-              : "Tus datos solo están en este dispositivo. Crea tu hogar en la nube (o únete al de tu pareja) para tenerlos a salvo y compartirlos.",
-            action: singleMode ? "Crear mi espacio" : "Crear o unirme a un hogar",
-          }
-        : null
+    : {
+        text: singleMode
+          ? "Tus datos solo están en este dispositivo. Crea tu espacio en la nube para tenerlos a salvo y usarlos desde cualquier dispositivo."
+          : "Tus datos solo están en este dispositivo. Crea tu hogar en la nube (o únete al de tu pareja) para tenerlos a salvo y compartirlos.",
+        action: singleMode ? "Crear mi espacio" : "Crear o unirme a un hogar",
+      }
 
   return (
     <div className="absolute right-0 flex items-center gap-1">

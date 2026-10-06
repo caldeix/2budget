@@ -32,6 +32,7 @@ import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
 import { VaultUnlock } from "@/components/vault-unlock"
+import { AuthScreen } from "@/components/auth-screen"
 import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 import { MasterCheckDialog } from "@/components/master-check-dialog"
 import { isMasterCheckDue } from "@/lib/cloud/master-check"
@@ -79,8 +80,11 @@ export default function HomePage() {
     householdInfo,
     syncError,
   } = useFinancialDataContext(cloudTarget)
+  // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
+  const needsAuth = session.enabled && (!session.user || !session.emailVerified)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
-  const isLoading = !session.ready || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading
+  const isLoading =
+    !session.ready || needsAuth || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading
   // Hogar en la nube pero sin la clave en este dispositivo: hay que escribir la contraseña maestra.
   const isVaultLocked = session.ready && vault.status === "locked"
 
@@ -104,14 +108,13 @@ export default function HomePage() {
     recordMasterCheck(session.services.db, session.user.uid)
   }, [vault.status, profile, session.services, session.user])
 
-  // Tras iniciar sesión (o verificar el email) sin hogar, la cuenta se abre sola UNA vez por
-  // usuario y etapa, no en cada recarga. Después, el aviso amarillo de la cabecera lo recuerda.
+  // Ya con la cuenta verificada y sin hogar, la ventana de Cuenta se abre sola UNA vez por
+  // usuario (no en cada recarga). Después, el aviso amarillo de la cabecera lo recuerda.
   useEffect(() => {
     const uid = session.user?.uid
-    if (!session.ready || !uid || session.householdId) return
-    const stage = session.emailVerified ? "household" : "verify"
-    if (hasAccountPromptBeenShown(uid, stage)) return
-    markAccountPromptShown(uid, stage)
+    if (!session.ready || !uid || !session.emailVerified || session.householdId) return
+    if (hasAccountPromptBeenShown(uid, "household")) return
+    markAccountPromptShown(uid, "household")
     setIsAccountModalOpen(true)
   }, [session.ready, session.user, session.emailVerified, session.householdId])
 
@@ -352,6 +355,11 @@ export default function HomePage() {
     // Se ejecuta una sola vez, cuando terminan de cargar los datos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
+
+  // La app exige una cuenta con el email verificado (si la build trae Firebase; si no, es solo local).
+  if (session.ready && needsAuth) {
+    return <AuthScreen session={session} />
+  }
 
   if (isVaultLocked) {
     return <VaultUnlock session={session} vault={vault} onRecoveryCode={setRecoveryCodeToShow} />

@@ -76,8 +76,9 @@ export function AuthForm({ auth }: AuthFormProps) {
       <div>
         <h3 className="text-lg font-semibold text-foreground">{title}</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Con una cuenta, tus datos se guardan en la nube y puedes usarlos desde cualquier dispositivo o compartirlos
-          con tu pareja.
+          {mode === "reset"
+            ? "Te enviaremos un enlace para elegir una contraseña nueva."
+            : "Necesitas una cuenta para usar 2Budget. Con ella podrás guardar tus datos cifrados en la nube, usarlos desde cualquier dispositivo y compartirlos con tu pareja."}
         </p>
       </div>
 
