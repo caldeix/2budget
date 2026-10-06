@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
 import { useCloudSession } from "@/hooks/use-cloud-session"
+import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
 import { subtractMoney } from "@/lib/money"
@@ -30,6 +31,7 @@ import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
+import { VaultUnlock } from "@/components/vault-unlock"
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
@@ -46,11 +48,16 @@ const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category ==
 const isCopyableIncome = (t: Transaction) => t.type === "income" && !/^Ajuste .+ - Cierre /.test(t.name)
 
 export default function HomePage() {
-  // Sesión en la nube: con hogar, los datos se leen y guardan en Firestore; si no, en local.
+  // Sesión en la nube: con hogar (y desbloqueado con la contraseña maestra), los datos se leen
+  // y guardan cifrados en Firestore; si no, en local.
   const session = useCloudSession()
+  const vault = useVault(session)
   const cloudTarget = useMemo(
-    () => (session.services && session.householdId ? { db: session.services.db, householdId: session.householdId } : null),
-    [session.services, session.householdId],
+    () =>
+      session.services && session.householdId && vault.dek
+        ? { db: session.services.db, householdId: session.householdId, dek: vault.dek }
+        : null,
+    [session.services, session.householdId, vault.dek],
   )
 
   const {
@@ -68,7 +75,10 @@ export default function HomePage() {
     householdInfo,
     syncError,
   } = useFinancialDataContext(cloudTarget)
-  const isLoading = !session.ready || isDataLoading
+  // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
+  const isLoading = !session.ready || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading
+  // Hogar en la nube pero sin la clave en este dispositivo: hay que escribir la contraseña maestra.
+  const isVaultLocked = session.ready && vault.status === "locked"
 
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
@@ -326,6 +336,10 @@ export default function HomePage() {
     // Se ejecuta una sola vez, cuando terminan de cargar los datos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
+
+  if (isVaultLocked) {
+    return <VaultUnlock session={session} vault={vault} />
+  }
 
   if (isLoading) {
     return (

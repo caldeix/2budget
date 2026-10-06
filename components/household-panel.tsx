@@ -19,8 +19,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { clearAllData, downloadAppData, emptyAppData, hasAppData, loadData } from "@/lib/storage"
-import { createHousehold, createInvite, joinHousehold, leaveHousehold, type HouseholdInfo } from "@/lib/cloud/repository"
+import {
+  createHousehold,
+  createInvite,
+  joinHousehold,
+  leaveHousehold,
+  unlockExtractableDek,
+  type HouseholdInfo,
+} from "@/lib/cloud/repository"
+import { formatCode } from "@/lib/cloud/crypto"
+import { clearVaultCache } from "@/lib/cloud/vault-cache"
 import { getErrorMessage } from "@/lib/cloud/auth"
+import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
 import { AlertTriangle, Copy, Download, Home, LogOut, UserPlus, Users } from "lucide-react"
 
 interface HouseholdSetupProps {
@@ -31,42 +41,53 @@ interface HouseholdSetupProps {
 
 /**
  * @function HouseholdSetup
- * @description Primer paso tras crear la cuenta: crear un hogar o unirse a uno.
+ * @description Primer paso tras verificar la cuenta: crear un hogar o unirse a uno. En los dos
+ *              casos se elige la contraseña maestra con la que se cifran los datos.
  */
 export function HouseholdSetup({ services, user, singleMode }: HouseholdSetupProps) {
   // Datos que hay en este navegador (modo local), para ofrecer subirlos.
   const [localData] = useState(() => loadData())
   const hasLocalData = hasAppData(localData)
+  const [choice, setChoice] = useState<"create" | "join" | null>(singleMode ? "create" : null)
   const [uploadLocal, setUploadLocal] = useState(true)
   const [code, setCode] = useState("")
+  const [masterPassword, setMasterPassword] = useState("")
+  const [masterRepeat, setMasterRepeat] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<"create" | "join" | null>(null)
+  const [isBusy, setIsBusy] = useState(false)
 
-  const handleCreate = async () => {
+  const choose = (next: "create" | "join" | null) => {
+    setChoice(next)
     setError(null)
-    setBusyAction("create")
-    try {
-      const initial = hasLocalData && uploadLocal ? localData : { ...emptyAppData, config: localData.config }
-      await createHousehold(services.db, user.uid, user.email ?? "", initial)
-      // Solo cuando la subida ha terminado bien se vacía la copia local.
-      if (hasLocalData && uploadLocal) clearAllData()
-    } catch (err) {
-      setError(getErrorMessage(err))
-      setBusyAction(null)
-    }
+    setMasterPassword("")
+    setMasterRepeat("")
   }
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const invalid = validateNewMasterPassword(masterPassword, masterRepeat)
+    if (invalid) {
+      setError(invalid)
+      return
+    }
     setError(null)
-    setBusyAction("join")
+    setIsBusy(true)
     try {
-      await joinHousehold(services.db, code, user.uid, user.email ?? "")
+      if (choice === "create") {
+        const initial = hasLocalData && uploadLocal ? localData : { ...emptyAppData, config: localData.config }
+        await createHousehold(services.db, user.uid, user.email ?? "", initial, masterPassword)
+        // Solo cuando la subida ha terminado bien se vacía la copia local.
+        if (hasLocalData && uploadLocal) clearAllData()
+      } else {
+        await joinHousehold(services.db, code, user.uid, user.email ?? "", masterPassword)
+      }
     } catch (err) {
       setError(getErrorMessage(err))
-      setBusyAction(null)
+      setIsBusy(false)
     }
   }
+
+  const spaceName = singleMode ? "tu espacio" : "el hogar"
 
   return (
     <div className="space-y-6">
@@ -79,75 +100,106 @@ export function HouseholdSetup({ services, user, singleMode }: HouseholdSetupPro
         </p>
       </div>
 
-      {/* Crear hogar */}
-      <div className="rounded-2xl border p-4 space-y-3">
-        <h4 className="font-medium text-foreground flex items-center gap-2">
-          <Home className="h-4 w-4" /> {singleMode ? "Crear mi espacio" : "Crear un hogar"}
-        </h4>
-        {hasLocalData && (
-          <label className="flex items-start gap-2 text-sm text-foreground">
-            <input
-              type="checkbox"
-              checked={uploadLocal}
-              onChange={(e) => setUploadLocal(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span>
-              Subir los datos de este dispositivo ({localData.transactions.length} transacciones y{" "}
-              {localData.reports.length} informes)
-            </span>
-          </label>
-        )}
-        <Button onClick={handleCreate} className="w-full" disabled={busyAction !== null}>
-          {busyAction === "create" ? "Creando y subiendo datos..." : singleMode ? "Crear mi espacio" : "Crear hogar"}
-        </Button>
-      </div>
+      {/* Elección: crear o unirse (en modo individual, directamente crear) */}
+      {choice === null && (
+        <div className="grid grid-cols-1 gap-3">
+          <Button type="button" onClick={() => choose("create")} className="flex items-center gap-2">
+            <Home className="h-4 w-4" /> Crear un hogar
+          </Button>
+          <Button type="button" variant="outline" onClick={() => choose("join")} className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" /> Unirme con un código
+          </Button>
+        </div>
+      )}
 
-      {/* Unirse a un hogar (no aplica en modo individual) */}
-      {singleMode ? (
+      {choice !== null && (
+        <form onSubmit={handleSubmit} className="rounded-2xl border p-4 space-y-4">
+          <h4 className="font-medium text-foreground flex items-center gap-2">
+            {choice === "create" ? <Home className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+            {choice === "create" ? (singleMode ? "Crear mi espacio" : "Crear un hogar") : "Unirme con un código"}
+          </h4>
+
+          {choice === "create" && hasLocalData && (
+            <label className="flex items-start gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                checked={uploadLocal}
+                onChange={(e) => setUploadLocal(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <span>
+                Subir los datos de este dispositivo ({localData.transactions.length} transacciones y{" "}
+                {localData.reports.length} informes)
+              </span>
+            </label>
+          )}
+
+          {choice === "join" && (
+            <>
+              {hasLocalData && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="space-y-2">
+                    <p className="text-xs text-amber-600">
+                      Los datos de este dispositivo no se mezclan con los del hogar: se quedan aquí, fuera de la
+                      cuenta. Exporta una copia si quieres conservarlos.
+                    </p>
+                    <Button type="button" size="sm" variant="outline" onClick={() => downloadAppData(localData)}>
+                      <Download className="h-3 w-3 mr-1" /> Exportar copia
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div>
+                <Label htmlFor="invite-code">Código de invitación</Label>
+                <Input
+                  id="invite-code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+                  autoComplete="off"
+                  className="font-mono tracking-wider uppercase"
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          <MasterPasswordFields
+            idPrefix={`setup-${choice}`}
+            password={masterPassword}
+            repeat={masterRepeat}
+            onPasswordChange={setMasterPassword}
+            onRepeatChange={setMasterRepeat}
+          />
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          <div className="flex justify-end gap-2">
+            {!singleMode && (
+              <Button type="button" variant="outline" onClick={() => choose(null)} disabled={isBusy}>
+                Volver
+              </Button>
+            )}
+            <Button type="submit" disabled={isBusy}>
+              {isBusy
+                ? choice === "create"
+                  ? "Cifrando y subiendo datos..."
+                  : "Uniéndome..."
+                : choice === "create"
+                  ? `Crear ${spaceName}`
+                  : "Unirme al hogar"}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {singleMode && (
         <p className="text-xs text-muted-foreground">
           ¿Quieres compartirlo con tu pareja? Desactiva el modo individual en Configuración y podréis usar un hogar
           compartido.
         </p>
-      ) : (
-        <form onSubmit={handleJoin} className="rounded-2xl border p-4 space-y-3">
-          <h4 className="font-medium text-foreground flex items-center gap-2">
-            <UserPlus className="h-4 w-4" /> Unirme con un código
-          </h4>
-          {hasLocalData && (
-            <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-              <div className="space-y-2">
-                <p className="text-xs text-amber-600">
-                  Los datos de este dispositivo no se mezclan con los del hogar: se quedan aquí, fuera de la cuenta.
-                  Exporta una copia si quieres conservarlos.
-                </p>
-                <Button type="button" size="sm" variant="outline" onClick={() => downloadAppData(localData)}>
-                  <Download className="h-3 w-3 mr-1" /> Exportar copia
-                </Button>
-              </div>
-            </div>
-        )}
-        <div>
-          <Label htmlFor="invite-code">Código de invitación</Label>
-          <Input
-            id="invite-code"
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="Ej: K7M2QX9P"
-            maxLength={8}
-            autoComplete="off"
-            className="font-mono tracking-widest uppercase"
-            required
-          />
-        </div>
-        <Button type="submit" variant="outline" className="w-full" disabled={busyAction !== null || code.trim().length < 8}>
-          {busyAction === "join" ? "Uniéndome..." : "Unirme al hogar"}
-        </Button>
-      </form>
       )}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   )
 }
@@ -176,6 +228,7 @@ export function HouseholdManager({
   singleMode,
 }: HouseholdManagerProps) {
   const [invite, setInvite] = useState<{ code: string; expiresAt: Date } | null>(null)
+  const [inviteMasterPassword, setInviteMasterPassword] = useState("")
   const [copied, setCopied] = useState(false)
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -186,11 +239,15 @@ export function HouseholdManager({
   // En modo individual, con un solo miembro, el hogar es "tu espacio" y no se invita a nadie.
   const isPersonalSpace = Boolean(singleMode) && isAlone
 
-  const handleInvite = async () => {
+  // La invitación lleva una copia de la clave del hogar: para sacarla hace falta la contraseña maestra.
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault()
     setError(null)
     setIsBusy(true)
     try {
-      setInvite(await createInvite(services.db, householdId, user.uid))
+      const dek = await unlockExtractableDek(services.db, householdId, user.uid, inviteMasterPassword)
+      setInvite(await createInvite(services.db, householdId, user.uid, dek))
+      setInviteMasterPassword("")
       setCopied(false)
     } catch (err) {
       setError(getErrorMessage(err))
@@ -202,7 +259,7 @@ export function HouseholdManager({
   const handleCopy = async () => {
     if (!invite) return
     try {
-      await navigator.clipboard.writeText(invite.code)
+      await navigator.clipboard.writeText(formatCode(invite.code))
       setCopied(true)
     } catch {
       // Sin permiso de portapapeles: el código sigue visible para copiarlo a mano.
@@ -214,6 +271,8 @@ export function HouseholdManager({
     setIsBusy(true)
     try {
       await leaveHousehold(services.db, householdId, user.uid)
+      // La clave de este hogar ya no sirve en este dispositivo.
+      await clearVaultCache()
     } catch (err) {
       setError(getErrorMessage(err))
       setIsBusy(false)
@@ -248,22 +307,41 @@ export function HouseholdManager({
 
       {/* Invitación (solo mientras falta el segundo miembro, y no en modo individual) */}
       {isAlone && !isPersonalSpace && (
-        <div className="rounded-2xl border p-4 space-y-3">
+        <form onSubmit={handleInvite} className="rounded-2xl border p-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Invita a tu pareja: genera un código y pásaselo. Lo usa una sola vez, en las próximas 48 horas.
+            Invita a tu pareja: genera un código y pásaselo por un canal privado. Lo usa una sola vez, en las próximas
+            48 horas, y con él elegirá su propia contraseña maestra.
           </p>
-          {invite ? (
-            <div className="flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-2">
-              <span className="font-mono text-lg tracking-widest text-foreground">{invite.code}</span>
-              <Button type="button" size="sm" variant="ghost" onClick={handleCopy}>
-                <Copy className="h-4 w-4 mr-1" /> {copied ? "Copiado" : "Copiar"}
-              </Button>
+          {invite && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-muted px-3 py-2">
+                <span className="font-mono text-sm sm:text-base tracking-wider text-foreground break-all">
+                  {formatCode(invite.code)}
+                </span>
+                <Button type="button" size="sm" variant="ghost" onClick={handleCopy} className="shrink-0">
+                  <Copy className="h-4 w-4 mr-1" /> {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Caduca el {invite.expiresAt.toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}.
+              </p>
             </div>
-          ) : null}
-          <Button type="button" variant="outline" className="w-full" onClick={handleInvite} disabled={isBusy}>
+          )}
+          <div>
+            <Label htmlFor="invite-master">Tu contraseña maestra</Label>
+            <Input
+              id="invite-master"
+              type="password"
+              autoComplete="current-password"
+              value={inviteMasterPassword}
+              onChange={(e) => setInviteMasterPassword(e.target.value)}
+              required
+            />
+          </div>
+          <Button type="submit" variant="outline" className="w-full" disabled={isBusy}>
             <UserPlus className="h-4 w-4 mr-2" /> {invite ? "Generar otro código" : "Generar código de invitación"}
           </Button>
-        </div>
+        </form>
       )}
 
       {/* Salir del hogar */}

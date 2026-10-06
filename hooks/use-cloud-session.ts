@@ -74,25 +74,47 @@ export function useCloudSession(): CloudSession {
     setProfileLoaded(false)
     if (!services || !user || !emailVerified) return
 
-    if (user.email) {
-      ensureUserProfile(services.db, user.uid, user.email).catch((error) =>
-        console.error("Error preparing user profile:", error),
+    let cancelled = false
+    let unsubscribe: (() => void) | null = null
+
+    const start = async () => {
+      // Las reglas leen la verificación del TOKEN de sesión, no del usuario. Un token emitido
+      // antes de verificar (p. ej. verificado en otra pestaña o restaurado al recargar) aún
+      // dice "no verificado" y Firestore lo rechazaría todo hasta que caducara (1 h): se renueva.
+      try {
+        const token = await user.getIdTokenResult()
+        if (token.claims.email_verified !== true) await user.getIdToken(true)
+      } catch (error) {
+        console.error("Error refreshing session token:", error)
+      }
+      if (cancelled) return
+
+      if (user.email) {
+        ensureUserProfile(services.db, user.uid, user.email).catch((error) =>
+          console.error("Error preparing user profile:", error),
+        )
+      }
+
+      unsubscribe = subscribeUserProfile(
+        services.db,
+        user.uid,
+        (nextProfile) => {
+          setProfile(nextProfile)
+          setProfileLoaded(true)
+        },
+        (error) => {
+          // Sin perfil accesible, la app sigue en modo local.
+          console.error("Error loading user profile:", error)
+          setProfileLoaded(true)
+        },
       )
     }
+    void start()
 
-    return subscribeUserProfile(
-      services.db,
-      user.uid,
-      (nextProfile) => {
-        setProfile(nextProfile)
-        setProfileLoaded(true)
-      },
-      (error) => {
-        // Sin perfil accesible, la app sigue en modo local.
-        console.error("Error loading user profile:", error)
-        setProfileLoaded(true)
-      },
-    )
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [services, user, emailVerified])
 
   return {

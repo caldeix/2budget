@@ -28,7 +28,9 @@ import {
   resendVerificationEmail,
   signOut,
 } from "@/lib/cloud/auth"
-import { LogOut, Mail, MailCheck, Trash2 } from "lucide-react"
+import { changeMasterPassword } from "@/lib/cloud/repository"
+import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
+import { KeyRound, LogOut, Mail, MailCheck, Trash2 } from "lucide-react"
 
 /**
  * @interface AccountModalProps
@@ -172,22 +174,27 @@ function VerifyEmailPanel({ session }: { session: CloudSession }) {
 
 /**
  * @function AccountSettings
- * @description Datos de la cuenta: email (y cambio de email), cerrar sesión y eliminarla.
+ * @description Datos de la cuenta: email (y cambio de email), contraseña maestra (con hogar),
+ *              cerrar sesión y eliminarla.
  */
 function AccountSettings({ session, pendingEmail }: { session: CloudSession; pendingEmail: string | null }) {
   const { services, user, householdId } = session
-  const [panel, setPanel] = useState<"none" | "email" | "delete">("none")
+  const [panel, setPanel] = useState<"none" | "email" | "master" | "delete">("none")
   const [newEmail, setNewEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [newMaster, setNewMaster] = useState("")
+  const [newMasterRepeat, setNewMasterRepeat] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
 
   if (!services || !user) return null
 
-  const openPanel = (next: "none" | "email" | "delete") => {
+  const openPanel = (next: "none" | "email" | "master" | "delete") => {
     setPanel(next)
     setPassword("")
+    setNewMaster("")
+    setNewMasterRepeat("")
     setNewEmail("")
     setError(null)
     setInfo(null)
@@ -213,6 +220,22 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
       setPanel("none")
       setPassword("")
       setInfo(`Te hemos enviado un enlace a ${newEmail.trim()}. El cambio se aplica cuando lo pulses.`)
+    })
+  }
+
+  // Cambiar la contraseña maestra: `password` es la actual y se comprueba al desenvolver la clave.
+  const handleMasterChange = (e: React.FormEvent) => {
+    e.preventDefault()
+    const invalid = validateNewMasterPassword(newMaster, newMasterRepeat)
+    if (invalid) {
+      setError(invalid)
+      return
+    }
+    if (!householdId) return
+    void run(async () => {
+      await changeMasterPassword(services.db, householdId, user.uid, password, newMaster)
+      openPanel("none")
+      setInfo("Contraseña maestra cambiada. Úsala a partir de ahora en tus otros dispositivos.")
     })
   }
 
@@ -267,6 +290,42 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
         </form>
       )}
 
+      {panel === "master" && (
+        <form onSubmit={handleMasterChange} className="rounded-2xl border p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Tus datos no cambian: solo se vuelve a proteger la clave del hogar con la contraseña nueva. Tu pareja
+            conserva la suya.
+          </p>
+          <div>
+            <Label htmlFor="current-master">Contraseña maestra actual</Label>
+            <Input
+              id="current-master"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <MasterPasswordFields
+            idPrefix="change"
+            label="Contraseña maestra nueva"
+            password={newMaster}
+            repeat={newMasterRepeat}
+            onPasswordChange={setNewMaster}
+            onRepeatChange={setNewMasterRepeat}
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => openPanel("none")} disabled={isBusy}>
+              Cancelar
+            </Button>
+            <Button type="submit" size="sm" disabled={isBusy}>
+              {isBusy ? "Cambiando..." : "Cambiar contraseña maestra"}
+            </Button>
+          </div>
+        </form>
+      )}
+
       {panel === "delete" && (
         <form onSubmit={handleDelete} className="rounded-2xl border border-destructive/40 p-4 space-y-3">
           <p className="text-sm text-foreground">
@@ -302,6 +361,11 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
           <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("email")}>
             <Mail className="h-4 w-4" /> Cambiar email
           </Button>
+          {householdId && (
+            <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("master")}>
+              <KeyRound className="h-4 w-4" /> Cambiar contraseña maestra
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"

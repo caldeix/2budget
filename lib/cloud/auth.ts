@@ -20,6 +20,7 @@ import {
 import { clearIndexedDbPersistence, terminate } from "firebase/firestore"
 import type { FirebaseServices } from "@/lib/cloud/firebase"
 import { deleteUserProfile, leaveHousehold, setPendingEmail } from "@/lib/cloud/repository"
+import { clearVaultCache } from "@/lib/cloud/vault-cache"
 
 /** Mensajes en español para los códigos de error de Firebase más habituales. */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -128,10 +129,12 @@ export async function requestEmailChange(
 
 /**
  * @function clearLocalCloudCacheAndReload
- * @description Cierra Firestore y borra su caché del dispositivo, y recarga la app.
- *              Así, tras cerrar sesión, los datos del hogar no quedan en este navegador.
+ * @description Cierra Firestore, borra su caché y la clave del hogar guardada en el
+ *              dispositivo, y recarga la app. Así, tras cerrar sesión, ni los datos (cifrados) ni
+ *              la clave para leerlos quedan en este navegador.
  */
 async function clearLocalCloudCacheAndReload(services: FirebaseServices): Promise<void> {
+  await clearVaultCache()
   try {
     await terminate(services.db)
     await clearIndexedDbPersistence(services.db)

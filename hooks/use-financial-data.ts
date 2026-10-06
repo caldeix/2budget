@@ -22,11 +22,13 @@ import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 
 /**
  * @interface CloudTarget
- * @description Hogar de Firestore donde se guardan los datos.
+ * @description Hogar de Firestore donde se guardan los datos y la clave (desbloqueada) con la
+ *              que se cifran y descifran.
  */
 export interface CloudTarget {
   db: Firestore
   householdId: string
+  dek: CryptoKey
 }
 
 /**
@@ -68,8 +70,16 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
 
   const db = cloud?.db ?? null
   const householdId = cloud?.householdId ?? null
+  const dek = cloud?.dek ?? null
   // Dónde se guarda cada cambio; se actualiza al cambiar de modo.
   const targetRef = useRef<CloudTarget | null>(null)
+
+  // Cifrar es asíncrono: las escrituras van en cola para que lleguen a Firestore en orden.
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve())
+  // Mientras hay escrituras cifrándose, los snapshots aún no las incluyen: se aparcan y se
+  // aplica el último cuando la cola se vacía (si no, un cambio se vería desaparecer y volver).
+  const pendingWritesRef = useRef(0)
+  const stashedSnapshotRef = useRef<{ data: AppData; info: HouseholdInfo } | null>(null)
 
   // Origen pedido ("local" o el id del hogar) y origen cuyos datos ya están en `data`.
   // Se compara en el mismo render: al cambiar de origen, `isLoading` es `true` desde el primer
@@ -85,7 +95,7 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
   useEffect(() => {
     setSyncError(null)
 
-    if (!db || !householdId) {
+    if (!db || !householdId || !dek) {
       // Modo local: los datos de este navegador, como siempre.
       targetRef.current = null
       const local = loadData()
@@ -96,12 +106,19 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
       return
     }
 
-    // Modo nube: se espera al primer snapshot completo del hogar.
-    targetRef.current = { db, householdId }
+    // Modo nube: se espera al primer snapshot completo (y descifrado) del hogar.
+    targetRef.current = { db, householdId, dek }
+    pendingWritesRef.current = 0
+    stashedSnapshotRef.current = null
     return subscribeHousehold(
       db,
       householdId,
+      dek,
       (cloudData, info) => {
+        if (pendingWritesRef.current > 0) {
+          stashedSnapshotRef.current = { data: cloudData, info }
+          return
+        }
         dataRef.current = cloudData
         setData(cloudData)
         setHouseholdInfo(info)
@@ -118,7 +135,7 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
         setLoadedSource(householdId)
       },
     )
-  }, [db, householdId])
+  }, [db, householdId, dek])
 
   /**
    * @function commit
@@ -140,11 +157,38 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
       saveData(next) // Modo local: localStorage.
       return
     }
-    // Modo nube: se envía la diferencia. Sin conexión queda en la cola de Firestore.
-    writeChanges(target.db, target.householdId, prev, next).catch((error) => {
-      console.error("Error saving to the cloud:", error)
-      setSyncError(getErrorMessage(error))
-    })
+    // Modo nube: se cifra y se envía la diferencia, en cola para respetar el orden.
+    // Sin conexión, el cambio queda guardado en la caché de Firestore y se envía al volver la red.
+    pendingWritesRef.current += 1
+    let changed = false
+    writeQueueRef.current = writeQueueRef.current
+      .then(async () => {
+        const result = await writeChanges(target.db, target.householdId, target.dek, prev, next)
+        changed = result.changed
+        const { acknowledged } = result
+        acknowledged.catch((error) => {
+          console.error("Error saving to the cloud:", error)
+          setSyncError(getErrorMessage(error))
+        })
+      })
+      .catch((error) => {
+        console.error("Error encrypting changes:", error)
+        setSyncError(getErrorMessage(error))
+      })
+      .finally(() => {
+        pendingWritesRef.current -= 1
+        if (pendingWritesRef.current > 0 || targetRef.current !== target) return
+        // Cola vacía. Si la última escritura cambió algo, el snapshot aparcado es anterior a ella:
+        // se descarta, porque Firestore enseguida emite uno nuevo que ya lo incluye todo.
+        // Si no cambió nada, no llegará otro: se aplica el aparcado (trae cambios remotos).
+        const stashed = stashedSnapshotRef.current
+        stashedSnapshotRef.current = null
+        if (stashed && !changed) {
+          dataRef.current = stashed.data
+          setData(stashed.data)
+          setHouseholdInfo(stashed.info)
+        }
+      })
   }, [])
 
   /**

@@ -4,6 +4,8 @@ rules_version = '2';
 // Hace falta haber verificado el email para leer o escribir cualquier cosa.
 // Cada usuario solo ve su perfil y el hogar del que es miembro (como mucho 2 miembros).
 // Para unirse a un hogar hace falta un código de invitación válido de ese hogar.
+// Los datos (transacciones, informes y configuración) van cifrados en el navegador: aquí solo
+// se controla quién puede leer y escribir los documentos cifrados.
 // Todo se valida aquí: no hay Cloud Functions (exigirían el plan de pago Blaze).
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -19,6 +21,13 @@ service cloud.firestore {
 
     function isMember(hid) {
       return signedIn() && request.auth.uid in householdData(hid).members;
+    }
+
+    // Miembro tras la escritura en curso: al crear el hogar, el hogar y la clave del creador
+    // van en el mismo lote, y `get()` aún no ve el hogar.
+    function isMemberAfter(hid) {
+      return signedIn()
+        && request.auth.uid in getAfter(/databases/$(database)/documents/households/$(hid)).data.members;
     }
 
     // Unirse con invitación: el usuario solo puede añadirse a sí mismo como Persona 2,
@@ -69,6 +78,13 @@ service cloud.firestore {
 
       match /reports/{reportId} {
         allow read, write: if isMember(hid);
+      }
+
+      // Clave del hogar envuelta con la contraseña maestra de cada miembro: solo la suya.
+      match /keys/{memberId} {
+        allow read: if request.auth.uid == memberId && isMember(hid);
+        allow create, update: if request.auth.uid == memberId && isMemberAfter(hid);
+        allow delete: if request.auth.uid == memberId && isMember(hid);
       }
     }
 
