@@ -1,10 +1,11 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-1.5.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.0.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-Auth_%2B_Firestore-FFCA28?logo=firebase&logoColor=black)
 ![Deployed on GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-222?logo=github&logoColor=white)
 ![License](https://img.shields.io/badge/License-Propietaria-red.svg)
 
@@ -16,7 +17,9 @@
 
 ## Descripción
 
-**2Budget** es una aplicación web de gestión financiera para parejas, que también puede usar una sola persona con el modo individual. Permite llevar un control detallado de ingresos y gastos compartidos, ver balances por persona y generar informes mensuales. Sin servidor — todos los datos se persisten en el navegador vía `localStorage`.
+**2Budget** es una aplicación web de gestión financiera para parejas, que también puede usar una sola persona con el modo individual. Permite llevar un control detallado de ingresos y gastos compartidos, ver balances por persona y generar informes mensuales.
+
+Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan en **Firebase** (Auth + Firestore), **cifrados de extremo a extremo** en el navegador con la contraseña maestra de cada usuario. Ni el administrador puede leerlos. Sin hogar en la nube, los datos se quedan en el navegador (`localStorage`).
 
 ---
 
@@ -30,36 +33,27 @@
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
 - **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, tarjetas con solo los totales y un único dinero real en el cierre de mes
+- **Cuenta y hogar en la nube** — Cuenta obligatoria con email verificado. Los datos se guardan en un hogar compartido por la pareja (o "tu espacio" en modo individual), sincronizado al momento entre dispositivos y también sin conexión. Invitación a la pareja con un código de un solo uso
+- **Cifrado de extremo a extremo** — Cada transacción, informe y la configuración se cifran en el navegador (AES-256-GCM) con una clave del hogar protegida por la **contraseña maestra** de cada miembro (PBKDF2). La contraseña maestra no se guarda en ningún sitio
+- **Código de recuperación** — Permite elegir una contraseña maestra nueva si se olvida; se muestra una sola vez. Una vez al mes, la app pide la contraseña maestra para que no se olvide
 - **Importar / Exportar** — Backup y restauración en JSON
 - **Tema oscuro / claro** — Paleta premium Gold × Violet con soporte automático del sistema
 - **Diseño responsivo** — Optimizado para móvil y escritorio
 
 ---
 
-## Instalación
-
-```bash
-git clone https://github.com/caldeix/2budget.git
-cd 2budget
-npm install
-npm run dev        # http://localhost:3000
-```
-
-### Producción
-
-La web se publica sola: cada push a la rama `production` lanza el workflow `.github/workflows/deploy.yml`, que compila la exportación estática y la sube a GitHub Pages.
-
-```bash
-git checkout production
-git merge development
-git push           # Dispara el despliegue
-```
-
-Para compilar en local: `npm run build` (genera la exportación estática en `/out`).
-
----
-
 ## Changelog
+
+### v2.0.0 — Cuenta, nube y cifrado de extremo a extremo
+
+- **Cuenta obligatoria** — Para usar la app hace falta una cuenta (email y contraseña) con el email verificado. Se puede cambiar el email (con confirmación en la dirección nueva) y eliminar la cuenta
+- **Hogar en la nube** — Los datos se guardan en Firestore, en un hogar compartido por la pareja o en "tu espacio" en modo individual. Se sincronizan al momento entre dispositivos y funcionan sin conexión. La pareja se une con un código de invitación de un solo uso que caduca en 48 h. Al crear el hogar se pueden subir los datos que ya había en el navegador
+- **Cifrado de extremo a extremo** — Transacciones, informes y configuración se cifran en el navegador con AES-256-GCM. La clave del hogar se protege con la contraseña maestra de cada miembro (PBKDF2-SHA256, 600.000 iteraciones), que nunca se guarda. En la nube solo hay datos ilegibles
+- **Contraseña maestra** — Se pide una vez por dispositivo y una vez al mes para no olvidarla. Se puede cambiar, y si se olvida, recuperar con el código de recuperación que se muestra al crear o unirse al hogar
+- **Firebase App Check** — Solo la propia app puede usar el proyecto (reCAPTCHA v3), para que nadie gaste la cuota gratuita desde fuera
+- **Iconos** — Logo nuevo como favicon e iconos de la app; los enlaces de los iconos ya funcionan en GitHub Pages (antes daban 404 por la ruta `/2budget`)
+- **Despliegue** — Automático con GitHub Actions al hacer push a `production`
+- SemVer: 1.5.0 → 2.0.0 (MAJOR)
 
 ### v1.5.0 — Modo individual
 

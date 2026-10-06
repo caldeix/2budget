@@ -391,11 +391,6 @@ function createDecryptingCache<T>(dek: CryptoKey, contextFor: (id: string) => st
     const next = new Map<string, { enc: string; value: T }>()
     for (const d of snap.docs) {
       const raw = d.data()
-      // Documentos de antes del cifrado (solo en pruebas): se leen tal cual y se cifran al reescribirlos.
-      if (typeof raw.enc !== "string") {
-        next.set(d.id, { enc: "", value: raw as T })
-        continue
-      }
       const cached = cache.get(d.id)
       const value = cached && cached.enc === raw.enc ? cached.value : await decryptJson<T>(dek, raw.enc, contextFor(d.id))
       next.set(d.id, { enc: raw.enc, value })
@@ -415,10 +410,7 @@ async function readHouseholdDoc(
   snap: DocumentSnapshot,
 ): Promise<{ config: AppConfig; version: number; info: HouseholdInfo }> {
   const raw = snap.data() ?? {}
-  const payload =
-    typeof raw.enc === "string"
-      ? await decryptJson<{ config: AppConfig; version: number }>(dek, raw.enc, context.household(hid))
-      : { config: raw.config ?? {}, version: raw.version }
+  const payload = await decryptJson<{ config: AppConfig; version: number }>(dek, raw.enc, context.household(hid))
   return {
     config: { ...defaultConfig, ...(payload.config ?? {}) },
     version: typeof payload.version === "number" ? payload.version : DATA_VERSION,
@@ -518,8 +510,7 @@ async function diffToOps(db: Firestore, hid: string, dek: CryptoKey, diff: AppDa
   const ops: BatchOp[] = []
   if (diff.householdChanged) {
     const enc = await encryptJson(dek, { config: next.config, version: next.version ?? DATA_VERSION }, context.household(hid))
-    // Se borran los campos en claro de los hogares de antes del cifrado (solo en pruebas).
-    ops.push((batch) => batch.update(householdRef(db, hid), { enc, config: deleteField(), version: deleteField() }))
+    ops.push((batch) => batch.update(householdRef(db, hid), { enc }))
   }
   for (const t of diff.transactionsToSet) {
     const enc = await encryptJson(dek, t, context.transaction(t.id))

@@ -431,26 +431,52 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
 
           {/* Sección: Persistencia de Datos */}
           <AccordionItem value="item-7">
-            <AccordionTrigger className="text-lg font-semibold text-primary">7. Persistencia de Datos</AccordionTrigger>
+            <AccordionTrigger className="text-lg font-semibold text-primary">
+              7. Cuenta, nube y privacidad
+            </AccordionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
-                Es importante saber que{" "}
-                <strong>todos sus datos se guardan automáticamente en el almacenamiento local de su navegador</strong>{" "}
-                Esto significa que sus transacciones e informes estarán disponibles cada vez que visiten la aplicación
-                en el mismo navegador y dispositivo.
+                Para usar 2Budget hace falta una <strong>cuenta con el email verificado</strong>. El botón de la nube,
+                arriba a la derecha, abre la ventana de <strong className="text-primary">Cuenta</strong>.
               </p>
-              <p>
-                <strong>Consideraciones:</strong>
-              </p>
+
+              <h4 className="font-medium text-foreground">Hogar en la nube:</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Si borran la caché o los datos del sitio web en su navegador, sus datos de 2Budget se perderán. Por
-                  ello, se recomienda usar la función de <strong>Exportar datos</strong> regularmente para tener copias
-                  de seguridad externas.
+                  Los datos se guardan en un <strong>hogar</strong>: lo crea uno y el otro se une con un código de
+                  invitación (en modo individual, es <strong>tu espacio en la nube</strong>). Así se sincronizan al
+                  momento entre dispositivos y entre los dos.
                 </li>
                 <li>
-                  Los datos no se sincronizan entre diferentes dispositivos o navegadores. Si desean usar 2Budget en
-                  otro dispositivo, deberán exportar los datos del primero e importarlos en el segundo.
+                  Al crear el hogar se pueden subir los datos que ya hubiera en el navegador. Mientras no haya hogar,
+                  los datos solo están en este dispositivo: lo avisa el icono amarillo junto a la nube.
+                </li>
+                <li>Sin conexión se puede seguir usando la app: los cambios se envían solos al volver la red.</li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">Cifrado y contraseña maestra:</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Los datos se <strong>cifran en el dispositivo</strong> antes de subirlos, con una{" "}
+                  <strong>contraseña maestra</strong> distinta de la de la cuenta. Nadie más puede leerlos, ni
+                  siquiera el administrador de la app. Cada miembro del hogar tiene la suya.
+                </li>
+                <li>
+                  La contraseña maestra <strong>no se guarda en ningún sitio</strong> y no se puede recuperar. Se pide
+                  una vez en cada dispositivo, y una vez al mes para que no se olvide.
+                </li>
+                <li>
+                  Al crear el hogar (o al unirse) se muestra un <strong>código de recuperación</strong>: guárdenlo en un
+                  lugar seguro. Con él se puede elegir una contraseña maestra nueva. Desde Cuenta se puede generar uno
+                  nuevo o cambiar la contraseña maestra.
+                </li>
+              </ul>
+
+              <h4 className="font-medium text-foreground">Copias de seguridad:</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Con <strong>Exportar datos</strong> (en Configuración) se descarga una copia en JSON, sin cifrar,
+                  para guardarla donde quieran o importarla más adelante.
                 </li>
               </ul>
             </AccordionContent>

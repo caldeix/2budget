@@ -26,13 +26,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/favicon.ico" type="image/ico" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/android-chrome-192x192.png" />
-        <link rel="icon" type="image/png" sizes="512x512" href="/android-chrome-512x512.png" />
-      </head>
+      {/* Los iconos (favicon.ico, icon1.png, icon2.png y apple-icon.png) están en app/: Next.js
+          genera sus enlaces con la ruta base /2budget. Puestos aquí a mano daban 404 en producción. */}
       <body className={`${inter.variable} ${poppins.variable}`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           {children}
