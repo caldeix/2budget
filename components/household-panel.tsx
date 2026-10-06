@@ -37,6 +37,8 @@ interface HouseholdSetupProps {
   services: FirebaseServices
   user: User
   singleMode?: boolean
+  /** Recibe el código de recuperación generado, para mostrarlo una sola vez. */
+  onRecoveryCode: (code: string) => void
 }
 
 /**
@@ -44,7 +46,7 @@ interface HouseholdSetupProps {
  * @description Primer paso tras verificar la cuenta: crear un hogar o unirse a uno. En los dos
  *              casos se elige la contraseña maestra con la que se cifran los datos.
  */
-export function HouseholdSetup({ services, user, singleMode }: HouseholdSetupProps) {
+export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: HouseholdSetupProps) {
   // Datos que hay en este navegador (modo local), para ofrecer subirlos.
   const [localData] = useState(() => loadData())
   const hasLocalData = hasAppData(localData)
@@ -75,11 +77,13 @@ export function HouseholdSetup({ services, user, singleMode }: HouseholdSetupPro
     try {
       if (choice === "create") {
         const initial = hasLocalData && uploadLocal ? localData : { ...emptyAppData, config: localData.config }
-        await createHousehold(services.db, user.uid, user.email ?? "", initial, masterPassword)
+        const { recoveryCode } = await createHousehold(services.db, user.uid, user.email ?? "", initial, masterPassword)
         // Solo cuando la subida ha terminado bien se vacía la copia local.
         if (hasLocalData && uploadLocal) clearAllData()
+        onRecoveryCode(recoveryCode)
       } else {
-        await joinHousehold(services.db, code, user.uid, user.email ?? "", masterPassword)
+        const { recoveryCode } = await joinHousehold(services.db, code, user.uid, user.email ?? "", masterPassword)
+        onRecoveryCode(recoveryCode)
       }
     } catch (err) {
       setError(getErrorMessage(err))

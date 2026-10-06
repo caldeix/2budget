@@ -7,6 +7,7 @@
  *                users/{uid}                          → perfil: hogar al que pertenece y email
  *                households/{hid}                     → miembros y `enc` (configuración cifrada)
  *                households/{hid}/keys/{uid}          → clave del hogar envuelta con la contraseña maestra de ese miembro
+ *                households/{hid}/recovery/{uid}      → clave del hogar envuelta con el código de recuperación de ese miembro
  *                households/{hid}/transactions/{id}   → `{ enc }`: una transacción cifrada por documento
  *                households/{hid}/reports/{id}        → `{ enc }`: un informe cifrado por documento
  *                invites/{id}                         → invitación de un solo uso (48 h), con la clave
@@ -46,6 +47,8 @@ import {
   MASTER_KDF_ITERATIONS,
   normalizeCode,
   randomReadable,
+  RECOVERY_CODE_LENGTH,
+  RECOVERY_KDF_ITERATIONS,
   toNonExtractable,
   unwrapDek,
   wrapDek,
@@ -101,6 +104,7 @@ const householdRef = (db: Firestore, hid: string) => doc(db, "households", hid)
 const transactionsCol = (db: Firestore, hid: string) => collection(db, "households", hid, "transactions")
 const reportsCol = (db: Firestore, hid: string) => collection(db, "households", hid, "reports")
 const keyRef = (db: Firestore, hid: string, uid: string) => doc(db, "households", hid, "keys", uid)
+const recoveryRef = (db: Firestore, hid: string, uid: string) => doc(db, "households", hid, "recovery", uid)
 const inviteRef = (db: Firestore, id: string) => doc(db, "invites", id)
 
 /** "Datos asociados" de cada documento cifrado: lo liga a su tipo e id. */
@@ -246,6 +250,78 @@ export async function changeMasterPassword(
 ): Promise<void> {
   const dek = await unlockExtractableDek(db, hid, uid, currentPassword)
   await setDoc(keyRef(db, hid, uid), await wrapDek(dek, newPassword, MASTER_KDF_ITERATIONS))
+}
+
+// ---------------------------------------------------------------------------
+// Código de recuperación
+// ---------------------------------------------------------------------------
+
+/**
+ * @function createRecovery
+ * @description Genera un código de recuperación nuevo y la copia de la clave del hogar envuelta
+ *              con él. El código solo se muestra una vez al usuario: no se guarda en ningún sitio.
+ */
+async function createRecovery(dek: CryptoKey): Promise<{ code: string; wrapped: WrappedKey }> {
+  const code = randomReadable(RECOVERY_CODE_LENGTH)
+  return { code, wrapped: await wrapDek(dek, code, RECOVERY_KDF_ITERATIONS) }
+}
+
+/**
+ * @function regenerateRecoveryCode
+ * @description Genera un código de recuperación nuevo (el anterior deja de funcionar).
+ *              Exige la contraseña maestra.
+ * @returns {Promise<string>} El código nuevo, para mostrarlo una sola vez.
+ */
+export async function regenerateRecoveryCode(db: Firestore, hid: string, uid: string, masterPassword: string): Promise<string> {
+  const dek = await unlockExtractableDek(db, hid, uid, masterPassword)
+  const recovery = await createRecovery(dek)
+  await setDoc(recoveryRef(db, hid, uid), recovery.wrapped)
+  return recovery.code
+}
+
+/** Error al usar un código de recuperación que no corresponde. */
+export class WrongRecoveryCodeError extends Error {
+  name = "WrongRecoveryCodeError"
+  constructor() {
+    super("El código de recuperación no es correcto. Revisa que esté completo y bien escrito.")
+  }
+}
+
+/**
+ * @function recoverWithCode
+ * @description Elige una contraseña maestra nueva con el código de recuperación. El código usado
+ *              queda gastado: se genera otro y se devuelve para mostrarlo.
+ * @returns La clave (no extraíble) para este dispositivo y el código de recuperación nuevo.
+ */
+export async function recoverWithCode(
+  db: Firestore,
+  hid: string,
+  uid: string,
+  rawCode: string,
+  newMasterPassword: string,
+): Promise<{ dek: CryptoKey; recoveryCode: string }> {
+  const snap = await getDoc(recoveryRef(db, hid, uid))
+  if (!snap.exists()) {
+    throw new HouseholdError("No tienes ningún código de recuperación generado para este hogar.")
+  }
+
+  let dek: CryptoKey
+  try {
+    dek = await unwrapDek(snap.data() as WrappedKey, normalizeCode(rawCode), true)
+  } catch (error) {
+    if (error instanceof WrongPasswordError) throw new WrongRecoveryCodeError()
+    throw error
+  }
+
+  const recovery = await createRecovery(dek)
+  const batch = writeBatch(db)
+  batch.set(keyRef(db, hid, uid), await wrapDek(dek, newMasterPassword, MASTER_KDF_ITERATIONS))
+  batch.set(recoveryRef(db, hid, uid), recovery.wrapped)
+  await batch.commit()
+
+  const localDek = await toNonExtractable(dek)
+  await saveCachedDek(uid, hid, localDek)
+  return { dek: localDek, recoveryCode: recovery.code }
 }
 
 // ---------------------------------------------------------------------------
@@ -443,7 +519,7 @@ export async function writeChanges(
  * @description Crea un hogar con el usuario como único miembro (Persona 1): genera la clave del
  *              hogar, la envuelve con su contraseña maestra y sube los datos iniciales cifrados
  *              (vacíos o los que había en este dispositivo).
- * @returns {Promise<string>} El id del hogar.
+ * @returns El id del hogar y el código de recuperación (para mostrarlo una sola vez).
  */
 export async function createHousehold(
   db: Firestore,
@@ -451,10 +527,11 @@ export async function createHousehold(
   email: string,
   initial: AppData,
   masterPassword: string,
-): Promise<string> {
+): Promise<{ householdId: string; recoveryCode: string }> {
   const hid = doc(collection(db, "households")).id
   const dek = await generateDek()
   const ownKey = await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS)
+  const recovery = await createRecovery(dek)
   const enc = await encryptJson(dek, { config: initial.config, version: initial.version ?? DATA_VERSION }, context.household(hid))
 
   // La clave queda guardada en el dispositivo ANTES de apuntar el perfil al hogar: así, al
@@ -473,6 +550,7 @@ export async function createHousehold(
     createdAt: new Date().toISOString(),
   })
   batch.set(keyRef(db, hid, uid), ownKey)
+  batch.set(recoveryRef(db, hid, uid), recovery.wrapped)
   batch.set(userRef(db, uid), { householdId: hid }, { merge: true })
   await batch.commit()
 
@@ -480,7 +558,7 @@ export async function createHousehold(
   const empty: AppData = { transactions: [], reports: [], config: initial.config, version: initial.version }
   const { acknowledged } = await writeChanges(db, hid, dek, empty, initial)
   await acknowledged
-  return hid
+  return { householdId: hid, recoveryCode: recovery.code }
 }
 
 /**
@@ -516,7 +594,7 @@ export async function createInvite(
  *              recupera la clave del hogar con el secreto del código y la vuelve a envolver con
  *              su propia contraseña maestra. Las reglas solo permiten añadir el propio uid, a un
  *              hogar de un miembro y con una invitación vigente de ese hogar.
- * @returns {Promise<string>} El id del hogar.
+ * @returns El id del hogar y el código de recuperación (para mostrarlo una sola vez).
  */
 export async function joinHousehold(
   db: Firestore,
@@ -524,7 +602,7 @@ export async function joinHousehold(
   uid: string,
   email: string,
   masterPassword: string,
-): Promise<string> {
+): Promise<{ householdId: string; recoveryCode: string }> {
   const code = normalizeCode(rawCode)
   if (code.length !== INVITE_ID_LENGTH + INVITE_SECRET_LENGTH) {
     throw new HouseholdError("El código debe tener 20 caracteres. Revisa que esté completo.")
@@ -564,18 +642,20 @@ export async function joinHousehold(
   // Ya es miembro: su clave, guardada en el dispositivo y envuelta con su contraseña maestra;
   // después se apunta su perfil al hogar y se gasta la invitación.
   await saveCachedDek(uid, householdId, await toNonExtractable(dek))
+  const recovery = await createRecovery(dek)
   const batch = writeBatch(db)
   batch.set(keyRef(db, householdId, uid), await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS))
+  batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
   batch.set(userRef(db, uid), { householdId }, { merge: true })
   batch.delete(inviteRef(db, id))
   await batch.commit()
-  return householdId
+  return { householdId, recoveryCode: recovery.code }
 }
 
 /**
  * @function leaveHousehold
- * @description Saca al usuario del hogar (y borra su clave). Si era el último miembro, borra el
- *              hogar y todos sus datos.
+ * @description Saca al usuario del hogar (y borra su clave y su código de recuperación). Si era
+ *              el último miembro, borra el hogar y todos sus datos.
  */
 export async function leaveHousehold(db: Firestore, hid: string, uid: string): Promise<void> {
   const snap = await getDoc(householdRef(db, hid))
@@ -585,6 +665,7 @@ export async function leaveHousehold(db: Firestore, hid: string, uid: string): P
     // Queda el otro miembro: solo se sale este. Su clave, el hogar y su perfil en el mismo lote.
     const batch = writeBatch(db)
     batch.delete(keyRef(db, hid, uid))
+    batch.delete(recoveryRef(db, hid, uid))
     batch.update(householdRef(db, hid), {
       members: arrayRemove(uid),
       [`roles.${uid}`]: deleteField(),
@@ -602,6 +683,7 @@ export async function leaveHousehold(db: Firestore, hid: string, uid: string): P
     await commitInChunks(db, [
       ...[...transactions.docs, ...reports.docs].map((d) => (batch: WriteBatch) => batch.delete(d.ref)),
       (batch: WriteBatch) => batch.delete(keyRef(db, hid, uid)),
+      (batch: WriteBatch) => batch.delete(recoveryRef(db, hid, uid)),
     ])
   }
   const batch = writeBatch(db)

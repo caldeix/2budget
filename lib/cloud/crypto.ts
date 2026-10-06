@@ -20,6 +20,12 @@ export const MASTER_KDF_ITERATIONS = 600_000
 /** Iteraciones para el secreto aleatorio de las invitaciones (ya tiene mucha entropía). */
 export const INVITE_KDF_ITERATIONS = 100_000
 
+/** Iteraciones para el código de recuperación (24 caracteres aleatorios: ~119 bits de entropía). */
+export const RECOVERY_KDF_ITERATIONS = 100_000
+
+/** Longitud del código de recuperación. */
+export const RECOVERY_CODE_LENGTH = 24
+
 /** Longitud mínima de la contraseña maestra. */
 export const MIN_MASTER_PASSWORD_LENGTH = 8
 
@@ -186,7 +192,7 @@ export async function decryptJson<T>(dek: CryptoKey, encrypted: string, context:
 }
 
 // ---------------------------------------------------------------------------
-// Secretos legibles (invitaciones y, en el paso 16, el código de recuperación)
+// Secretos legibles (invitaciones y código de recuperación)
 // ---------------------------------------------------------------------------
 
 /** Letras y números sin los que se confunden (0/O, 1/I/L). */

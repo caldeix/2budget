@@ -86,6 +86,13 @@ service cloud.firestore {
         allow create, update: if request.auth.uid == memberId && isMemberAfter(hid);
         allow delete: if request.auth.uid == memberId && isMember(hid);
       }
+
+      // Clave del hogar envuelta con el código de recuperación de cada miembro: solo la suya.
+      match /recovery/{memberId} {
+        allow read: if request.auth.uid == memberId && isMember(hid);
+        allow create, update: if request.auth.uid == memberId && isMemberAfter(hid);
+        allow delete: if request.auth.uid == memberId && isMember(hid);
+      }
     }
 
     // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar.

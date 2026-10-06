@@ -28,9 +28,9 @@ import {
   resendVerificationEmail,
   signOut,
 } from "@/lib/cloud/auth"
-import { changeMasterPassword } from "@/lib/cloud/repository"
+import { changeMasterPassword, regenerateRecoveryCode } from "@/lib/cloud/repository"
 import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
-import { KeyRound, LogOut, Mail, MailCheck, Trash2 } from "lucide-react"
+import { KeyRound, LogOut, Mail, MailCheck, ShieldCheck, Trash2 } from "lucide-react"
 
 /**
  * @interface AccountModalProps
@@ -39,6 +39,7 @@ import { KeyRound, LogOut, Mail, MailCheck, Trash2 } from "lucide-react"
  * @property {string} person1Name - Nombre de la Persona 1 (rol de quien crea el hogar).
  * @property {string} person2Name - Nombre de la Persona 2 (rol de quien se une).
  * @property {boolean} [singleMode] - Modo individual: el hogar se presenta como "tu espacio en la nube".
+ * @property {(code: string) => void} onRecoveryCode - Recibe un código de recuperación nuevo para mostrarlo.
  */
 interface AccountModalProps {
   isOpen: boolean
@@ -48,6 +49,7 @@ interface AccountModalProps {
   person1Name: string
   person2Name: string
   singleMode?: boolean
+  onRecoveryCode: (code: string) => void
 }
 
 export function AccountModal({
@@ -58,6 +60,7 @@ export function AccountModal({
   person1Name,
   person2Name,
   singleMode,
+  onRecoveryCode,
 }: AccountModalProps) {
   const { services, user, profile, householdId } = session
   if (!services) return null
@@ -82,9 +85,13 @@ export function AccountModal({
                 singleMode={singleMode}
               />
             ) : (
-              <HouseholdSetup services={services} user={user} singleMode={singleMode} />
+              <HouseholdSetup services={services} user={user} singleMode={singleMode} onRecoveryCode={onRecoveryCode} />
             )}
-            <AccountSettings session={session} pendingEmail={profile?.pendingEmail ?? null} />
+            <AccountSettings
+              session={session}
+              pendingEmail={profile?.pendingEmail ?? null}
+              onRecoveryCode={onRecoveryCode}
+            />
           </>
         )}
       </div>
@@ -177,9 +184,17 @@ function VerifyEmailPanel({ session }: { session: CloudSession }) {
  * @description Datos de la cuenta: email (y cambio de email), contraseña maestra (con hogar),
  *              cerrar sesión y eliminarla.
  */
-function AccountSettings({ session, pendingEmail }: { session: CloudSession; pendingEmail: string | null }) {
+function AccountSettings({
+  session,
+  pendingEmail,
+  onRecoveryCode,
+}: {
+  session: CloudSession
+  pendingEmail: string | null
+  onRecoveryCode: (code: string) => void
+}) {
   const { services, user, householdId } = session
-  const [panel, setPanel] = useState<"none" | "email" | "master" | "delete">("none")
+  const [panel, setPanel] = useState<"none" | "email" | "master" | "recovery" | "delete">("none")
   const [newEmail, setNewEmail] = useState("")
   const [password, setPassword] = useState("")
   const [newMaster, setNewMaster] = useState("")
@@ -190,7 +205,7 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
 
   if (!services || !user) return null
 
-  const openPanel = (next: "none" | "email" | "master" | "delete") => {
+  const openPanel = (next: "none" | "email" | "master" | "recovery" | "delete") => {
     setPanel(next)
     setPassword("")
     setNewMaster("")
@@ -236,6 +251,17 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
       await changeMasterPassword(services.db, householdId, user.uid, password, newMaster)
       openPanel("none")
       setInfo("Contraseña maestra cambiada. Úsala a partir de ahora en tus otros dispositivos.")
+    })
+  }
+
+  // Código de recuperación nuevo: `password` es la contraseña maestra. El anterior deja de funcionar.
+  const handleRegenerateRecovery = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!householdId) return
+    void run(async () => {
+      const code = await regenerateRecoveryCode(services.db, householdId, user.uid, password)
+      openPanel("none")
+      onRecoveryCode(code)
     })
   }
 
@@ -326,6 +352,34 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
         </form>
       )}
 
+      {panel === "recovery" && (
+        <form onSubmit={handleRegenerateRecovery} className="rounded-2xl border p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Si olvidas tu contraseña maestra, con el código de recuperación podrás elegir una nueva. Al generar uno
+            nuevo, el anterior deja de funcionar.
+          </p>
+          <div>
+            <Label htmlFor="recovery-master">Contraseña maestra</Label>
+            <Input
+              id="recovery-master"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => openPanel("none")} disabled={isBusy}>
+              Cancelar
+            </Button>
+            <Button type="submit" size="sm" disabled={isBusy}>
+              {isBusy ? "Generando..." : "Generar código"}
+            </Button>
+          </div>
+        </form>
+      )}
+
       {panel === "delete" && (
         <form onSubmit={handleDelete} className="rounded-2xl border border-destructive/40 p-4 space-y-3">
           <p className="text-sm text-foreground">
@@ -362,9 +416,14 @@ function AccountSettings({ session, pendingEmail }: { session: CloudSession; pen
             <Mail className="h-4 w-4" /> Cambiar email
           </Button>
           {householdId && (
-            <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("master")}>
-              <KeyRound className="h-4 w-4" /> Cambiar contraseña maestra
-            </Button>
+            <>
+              <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("master")}>
+                <KeyRound className="h-4 w-4" /> Cambiar contraseña maestra
+              </Button>
+              <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("recovery")}>
+                <ShieldCheck className="h-4 w-4" /> Generar código de recuperación nuevo
+              </Button>
+            </>
           )}
           <Button
             type="button"

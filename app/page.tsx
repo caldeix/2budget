@@ -32,6 +32,7 @@ import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
 import { VaultUnlock } from "@/components/vault-unlock"
+import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
@@ -87,6 +88,8 @@ export default function HomePage() {
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false)
+  // Código de recuperación recién generado: se muestra una sola vez.
+  const [recoveryCodeToShow, setRecoveryCodeToShow] = useState<string | null>(null)
 
   // Tras iniciar sesión (o verificar el email) sin hogar, la cuenta se abre sola UNA vez por
   // usuario y etapa, no en cada recarga. Después, el aviso amarillo de la cabecera lo recuerda.
@@ -338,7 +341,7 @@ export default function HomePage() {
   }, [isLoading])
 
   if (isVaultLocked) {
-    return <VaultUnlock session={session} vault={vault} />
+    return <VaultUnlock session={session} vault={vault} onRecoveryCode={setRecoveryCodeToShow} />
   }
 
   if (isLoading) {
@@ -617,6 +620,16 @@ export default function HomePage() {
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
+        onRecoveryCode={(code) => {
+          setIsAccountModalOpen(false)
+          setRecoveryCodeToShow(code)
+        }}
+      />
+
+      <RecoveryCodeDialog
+        code={recoveryCodeToShow}
+        email={session.user?.email ?? null}
+        onClose={() => setRecoveryCodeToShow(null)}
       />
 
       <DocumentationModal

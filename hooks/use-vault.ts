@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useState } from "react"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import { loadCachedDek } from "@/lib/cloud/vault-cache"
-import { unlockHousehold } from "@/lib/cloud/repository"
+import { recoverWithCode, unlockHousehold } from "@/lib/cloud/repository"
 
 /**
  * @typedef {"none" | "checking" | "locked" | "unlocked"} VaultStatus
@@ -26,6 +26,11 @@ export interface Vault {
   dek: CryptoKey | null
   /** Desbloquea con la contraseña maestra; lanza `WrongPasswordError` si no es la correcta. */
   unlock: (masterPassword: string) => Promise<void>
+  /**
+   * Elige una contraseña maestra nueva con el código de recuperación y desbloquea.
+   * Devuelve el código de recuperación nuevo (el usado queda gastado).
+   */
+  recover: (recoveryCode: string, newMasterPassword: string) => Promise<string>
 }
 
 export function useVault(session: CloudSession): Vault {
@@ -65,7 +70,17 @@ export function useVault(session: CloudSession): Vault {
     [db, uid, householdId, key],
   )
 
+  const recover = useCallback(
+    async (recoveryCode: string, newMasterPassword: string) => {
+      if (!db || !uid || !householdId || !key) throw new Error("No hay ningún hogar que desbloquear.")
+      const result = await recoverWithCode(db, householdId, uid, recoveryCode, newMasterPassword)
+      setState({ key, status: "unlocked", dek: result.dek })
+      return result.recoveryCode
+    },
+    [db, uid, householdId, key],
+  )
+
   // Mientras el efecto aún no ha corrido para la clave actual, se considera "comprobando".
   const current = state.key === key ? state : { key, status: key ? ("checking" as const) : ("none" as const), dek: null }
-  return { status: current.status, dek: current.dek, unlock }
+  return { status: current.status, dek: current.dek, unlock, recover }
 }
