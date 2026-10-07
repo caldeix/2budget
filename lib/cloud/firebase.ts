@@ -8,7 +8,7 @@
  */
 
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app"
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check"
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check"
 import {
   browserLocalPersistence,
   getAuth,
@@ -33,7 +33,11 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
 }
 
-/** Clave del sitio de reCAPTCHA v3 para App Check (pública). Sin ella, App Check no se activa. */
+/**
+ * Clave del sitio de reCAPTCHA para App Check (pública). Sin ella, App Check no se activa.
+ * Es una clave de reCAPTCHA Enterprise ("Fraud Defense" en la consola de Google Cloud), que es
+ * el proveedor con el que está registrada la app en Firebase → App Check.
+ */
 const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
 
 /** `true` si la build trae la configuración de Firebase; si no, la app es solo local. */
@@ -65,8 +69,10 @@ export function getFirebase(): FirebaseServices | null {
   const app = alreadyInitialized ? getApp() : initializeApp(firebaseConfig)
 
   // App Check: cada petición a Auth y Firestore lleva un token que demuestra que viene de esta
-  // app (reCAPTCHA v3, invisible). Así nadie puede usar el proyecto desde scripts propios y
-  // gastar la cuota. Va antes que Auth y Firestore para que sus primeras peticiones ya lo lleven.
+  // app (reCAPTCHA Enterprise, invisible). Así nadie puede usar el proyecto desde scripts propios
+  // y gastar la cuota. Va antes que Auth y Firestore para que sus primeras peticiones ya lo lleven.
+  // El proveedor tiene que ser el mismo que el registrado en Firebase: con reCAPTCHA v3 clásico
+  // los tokens no se validaban y, al aplicar App Check, la app dejaba de funcionar.
   if (!alreadyInitialized && recaptchaSiteKey) {
     // En local, reCAPTCHA no valida: se usa un token de depuración. La primera vez, el SDK lo
     // escribe en la consola del navegador y hay que registrarlo en Firebase → App Check.
@@ -74,7 +80,7 @@ export function getFirebase(): FirebaseServices | null {
       ;(self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true
     }
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
       isTokenAutoRefreshEnabled: true,
     })
   }

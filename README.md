@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.0.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.0.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,11 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.0.1 — App Check con reCAPTCHA Enterprise
+
+- **App Check con el proveedor correcto** — la app pedía tokens a reCAPTCHA v3 clásico, pero en Firebase está registrada con reCAPTCHA Enterprise ("Fraud Defense"). Los tokens no se validaban y, al aplicar App Check, el login fallaba con "token inválido". Ahora usa reCAPTCHA Enterprise con la misma clave
+- SemVer: 2.0.0 → 2.0.1 (PATCH)
 
 ### v2.0.0 — Cuenta, nube y cifrado de extremo a extremo
 
