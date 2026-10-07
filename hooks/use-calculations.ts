@@ -10,8 +10,21 @@
 
 import { useMemo } from "react"
 import type { Transaction } from "@/types"
-import { aggregateTransactions } from "@/lib/aggregations"
+import { aggregateTransactions, isSettled } from "@/lib/aggregations"
 import { subtractMoney } from "@/lib/money"
+
+/**
+ * @interface TodayFigures
+ * @description Cifras "a día de hoy": solo con los gastos ya pagados (los ingresos cuentan siempre).
+ */
+export interface TodayFigures {
+  totalExpenses: number
+  person1Expenses: number
+  person2Expenses: number
+  balance: number
+  person1Balance: number
+  person2Balance: number
+}
 
 /**
  * @interface CalculationResult
@@ -28,6 +41,8 @@ import { subtractMoney } from "@/lib/money"
  * @property {number} person2Balance - Balance de la Persona 2 (ingresos P2 - gastos P2).
  * @property {number} fixedExpenses - Suma de los gastos de categoría "fijo".
  * @property {number} variableExpenses - Suma de los gastos de categoría "variable".
+ * @property {TodayFigures} today - Las mismas cifras de gastos y balances, solo con lo ya pagado.
+ * @property {boolean} hasPendingExpenses - Si queda algún gasto sin pagar (si no, "hoy" = "previsto").
  */
 interface CalculationResult {
   totalIncome: number
@@ -42,6 +57,8 @@ interface CalculationResult {
   fixedExpenses: number
   variableExpenses: number
   nonComputableExpenses: number
+  today: TodayFigures
+  hasPendingExpenses: boolean
 }
 
 /**
@@ -67,6 +84,9 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
     // Los gastos no computables SÍ entran en los totales del mes y además se contabilizan
     // aparte en `nonComputableExpenses` (comportamiento histórico de este hook).
     const totals = aggregateTransactions(transactions)
+    // "A día de hoy": el mismo cálculo, solo con lo ya pagado (ver `isSettled`).
+    const settled = transactions.filter(isSettled)
+    const paid = aggregateTransactions(settled)
 
     return {
       ...totals,
@@ -75,6 +95,15 @@ export function useCalculations(transactions: Transaction[]): CalculationResult 
       balance: subtractMoney(totals.totalIncome, totals.totalExpenses),
       person1Balance: subtractMoney(totals.person1Income, totals.person1Expenses),
       person2Balance: subtractMoney(totals.person2Income, totals.person2Expenses),
+      today: {
+        totalExpenses: paid.totalExpenses,
+        person1Expenses: paid.person1Expenses,
+        person2Expenses: paid.person2Expenses,
+        balance: subtractMoney(paid.totalIncome, paid.totalExpenses),
+        person1Balance: subtractMoney(paid.person1Income, paid.person1Expenses),
+        person2Balance: subtractMoney(paid.person2Income, paid.person2Expenses),
+      },
+      hasPendingExpenses: settled.length < transactions.length,
     }
   }, [transactions]) // Dependencia: el cálculo se ejecuta solo si 'transactions' cambia.
 }

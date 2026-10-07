@@ -17,6 +17,7 @@ import {
   setLastSeenMonth,
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
+import { isClosingAdjustment } from "@/lib/aggregations"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -50,7 +51,7 @@ function getMonthName(month: number): string {
 
 const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
 // Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
-const isCopyableIncome = (t: Transaction) => t.type === "income" && !/^Ajuste .+ - Cierre /.test(t.name)
+const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
 
 export default function HomePage() {
   // Sesión en la nube: con hogar (y desbloqueado con la contraseña maestra), los datos se leen
@@ -426,6 +427,9 @@ export default function HomePage() {
           selectedYear={selectedYear}
           nonComputableExpenses={calculations.nonComputableExpenses}
           singleMode={data.config.singleMode}
+          today={calculations.today}
+          // "Hoy" solo tiene sentido si queda algo por pagar y el mes ya ha empezado.
+          showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
         />
 
         <div className="flex flex-col lg:flex-row gap-8 mt-8">
