@@ -104,6 +104,7 @@ export function ReportDetailModal({
       onClose={onClose}
       title={`Informe de ${formatMonthYear(report.month, report.year)}`} // Título dinámico del modal.
       size="xl" // Tamaño extra grande para el modal de detalle.
+      centerTitle
     >
       <div className="p-6 space-y-8">
         {/* Sección de Resumen General */}
@@ -133,13 +134,13 @@ export function ReportDetailModal({
         <div className={`grid grid-cols-1 gap-8 ${showPerson2 ? "lg:grid-cols-2" : ""}`}>
           {/* Gráfico de Distribución de Gastos */}
           <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Distribución de Gastos</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Gastos</h3>
             <PieChart data={expenseChartData} size={250} />
           </div>
           {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2 no aporta nada) */}
           {showPerson2 && (
             <div>
-              <h3 className="text-lg font-semibold text-foreground mb-4">Distribución de Ingresos</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Ingresos</h3>
               <PieChart data={incomeChartData} size={250} />
             </div>
           )}

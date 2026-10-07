@@ -437,19 +437,19 @@ export function TransactionsTable({
           <div>
             <h2 className="text-xl font-semibold text-foreground">Transacciones</h2>
             <p className="text-sm text-muted-foreground">
-              {filteredAndSortedTransactions.length} de {transactions.length} transacciones
+              {filteredAndSortedTransactions.length}/{transactions.length}
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* Campo de búsqueda */}
-            <div className="relative">
+            {/* Campo de búsqueda (a todo el ancho en móvil, como los selectores) */}
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar transacciones..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 bg-input text-foreground border-border"
+                className="pl-10 w-full sm:w-64 bg-input text-foreground border-border"
               />
             </div>
 
@@ -477,41 +477,42 @@ export function TransactionsTable({
           </div>
         </div>
 
-        {/* Tarjetas de resumen de ingresos/gastos/balance filtrados */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-card rounded-2xl p-4 border">
+        {/* Totales de lo filtrado (búsqueda/tipo/categoría). En móvil, ingresos y gastos en una
+            línea y el balance debajo, a todo el ancho. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mt-6">
+          <div className="bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="hidden sm:block p-2 bg-green-100 rounded-lg">
                 <TrendingUp className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Ingresos Filtrados</p>
-                <p className="text-lg font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
+                <p className="text-sm text-muted-foreground">Ingresos</p>
+                <p className="text-base sm:text-lg font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl p-4 border">
+          <div className="bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
+              <div className="hidden sm:block p-2 bg-red-100 rounded-lg">
                 <TrendingDown className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Gastos Filtrados</p>
-                <p className="text-lg font-semibold text-red-600">{formatCurrency(totalExpenses)}</p>
+                <p className="text-sm text-muted-foreground">Gastos</p>
+                <p className="text-base sm:text-lg font-semibold text-red-600">{formatCurrency(totalExpenses)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl p-4 border">
+          <div className="col-span-2 md:col-span-1 bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
+              <div className="hidden sm:block p-2 bg-primary/10 rounded-lg">
                 <DollarSign className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Balance Filtrado</p>
+                <p className="text-sm text-muted-foreground">Balance</p>
                 <p
-                  className={`text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-base sm:text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
                   {formatCurrency(filteredBalance)}
                 </p>

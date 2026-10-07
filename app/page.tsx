@@ -6,9 +6,7 @@ import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financi
 import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
-import { subtractMoney } from "@/lib/money"
-import { generateSampleData } from "@/lib/sample-data"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import {
   getLastSeenMonth,
   hasAccountPromptBeenShown,
@@ -24,6 +22,7 @@ import { TransactionsTable } from "@/components/transactions-table"
 import { TransactionForm } from "@/components/transaction-form"
 import { MonthlyReportModal as MonthlyReportModalComponent } from "@/components/monthly-report-modal"
 import { ReportDetailModal } from "@/components/report-detail-modal"
+import { ReportButton, ReportsListModal, sortReportsDesc } from "@/components/reports-list-modal"
 import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
@@ -40,7 +39,8 @@ import { isMasterCheckDue } from "@/lib/cloud/master-check"
 import { recordMasterCheck } from "@/lib/cloud/repository"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
+import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // Pure helper — kept outside component to avoid stale-closure issues in callbacks.
 // Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
@@ -50,6 +50,9 @@ function getMonthName(month: number): string {
 }
 
 const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
+// En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
+const RECENT_REPORTS = 3
+
 // Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
 const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
 
@@ -92,6 +95,9 @@ export default function HomePage() {
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
+  const [isReportsListOpen, setIsReportsListOpen] = useState(false)
+  // Móvil: los botones flotantes secundarios se despliegan con el botón de menú (en PC se ven siempre).
+  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -162,6 +168,21 @@ export default function HomePage() {
   const isCopyBlockedByFuture = isSelectedMonthFuture && !isPreviousMonthClosed
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
+
+  // Nombres ya usados (sin los ajustes de cierre), del más reciente al más antiguo, para
+  // sugerirlos al escribir el nombre de una transacción.
+  const nameSuggestions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: { name: string; type: Transaction["type"] }[] = []
+    for (const t of [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))) {
+      const name = t.name.trim()
+      const key = `${t.type}:${name.toLowerCase()}`
+      if (!name || isClosingAdjustment(t) || seen.has(key)) continue
+      seen.add(key)
+      out.push({ name, type: t.type })
+    }
+    return out
+  }, [data.transactions])
 
   const handleAddOrUpdateTransaction = (transactionData: TransactionFormData) => {
     if (editingTransaction) {
@@ -277,11 +298,6 @@ export default function HomePage() {
     return true
   }
 
-  const handleLoadSampleData = () => {
-    const sampleTransactions = generateSampleData(data.config.singleMode)
-    replaceAllData({ ...data, transactions: sampleTransactions, reports: [] })
-  }
-
   const handleClearData = () => {
     replaceAllData({ transactions: [], reports: [], config: data.config })
   }
@@ -381,8 +397,8 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative flex justify-center items-center h-16">
-            <h1 className="text-2xl font-bold text-foreground relative">
+          <div className="relative flex justify-center items-center h-12 sm:h-16">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground relative">
               2Budge
               <span className="relative inline-block">
                 t
@@ -410,7 +426,8 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
         <SummaryCards
           totalIncome={calculations.totalIncome}
           totalExpenses={calculations.totalExpenses}
@@ -447,15 +464,26 @@ export default function HomePage() {
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Informes Mensuales
+                  Informes
                 </h3>
               </div>
-              <div className="p-4 max-h-96 overflow-y-auto">
-                <div className="mb-4">
+              <div className="p-4">
+                <div className="mb-4 flex gap-2">
+                  {data.reports.length > 0 && (
+                    <Button
+                      onClick={() => setIsReportsListOpen(true)}
+                      variant="outline"
+                      className="flex items-center gap-2"
+                      title="Ver todos los informes"
+                    >
+                      <List className="h-4 w-4" />
+                      Todos
+                    </Button>
+                  )}
                   <Button
                     onClick={handleOpenReportModalForCurrentMonth}
                     variant="secondary"
-                    className="w-full flex items-center gap-2"
+                    className="flex-1 flex items-center gap-2"
                   >
                     <FileText className="h-4 w-4" />
                     {existingReportForActualMonth ? "Actualizar Mes Actual" : "Cerrar Mes Actual"}
@@ -485,25 +513,10 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {[...data.reports]
-                      .sort((a, b) => {
-                        if (a.year !== b.year) return b.year - a.year
-                        return b.month - a.month
-                      })
+                    {sortReportsDesc(data.reports)
+                      .slice(0, RECENT_REPORTS)
                       .map((report) => (
-                        <button
-                          key={report.id}
-                          onClick={() => handleViewReport(report)}
-                          className="w-full text-left p-3 rounded-lg hover:bg-muted/50 transition-colors border border-border"
-                        >
-                          <div className="font-medium text-foreground">
-                            {formatMonthYear(report.month, report.year)}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Balance:{" "}
-                            {formatCurrency(subtractMoney(report.totalIncome, report.totalExpenses))}
-                          </div>
-                        </button>
+                        <ReportButton key={report.id} report={report} onClick={() => handleViewReport(report)} />
                       ))}
                   </div>
                 )}
@@ -532,40 +545,79 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Botones flotantes. En móvil solo se ven "+" y el menú, que despliega el resto (así no
+          tapan el contenido); en PC se ven todos, con "+" arriba. */}
       <div className="mb-8 fixed bottom-6 left-6 flex flex-col gap-3 z-50">
-        <Button onClick={() => setIsTransactionFormOpen(true)} variant="secondary" size="icon" className="shadow-lg">
+        <Button
+          onClick={() => setIsTransactionFormOpen(true)}
+          variant="secondary"
+          size="icon"
+          className="shadow-lg order-2 sm:order-1"
+        >
           <Plus className="h-5 w-5" />
           <span className="sr-only">Nueva Transacción</span>
         </Button>
 
+        <div className={cn("flex-col gap-3 order-1 sm:order-2 sm:flex", isFabMenuOpen ? "flex" : "hidden")}>
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              prepareCopyFixedExpenses()
+            }}
+            variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
+            size="icon"
+            className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
+            disabled={hasNothingToCopy || isCopyBlockedByFuture}
+            title={
+              hasNothingToCopy
+                ? "Ya hay gastos fijos e ingresos este mes"
+                : isCopyBlockedByFuture
+                  ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
+                  : "Copiar gastos fijos e ingresos del mes anterior"
+            }
+          >
+            <Copy className="h-5 w-5" />
+            <span className="sr-only">Copiar gastos fijos e ingresos</span>
+          </Button>
+
+          <ThemeToggle />
+
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              setIsSettingsModal(true)
+            }}
+            variant="outline"
+            size="icon"
+            className="shadow-lg"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="sr-only">Configuración</span>
+          </Button>
+
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              setIsDocumentationModalOpen(true)
+            }}
+            variant="outline"
+            size="icon"
+            className="shadow-lg"
+          >
+            <Info className="h-4 w-4" />
+            <span className="sr-only">Documentación</span>
+          </Button>
+        </div>
+
         <Button
-          onClick={prepareCopyFixedExpenses}
-          variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
+          onClick={() => setIsFabMenuOpen((open) => !open)}
+          variant="outline"
           size="icon"
-          className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
-          disabled={hasNothingToCopy || isCopyBlockedByFuture}
-          title={
-            hasNothingToCopy
-              ? "Ya hay gastos fijos e ingresos este mes"
-              : isCopyBlockedByFuture
-                ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
-                : "Copiar gastos fijos e ingresos del mes anterior"
-          }
+          className="shadow-lg order-3 sm:hidden"
+          aria-expanded={isFabMenuOpen}
         >
-          <Copy className="h-5 w-5" />
-          <span className="sr-only">Copiar gastos fijos e ingresos</span>
-        </Button>
-
-        <ThemeToggle />
-
-        <Button onClick={() => setIsSettingsModal(true)} variant="outline" size="icon" className="shadow-lg">
-          <Settings className="h-4 w-4" />
-          <span className="sr-only">Configuración</span>
-        </Button>
-
-        <Button onClick={() => setIsDocumentationModalOpen(true)} variant="outline" size="icon" className="shadow-lg">
-          <Info className="h-4 w-4" />
-          <span className="sr-only">Documentación</span>
+          {isFabMenuOpen ? <X className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
+          <span className="sr-only">{isFabMenuOpen ? "Cerrar menú" : "Más opciones"}</span>
         </Button>
       </div>
 
@@ -596,6 +648,7 @@ export default function HomePage() {
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
+        nameSuggestions={nameSuggestions}
       />
 
       {isReportModalOpen && (
@@ -612,6 +665,16 @@ export default function HomePage() {
           singleMode={data.config.singleMode}
         />
       )}
+
+      <ReportsListModal
+        isOpen={isReportsListOpen}
+        onClose={() => setIsReportsListOpen(false)}
+        reports={data.reports}
+        onViewReport={(report) => {
+          setIsReportsListOpen(false)
+          handleViewReport(report)
+        }}
+      />
 
       {selectedReport && (
         <ReportDetailModal
@@ -632,7 +695,6 @@ export default function HomePage() {
         appData={data}
         onImportData={handleImportData}
         isCloud={cloudTarget !== null}
-        onLoadSampleData={handleLoadSampleData}
         onClearData={handleClearData}
         person2OpenTransactionsCount={countPerson2OpenTransactions(data.transactions, data.reports)}
       />
