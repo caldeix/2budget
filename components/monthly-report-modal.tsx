@@ -20,6 +20,7 @@ import { isZeroMoney, subtractMoney } from "@/lib/money" // Aritmética monetari
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
 import { useCalculations } from "@/hooks/use-calculations" // Hook para cálculos financieros.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
+import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de un cierre anterior.
 import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos.
 
 /**
@@ -78,8 +79,13 @@ export function MonthlyReportModal({
   // Estado para controlar si el formulario está en proceso de envío.
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Hook `useCalculations` para obtener los balances calculados de las transacciones del mes.
-  const calculations = useCalculations(transactions)
+  // Balances calculados SIN los ajustes de un cierre anterior: al guardar, esos ajustes se
+  // sustituyen por los nuevos (no se suman), así que el cálculo parte del mes "antes de ajustes".
+  const transactionsBeforeAdjustments = useMemo(
+    () => transactions.filter((t) => !isClosingAdjustment(t)),
+    [transactions],
+  )
+  const calculations = useCalculations(transactionsBeforeAdjustments)
 
   /**
    * `useEffect` para inicializar los estados del dinero real cuando el modal se abre
@@ -138,6 +144,8 @@ export function MonthlyReportModal({
         person1Percentage: 100, // 100% para Persona 1.
         person2Percentage: 0, // 0% para Persona 2.
         nonComputable: false, // Un ajuste de cierre siempre computa.
+        paid: true, // Apunte contable: nunca queda pendiente de pagar.
+        closingAdjustment: true,
         date: adjustmentDate, // Fecha de la transacción de ajuste.
       })
     }
@@ -153,6 +161,8 @@ export function MonthlyReportModal({
         person1Percentage: 0,
         person2Percentage: 100,
         nonComputable: false, // Un ajuste de cierre siempre computa.
+        paid: true, // Apunte contable: nunca queda pendiente de pagar.
+        closingAdjustment: true,
         date: adjustmentDate,
       })
     }
@@ -238,8 +248,8 @@ export function MonthlyReportModal({
               <div>
                 <h3 className="font-medium text-amber-600">Informe existente</h3>
                 <p className="text-sm text-amber-600 mt-1">
-                  Ya existe un informe para este mes. Al continuar, sobrescribirás los datos existentes y se crearán
-                  nuevas transacciones de ajuste si es necesario.
+                  Ya existe un informe para este mes. Al continuar, se actualizará y sus transacciones de ajuste
+                  se sustituirán por las nuevas.
                 </p>
               </div>
             </div>

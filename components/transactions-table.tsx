@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
-import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
+import { aggregateTransactions, isClosingAdjustment } from "@/lib/aggregations" // Núcleo único de agregación.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
@@ -35,6 +35,9 @@ import {
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 
+/** Los ajustes de cierre los gestiona el informe: no se editan ni se borran a mano. */
+const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes\" o borrando el informe"
+
 /**
  * @interface TransactionsTableProps
  * @description Define las propiedades que acepta el componente `TransactionsTable`.
@@ -51,6 +54,7 @@ import { TransactionMonthNavigator } from "@/components/transaction-month-naviga
  * @property {() => void} onLoadMore - Función de callback para cargar más transacciones.
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
+ * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -67,6 +71,7 @@ interface TransactionsTableProps {
   onLoadMore: () => void
   hasMore: boolean
   singleMode?: boolean
+  locked?: boolean
 }
 
 /**
@@ -103,6 +108,7 @@ export function TransactionsTable({
   onLoadMore, // Función para cargar más.
   hasMore, // Si hay más transacciones para cargar.
   singleMode = false,
+  locked = false,
 }: TransactionsTableProps) {
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
@@ -149,6 +155,7 @@ export function TransactionsTable({
    * @returns {void}
    */
   const handleTouchEndRow = (e: React.TouchEvent, transactionId: string) => {
+    if (locked) return // Mes cerrado: no hay acciones que mostrar.
     const touchEndX = e.changedTouches[0].clientX
     const deltaX = touchEndX - touchStartXRow // Distancia horizontal del swipe.
 
@@ -426,30 +433,34 @@ export function TransactionsTable({
         onTouchEnd={handleTouchEndMonthNav}
       >
         {/* Navegador de Mes/Año */}
-        <TransactionMonthNavigator
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onMonthChange={onMonthChange}
-          onYearChange={onYearChange}
-        />
+        <div data-tour="month-nav">
+          <TransactionMonthNavigator
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onMonthChange={onMonthChange}
+            onYearChange={onYearChange}
+          />
+        </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mt-4">
+        {/* Título y filtros en una línea solo con ancho de sobra (desde 1280 px); si no, los filtros
+            se salían de la tarjeta. */}
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mt-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Transacciones</h2>
             <p className="text-sm text-muted-foreground">
-              {filteredAndSortedTransactions.length} de {transactions.length} transacciones
+              {filteredAndSortedTransactions.length}/{transactions.length}
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Campo de búsqueda */}
-            <div className="relative">
+          <div data-tour="filters" className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+            {/* Campo de búsqueda (a todo el ancho en móvil, como los selectores) */}
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar transacciones..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-64 bg-input text-foreground border-border"
+                className="pl-10 w-full sm:w-64 bg-input text-foreground border-border"
               />
             </div>
 
@@ -477,41 +488,42 @@ export function TransactionsTable({
           </div>
         </div>
 
-        {/* Tarjetas de resumen de ingresos/gastos/balance filtrados */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="bg-card rounded-2xl p-4 border">
+        {/* Totales de lo filtrado (búsqueda/tipo/categoría). En móvil, ingresos y gastos en una
+            línea y el balance debajo, a todo el ancho. */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 mt-6">
+          <div className="bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="hidden sm:block p-2 bg-green-100 rounded-lg">
                 <TrendingUp className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Ingresos Filtrados</p>
-                <p className="text-lg font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
+                <p className="text-sm text-muted-foreground">Ingresos</p>
+                <p className="text-base sm:text-lg font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl p-4 border">
+          <div className="bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
+              <div className="hidden sm:block p-2 bg-red-100 rounded-lg">
                 <TrendingDown className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Gastos Filtrados</p>
-                <p className="text-lg font-semibold text-red-600">{formatCurrency(totalExpenses)}</p>
+                <p className="text-sm text-muted-foreground">Gastos</p>
+                <p className="text-base sm:text-lg font-semibold text-red-600">{formatCurrency(totalExpenses)}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-card rounded-2xl p-4 border">
+          <div className="col-span-2 md:col-span-1 bg-card rounded-2xl p-3 md:p-4 border">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
+              <div className="hidden sm:block p-2 bg-primary/10 rounded-lg">
                 <DollarSign className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Balance Filtrado</p>
+                <p className="text-sm text-muted-foreground">Balance</p>
                 <p
-                  className={`text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
+                  className={`text-base sm:text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
                   {formatCurrency(filteredBalance)}
                 </p>
@@ -574,10 +586,10 @@ export function TransactionsTable({
 
             {/* Lista de Transacciones (renderiza filas para escritorio y móvil) */}
             <div className="divide-y divide-border">
-              {filteredAndSortedTransactions.map((transaction) => (
+              {filteredAndSortedTransactions.map((transaction, index) => (
                 <React.Fragment key={transaction.id}>
                   {/* Fila de escritorio (diseño de tarjeta, visible solo en pantallas grandes) */}
-                  <div className={cn(
+                  <div data-tour={index === 0 ? "tx-row" : undefined} className={cn(
                     "hidden sm:grid items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
                     desktopGridCols,
                     transaction.nonComputable && "opacity-70"
@@ -629,11 +641,13 @@ export function TransactionsTable({
                       {transaction.type === "income" ? "+" : "-"}
                       {formatCurrency(transaction.amount)}
                     </div>
+                    {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
-                      {transaction.type === "expense" && (
+                      {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                         <Button
                           size="sm"
                           variant="ghost"
+                          data-tour="paid"
                           onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
                           className={cn(
                             "h-8 w-8 p-0",
@@ -647,27 +661,35 @@ export function TransactionsTable({
                           <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEdit(transaction)}
-                        className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onDelete(transaction.id)}
-                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!locked && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEdit(transaction)}
+                            disabled={isClosingAdjustment(transaction)}
+                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Editar"}
+                            className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDelete(transaction.id)}
+                            disabled={isClosingAdjustment(transaction)}
+                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Eliminar"}
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   {/* Fila móvil (diseño con swipe, visible solo en pantallas pequeñas) */}
-                  <div className="sm:hidden">
+                  <div data-tour={index === 0 ? "tx-row" : undefined} className="sm:hidden">
                     <div className="p-0 relative overflow-hidden">
                       <div
                         className={cn(
@@ -714,9 +736,10 @@ export function TransactionsTable({
                                 NC
                               </span>
                             )}
-                            {transaction.type === "expense" && (
+                            {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                               <button
                                 type="button"
+                                data-tour="paid"
                                 onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
                                 className={cn(
                                   "ml-1 p-0.5",
@@ -756,6 +779,7 @@ export function TransactionsTable({
                         <Button
                           size="sm"
                           className="flex-1 bg-amber-600 text-primary-foreground hover:bg-amber-700"
+                          disabled={isClosingAdjustment(transaction)}
                           onClick={() => {
                             onEdit(transaction)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.
@@ -768,6 +792,7 @@ export function TransactionsTable({
                           size="sm"
                           variant="destructive"
                           className="flex-1"
+                          disabled={isClosingAdjustment(transaction)}
                           onClick={() => {
                             onDelete(transaction.id)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.

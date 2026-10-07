@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.0.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.5.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,46 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.5.0 — Menos lecturas de Firestore
+
+- **Meses cerrados archivados** — Las transacciones de un mes pasado con informe se guardan dentro del documento cifrado de su informe y se borran sus documentos sueltos. Al abrir la app solo se leen las transacciones de los meses abiertos y un documento por mes cerrado: con dos años de datos, unas 15 veces menos lecturas, y el coste casi deja de crecer con la historia
+- **Sin cambios visibles** — La app ve los mismos datos. La migración se hace sola al abrir la app (con datos del servidor, no de la caché), es segura si se corta a medias y no se repite. Al borrar el informe de un mes archivado, sus transacciones vuelven a ser documentos sueltos
+- SemVer: 2.4.0 → 2.5.0 (MINOR)
+
+### v2.4.0 — Tour de bienvenida y ayuda al día
+
+- **Tour guiado** — La primera vez que se entra (o si nunca se ha visto), un tour recorre la app paso a paso: resalta cada parte con un borde dorado y explica qué hace en un tooltip con el paso ("3/15") y "Siguiente" ("Finalizar" en el último). No se puede saltar. Usa datos de ejemplo que solo viven en memoria: los datos reales no se tocan ni se guarda nada. En móvil tiene sus propios pasos (carrusel, deslizar, menú ⋮)
+- **Solo una vez** — Queda marcado en el perfil de la cuenta, así que no vuelve a salir en otros dispositivos. Se puede repetir desde la ayuda
+- **Ayuda revisada** — Reescrita entera para la app actual: "Hoy" y "Previsto", marcar como pagado, autocompletado, revisar importes al copiar, meses cerrados, borrar el último informe, el menú del móvil… Corrige dos secciones con el mismo número que se abrían a la vez
+- **Diseño entre 1024 y 1280 px** — Las tarjetas del resumen van de dos en dos (los nombres ya no se cortan), los filtros de transacciones bajan debajo del título y la página ya no se desplaza en horizontal
+- SemVer: 2.3.0 → 2.4.0 (MINOR)
+
+### v2.3.0 — Cierre de mes
+
+- **Borrar el último informe** — Desde el detalle del último informe se puede borrar (con confirmación), junto con sus transacciones de ajuste, por si se cerró el mes sin querer. El mes vuelve a quedar abierto
+- **"Actualizar mes" sustituye los ajustes** — Antes, actualizar un informe añadía ajustes nuevos encima de los anteriores; ahora los recalcula sin ellos y los sustituye: siempre queda un ajuste por persona
+- **Ajustes de cierre protegidos** — Llevan una marca propia y sus botones de editar y borrar se ven desactivados: se cambian actualizando el mes o borrando el informe. Nunca quedan pendientes de pagar
+- **Meses cerrados de solo lectura** — En un mes pasado con informe, las transacciones no muestran los botones de pagado, editar ni borrar
+- **Revisar importes al copiar** — El modal de copiar gastos fijos e ingresos (ahora con margen interior) tiene un tercer botón, "Revisar importes", para cambiar el importe de cada uno antes de copiarlos
+- SemVer: 2.2.0 → 2.3.0 (MINOR)
+
+### v2.2.0 — Estilo y limpieza
+
+- **Informes** — Los gráficos del informe salen centrados (también en móvil) y el título del informe, centrado. La tarjeta pasa a llamarse "Informes" y muestra solo los 3 últimos; el botón "Todos", junto a "Cerrar mes actual", abre un modal con todos los informes y un filtro por año
+- **Autocompletado del nombre** — Al escribir el nombre de una transacción se sugieren los nombres ya usados del mismo tipo (sin tildes ni mayúsculas); se elige con un toque o con las flechas y Enter
+- **Móvil** — Cabecera más baja y el mes centrado y más cerca de ella. Las tarjetas del resumen van en un carrusel deslizable con puntos. En transacciones, el buscador ocupa todo el ancho e Ingresos y Gastos van en una línea con el Balance debajo. Los botones flotantes se recogen en un menú (solo queda "+" a la vista) para no tapar el contenido
+- **Textos** — "Resumen del mes de…" centrado, "Total acumulado", "No computables", contador de transacciones como "10/29" y totales de transacciones sin la palabra "filtrados"
+- Margen entre la lista de transacciones y el footer, en móvil y en PC
+- **Se quita "Cargar datos de prueba"** de los ajustes, con toda su lógica
+- SemVer: 2.1.0 → 2.2.0 (MINOR)
+
+### v2.1.0 — "Hoy" y "Previsto" en el resumen del mes
+
+- **Dos cifras en el resumen** — Las tarjetas de Balance, Gastos y Balance individual muestran lo que hay **hoy** (solo con los gastos marcados como pagados) y lo **previsto** a final de mes (con todos los gastos). Los ingresos cuentan siempre y los ajustes de cierre nunca quedan pendientes
+- Si no queda nada por pagar, o el mes aún no ha empezado, se ve solo una cifra, como antes
+- En PC, las filas de las cuatro tarjetas quedan a la misma altura aunque alguna no tenga la línea "Hoy"
+- SemVer: 2.0.1 → 2.1.0 (MINOR)
 
 ### v2.0.1 — App Check con reCAPTCHA Enterprise
 

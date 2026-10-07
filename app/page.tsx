@@ -1,33 +1,35 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
+import type { AppData, Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
 import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, formatCurrency } from "@/lib/utils"
-import { subtractMoney } from "@/lib/money"
-import { generateSampleData } from "@/lib/sample-data"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import {
   getLastSeenMonth,
   hasAccountPromptBeenShown,
+  hasSeenTourOnDevice,
   markAccountPromptShown,
+  markTourSeenOnDevice,
   parseImportedData,
   setLastSeenMonth,
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
+import { isClosingAdjustment } from "@/lib/aggregations"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
 import { TransactionForm } from "@/components/transaction-form"
 import { MonthlyReportModal as MonthlyReportModalComponent } from "@/components/monthly-report-modal"
 import { ReportDetailModal } from "@/components/report-detail-modal"
+import { ReportButton, ReportsListModal, sortReportsDesc } from "@/components/reports-list-modal"
 import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
-import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
+import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
@@ -36,10 +38,14 @@ import { AuthScreen } from "@/components/auth-screen"
 import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 import { MasterCheckDialog } from "@/components/master-check-dialog"
 import { isMasterCheckDue } from "@/lib/cloud/master-check"
-import { recordMasterCheck } from "@/lib/cloud/repository"
+import { recordMasterCheck, recordTourCompleted } from "@/lib/cloud/repository"
+import { AppTour, type TourStep } from "@/components/app-tour"
+import { getTourSteps } from "@/components/tour-steps"
+import { createTourData } from "@/lib/tour-data"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle } from "lucide-react"
+import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 // Pure helper — kept outside component to avoid stale-closure issues in callbacks.
 // Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
@@ -49,8 +55,11 @@ function getMonthName(month: number): string {
 }
 
 const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
+// En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
+const RECENT_REPORTS = 3
+
 // Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
-const isCopyableIncome = (t: Transaction) => t.type === "income" && !/^Ajuste .+ - Cierre /.test(t.name)
+const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
 
 export default function HomePage() {
   // Sesión en la nube: con hogar (y desbloqueado con la contraseña maestra), los datos se leen
@@ -65,6 +74,10 @@ export default function HomePage() {
     [session.services, session.householdId, vault.dek],
   )
 
+  // Tour de bienvenida: mientras dura, la app enseña datos ficticios (y no guarda nada).
+  const [tourData, setTourData] = useState<AppData | null>(null)
+  const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null)
+
   const {
     data,
     isLoading: isDataLoading,
@@ -74,12 +87,13 @@ export default function HomePage() {
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
+    deleteReport,
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
     householdInfo,
     syncError,
-  } = useFinancialDataContext(cloudTarget)
+  } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
   const needsAuth = session.enabled && (!session.user || !session.emailVerified)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
@@ -91,6 +105,9 @@ export default function HomePage() {
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
+  const [isReportsListOpen, setIsReportsListOpen] = useState(false)
+  // Móvil: los botones flotantes secundarios se despliegan con el botón de menú (en PC se ven siempre).
+  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -159,8 +176,28 @@ export default function HomePage() {
   const isPreviousMonthClosed = !!getExistingReport(prevOfSelectedMonth, prevOfSelectedYear)
   // Un mes futuro solo se bloquea para copiar si el mes anterior aún no tiene informe cerrado.
   const isCopyBlockedByFuture = isSelectedMonthFuture && !isPreviousMonthClosed
+  // Un mes pasado con informe está cerrado: sus transacciones son de solo lectura. Para cambiar
+  // algo se borra su informe (si es el último), y el mes vuelve a quedar abierto.
+  const isSelectedMonthLocked = !!existingReportForSelectedMonth && !isSelectedMonthCurrent && !isSelectedMonthFuture
+  // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
+  const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
+
+  // Nombres ya usados (sin los ajustes de cierre), del más reciente al más antiguo, para
+  // sugerirlos al escribir el nombre de una transacción.
+  const nameSuggestions = useMemo(() => {
+    const seen = new Set<string>()
+    const out: { name: string; type: Transaction["type"] }[] = []
+    for (const t of [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))) {
+      const name = t.name.trim()
+      const key = `${t.type}:${name.toLowerCase()}`
+      if (!name || isClosingAdjustment(t) || seen.has(key)) continue
+      seen.add(key)
+      out.push({ name, type: t.type })
+    }
+    return out
+  }, [data.transactions])
 
   const handleAddOrUpdateTransaction = (transactionData: TransactionFormData) => {
     if (editingTransaction) {
@@ -200,7 +237,7 @@ export default function HomePage() {
     setIsConfirmCopyModalOpen(true)
   }, [selectedMonth, selectedYear, getTransactionsForMonth, hasFixedExpensesInCurrentMonth, hasIncomesInCurrentMonth])
 
-  const confirmCopyTransactions = useCallback(() => {
+  const confirmCopyTransactions = useCallback((amounts: CopyAmounts) => {
     // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
     const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
 
@@ -210,7 +247,8 @@ export default function HomePage() {
         category: transaction.category,
         // Se copia con el mismo nombre, limpiando el sufijo " (copiado)" que dejaban versiones anteriores.
         name: transaction.name.replace(/( \(copiado\))+$/, ""),
-        amount: transaction.amount,
+        // Importe revisado en el modal ("Revisar importes"), o el del mes anterior.
+        amount: amounts[transaction.id] ?? transaction.amount,
         owner: transaction.owner,
         person1Percentage: transaction.person1Percentage ?? 50,
         person2Percentage: transaction.person2Percentage ?? 50,
@@ -274,11 +312,6 @@ export default function HomePage() {
     }
     replaceAllData(imported)
     return true
-  }
-
-  const handleLoadSampleData = () => {
-    const sampleTransactions = generateSampleData(data.config.singleMode)
-    replaceAllData({ ...data, transactions: sampleTransactions, reports: [] })
   }
 
   const handleClearData = () => {
@@ -356,6 +389,63 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
 
+  // --- Tour de bienvenida ---
+  // Se muestra una sola vez por usuario: queda marcado en su perfil (en todos sus dispositivos)
+  // y en este dispositivo. Sin cuenta (build solo local), solo en el dispositivo.
+  const uid = session.user?.uid ?? null
+  const isTourActive = tourData !== null
+  const hasSeenTour = hasSeenTourOnDevice(uid) || Boolean(profile?.tourCompletedAt)
+  // Con cuenta, hay que esperar al perfil para saber si ya lo vio.
+  const isProfileReady = !session.enabled || profile !== null
+  const isAnyModalOpen =
+    isMasterCheckOpen ||
+    recoveryCodeToShow !== null ||
+    isPaidReconcileOpen ||
+    isAccountModalOpen ||
+    isTransactionFormOpen ||
+    isReportModalOpen ||
+    selectedReport !== null ||
+    isReportsListOpen ||
+    isSettingsModalOpen ||
+    isDocumentationModalOpen ||
+    isConfirmCopyModalOpen
+  const canAutoStartTour =
+    !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
+
+  const startTour = useCallback(() => {
+    // Siempre sobre el mes actual, con los nombres y el modo de la configuración real.
+    setSelectedMonth(getCurrentMonth())
+    setSelectedYear(getCurrentYear())
+    setIsFabMenuOpen(false)
+    window.scrollTo({ top: 0 })
+    setTourData(createTourData(new Date(), data.config))
+    setTourSteps(
+      getTourSteps({
+        person1Name: data.config.person1Name,
+        person2Name: data.config.person2Name,
+        singleMode: Boolean(data.config.singleMode),
+        cloud: session.enabled,
+        isDesktop: window.matchMedia("(min-width: 640px)").matches,
+      }),
+    )
+  }, [data.config, session.enabled])
+
+  const finishTour = useCallback(() => {
+    setTourData(null)
+    setTourSteps(null)
+    markTourSeenOnDevice(uid)
+    if (session.services && uid) recordTourCompleted(session.services.db, uid)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [uid, session.services])
+
+  // Arranca solo la primera vez, cuando no hay ninguna otra ventana abierta. La espera deja que
+  // se abran antes las que salen al cargar (p. ej. la de gastos pagados del mes anterior).
+  useEffect(() => {
+    if (!canAutoStartTour) return
+    const timer = setTimeout(startTour, 600)
+    return () => clearTimeout(timer)
+  }, [canAutoStartTour, startTour])
+
   // La app exige una cuenta con el email verificado (si la build trae Firebase; si no, es solo local).
   if (session.ready && needsAuth) {
     return <AuthScreen session={session} />
@@ -380,8 +470,8 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative flex justify-center items-center h-16">
-            <h1 className="text-2xl font-bold text-foreground relative">
+          <div className="relative flex justify-center items-center h-12 sm:h-16">
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground relative">
               2Budge
               <span className="relative inline-block">
                 t
@@ -409,7 +499,8 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
         <SummaryCards
           totalIncome={calculations.totalIncome}
           totalExpenses={calculations.totalExpenses}
@@ -426,6 +517,9 @@ export default function HomePage() {
           selectedYear={selectedYear}
           nonComputableExpenses={calculations.nonComputableExpenses}
           singleMode={data.config.singleMode}
+          today={calculations.today}
+          // "Hoy" solo tiene sentido si queda algo por pagar y el mes ya ha empezado.
+          showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
         />
 
         <div className="flex flex-col lg:flex-row gap-8 mt-8">
@@ -439,19 +533,33 @@ export default function HomePage() {
               singleMode={data.config.singleMode}
             />
 
-            <div className="bg-card rounded-2xl shadow-lg border">
+            <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Informes Mensuales
+                  Informes
                 </h3>
               </div>
-              <div className="p-4 max-h-96 overflow-y-auto">
-                <div className="mb-4">
+              <div className="p-4">
+                <div className="mb-4 flex gap-2">
+                  {data.reports.length > 0 && (
+                    // En PC la columna es estrecha: solo el icono, para que el otro botón quepa entero.
+                    <Button
+                      onClick={() => setIsReportsListOpen(true)}
+                      variant="outline"
+                      className="shrink-0 flex items-center gap-2 lg:px-3"
+                      title="Ver todos los informes"
+                      data-tour="reports-all"
+                      aria-label="Ver todos los informes"
+                    >
+                      <List className="h-4 w-4" />
+                      <span className="lg:hidden">Todos</span>
+                    </Button>
+                  )}
                   <Button
                     onClick={handleOpenReportModalForCurrentMonth}
                     variant="secondary"
-                    className="w-full flex items-center gap-2"
+                    className="flex-1 min-w-0 flex items-center gap-2"
                   >
                     <FileText className="h-4 w-4" />
                     {existingReportForActualMonth ? "Actualizar Mes Actual" : "Cerrar Mes Actual"}
@@ -481,25 +589,10 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {[...data.reports]
-                      .sort((a, b) => {
-                        if (a.year !== b.year) return b.year - a.year
-                        return b.month - a.month
-                      })
+                    {sortReportsDesc(data.reports)
+                      .slice(0, RECENT_REPORTS)
                       .map((report) => (
-                        <button
-                          key={report.id}
-                          onClick={() => handleViewReport(report)}
-                          className="w-full text-left p-3 rounded-lg hover:bg-muted/50 transition-colors border border-border"
-                        >
-                          <div className="font-medium text-foreground">
-                            {formatMonthYear(report.month, report.year)}
-                          </div>
-                          <div className="text-sm text-muted-foreground mt-1">
-                            Balance:{" "}
-                            {formatCurrency(subtractMoney(report.totalIncome, report.totalExpenses))}
-                          </div>
-                        </button>
+                        <ReportButton key={report.id} report={report} onClick={() => handleViewReport(report)} />
                       ))}
                   </div>
                 )}
@@ -507,7 +600,8 @@ export default function HomePage() {
             </div>
           </aside>
 
-          <div className="flex-1 space-y-8">
+          {/* `min-w-0`: sin él, la tabla ensancha la columna y la página entera se desplaza en horizontal. */}
+          <div className="flex-1 min-w-0 space-y-8">
             <TransactionsTable
               transactions={allTransactionsForSelectedMonth}
               person1Name={data.config.person1Name}
@@ -523,45 +617,92 @@ export default function HomePage() {
               onLoadMore={handleLoadMoreTransactions}
               hasMore={hasMoreTransactions}
               singleMode={data.config.singleMode}
+              locked={isSelectedMonthLocked}
             />
           </div>
         </div>
       </div>
 
+      {/* Botones flotantes. En móvil solo se ven "+" y el menú, que despliega el resto (así no
+          tapan el contenido); en PC se ven todos, con "+" arriba. */}
       <div className="mb-8 fixed bottom-6 left-6 flex flex-col gap-3 z-50">
-        <Button onClick={() => setIsTransactionFormOpen(true)} variant="secondary" size="icon" className="shadow-lg">
+        <Button
+          onClick={() => setIsTransactionFormOpen(true)}
+          variant="secondary"
+          size="icon"
+          className="shadow-lg order-2 sm:order-1"
+          data-tour="fab-add"
+        >
           <Plus className="h-5 w-5" />
           <span className="sr-only">Nueva Transacción</span>
         </Button>
 
+        <div className={cn("flex-col gap-3 order-1 sm:order-2 sm:flex", isFabMenuOpen ? "flex" : "hidden")}>
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              prepareCopyFixedExpenses()
+            }}
+            variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
+            size="icon"
+            className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
+            disabled={hasNothingToCopy || isCopyBlockedByFuture}
+            data-tour="fab-copy"
+            title={
+              hasNothingToCopy
+                ? "Ya hay gastos fijos e ingresos este mes"
+                : isCopyBlockedByFuture
+                  ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
+                  : "Copiar gastos fijos e ingresos del mes anterior"
+            }
+          >
+            <Copy className="h-5 w-5" />
+            <span className="sr-only">Copiar gastos fijos e ingresos</span>
+          </Button>
+
+          <div data-tour="fab-theme" className="flex">
+            <ThemeToggle />
+          </div>
+
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              setIsSettingsModal(true)
+            }}
+            variant="outline"
+            size="icon"
+            className="shadow-lg"
+            data-tour="fab-settings"
+          >
+            <Settings className="h-4 w-4" />
+            <span className="sr-only">Configuración</span>
+          </Button>
+
+          <Button
+            onClick={() => {
+              setIsFabMenuOpen(false)
+              setIsDocumentationModalOpen(true)
+            }}
+            variant="outline"
+            size="icon"
+            className="shadow-lg"
+            data-tour="fab-info"
+          >
+            <Info className="h-4 w-4" />
+            <span className="sr-only">Documentación</span>
+          </Button>
+        </div>
+
         <Button
-          onClick={prepareCopyFixedExpenses}
-          variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
+          onClick={() => setIsFabMenuOpen((open) => !open)}
+          variant="outline"
           size="icon"
-          className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
-          disabled={hasNothingToCopy || isCopyBlockedByFuture}
-          title={
-            hasNothingToCopy
-              ? "Ya hay gastos fijos e ingresos este mes"
-              : isCopyBlockedByFuture
-                ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
-                : "Copiar gastos fijos e ingresos del mes anterior"
-          }
+          className="shadow-lg order-3 sm:hidden"
+          aria-expanded={isFabMenuOpen}
+          data-tour="fab-menu"
         >
-          <Copy className="h-5 w-5" />
-          <span className="sr-only">Copiar gastos fijos e ingresos</span>
-        </Button>
-
-        <ThemeToggle />
-
-        <Button onClick={() => setIsSettingsModal(true)} variant="outline" size="icon" className="shadow-lg">
-          <Settings className="h-4 w-4" />
-          <span className="sr-only">Configuración</span>
-        </Button>
-
-        <Button onClick={() => setIsDocumentationModalOpen(true)} variant="outline" size="icon" className="shadow-lg">
-          <Info className="h-4 w-4" />
-          <span className="sr-only">Documentación</span>
+          {isFabMenuOpen ? <X className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
+          <span className="sr-only">{isFabMenuOpen ? "Cerrar menú" : "Más opciones"}</span>
         </Button>
       </div>
 
@@ -571,6 +712,7 @@ export default function HomePage() {
         onConfirm={confirmCopyTransactions}
         monthName={getMonthName(selectedMonth - 1)}
         year={selectedYear}
+        transactions={transactionsToCopy}
         expenseCount={transactionsToCopy.filter(isFixedExpense).length}
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
       />
@@ -592,6 +734,7 @@ export default function HomePage() {
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
+        nameSuggestions={nameSuggestions}
       />
 
       {isReportModalOpen && (
@@ -609,6 +752,16 @@ export default function HomePage() {
         />
       )}
 
+      <ReportsListModal
+        isOpen={isReportsListOpen}
+        onClose={() => setIsReportsListOpen(false)}
+        reports={data.reports}
+        onViewReport={(report) => {
+          setIsReportsListOpen(false)
+          handleViewReport(report)
+        }}
+      />
+
       {selectedReport && (
         <ReportDetailModal
           isOpen={!!selectedReport}
@@ -617,6 +770,14 @@ export default function HomePage() {
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
           singleMode={data.config.singleMode}
+          onDelete={
+            selectedReport.id === latestReportId
+              ? () => {
+                  deleteReport(selectedReport.id)
+                  setSelectedReport(null)
+                }
+              : undefined
+          }
         />
       )}
 
@@ -628,7 +789,6 @@ export default function HomePage() {
         appData={data}
         onImportData={handleImportData}
         isCloud={cloudTarget !== null}
-        onLoadSampleData={handleLoadSampleData}
         onClearData={handleClearData}
         person2OpenTransactionsCount={countPerson2OpenTransactions(data.transactions, data.reports)}
       />
@@ -665,7 +825,13 @@ export default function HomePage() {
         onClose={() => setIsDocumentationModalOpen(false)}
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
+        onStartTour={() => {
+          setIsDocumentationModalOpen(false)
+          startTour()
+        }}
       />
+
+      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} />}
     </div>
   )
 }

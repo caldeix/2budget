@@ -11,7 +11,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import type { Transaction, TransactionFormData } from "@/types"
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
@@ -19,7 +19,24 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
-import { getTodayDate } from "@/lib/utils" // Fecha de hoy en local (no UTC).
+import { getTodayDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC) y unión de clases.
+
+/** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
+export interface NameSuggestion {
+  name: string
+  type: "income" | "expense"
+}
+
+/** Máximo de sugerencias visibles a la vez. */
+const MAX_SUGGESTIONS = 6
+
+/** Texto comparable: sin mayúsculas ni tildes. */
+const normalize = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
 
 /**
  * @interface TransactionFormProps
@@ -31,6 +48,7 @@ import { getTodayDate } from "@/lib/utils" // Fecha de hoy en local (no UTC).
  * @property {string} person1Name - Nombre de la Persona 1.
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta el propietario y el reparto.
+ * @property {NameSuggestion[]} [nameSuggestions] - Nombres ya usados, para sugerirlos al escribir.
  */
 interface TransactionFormProps {
   isOpen: boolean
@@ -40,6 +58,7 @@ interface TransactionFormProps {
   person1Name: string
   person2Name: string
   singleMode?: boolean
+  nameSuggestions?: NameSuggestion[]
 }
 
 /**
@@ -57,6 +76,7 @@ export function TransactionForm({
   person1Name,
   person2Name,
   singleMode = false,
+  nameSuggestions = [],
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
   const defaultOwner = singleMode ? "person1" : "both"
@@ -112,6 +132,45 @@ export function TransactionForm({
       })
     }
   }, [transaction, isOpen, defaultOwner, defaultPerson1Percentage]) // Se ejecuta al abrir, al cambiar la transacción o el modo.
+
+  // Sugerencias de nombre: las del mismo tipo que contienen lo escrito (sin contar el nombre exacto).
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [highlighted, setHighlighted] = useState(-1)
+  const suggestions = useMemo(() => {
+    const query = normalize(formData.name)
+    if (!query) return []
+    return nameSuggestions
+      .filter((s) => s.type === formData.type)
+      .map((s) => s.name)
+      .filter((name) => normalize(name).includes(query) && normalize(name) !== query)
+      .slice(0, MAX_SUGGESTIONS)
+  }, [nameSuggestions, formData.name, formData.type])
+  const isSuggesting = showSuggestions && suggestions.length > 0
+
+  const pickSuggestion = (name: string) => {
+    setFormData((prev) => ({ ...prev, name }))
+    setShowSuggestions(false)
+    setHighlighted(-1)
+  }
+
+  /** Flechas para moverse por las sugerencias, Enter para elegir y Escape para cerrarlas. */
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSuggesting) return
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setHighlighted((i) => (i + 1) % suggestions.length)
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setHighlighted((i) => (i <= 0 ? suggestions.length - 1 : i - 1))
+    } else if (e.key === "Enter" && highlighted >= 0) {
+      e.preventDefault()
+      pickSuggestion(suggestions[highlighted])
+    } else if (e.key === "Escape") {
+      // Solo cierra las sugerencias, no el modal.
+      e.stopPropagation()
+      setShowSuggestions(false)
+    }
+  }
 
   /**
    * @function handleSubmit
@@ -215,16 +274,54 @@ export function TransactionForm({
         </div>
 
         {/* Campo de Nombre */}
-        <div>
+        <div className="relative">
           <Label htmlFor="name">Nombre</Label>
           <Input
             id="name"
             type="text"
             value={formData.name}
-            onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+            onChange={(e) => {
+              setFormData((prev) => ({ ...prev, name: e.target.value }))
+              setShowSuggestions(true)
+              setHighlighted(-1)
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setShowSuggestions(false)}
+            onKeyDown={handleNameKeyDown}
             placeholder="Ej: Supermercado, Salario, etc."
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={isSuggesting}
+            aria-controls="name-suggestions"
             required
           />
+          {/* Nombres ya usados que coinciden con lo escrito: se pulsa uno en vez de escribirlo entero. */}
+          {isSuggesting && (
+            <ul
+              id="name-suggestions"
+              role="listbox"
+              className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-border bg-card shadow-lg py-1"
+            >
+              {suggestions.map((name, i) => (
+                <li
+                  key={name}
+                  role="option"
+                  aria-selected={i === highlighted}
+                  // `mousedown` (no `click`): se elige antes de que el input pierda el foco.
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    pickSuggestion(name)
+                  }}
+                  className={cn(
+                    "px-3 py-2 text-sm cursor-pointer text-foreground hover:bg-muted",
+                    i === highlighted && "bg-muted",
+                  )}
+                >
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Campos de Importe y Fecha */}

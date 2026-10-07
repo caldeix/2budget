@@ -123,7 +123,7 @@ export function PieChart({ data, size = 200, className }: PieChartProps) {
   // Si no hay datos para el gráfico, muestra un mensaje de "Sin datos".
   if (total === 0) {
     return (
-      <div className={`flex items-center justify-center ${className}`} style={{ width: size, height: size }}>
+      <div className={`flex items-center justify-center mx-auto ${className ?? ""}`} style={{ width: size, height: size }}>
         <div className="text-gray-400 text-center">
           <div className="w-16 h-16 border-4 border-gray-200 rounded-full mx-auto mb-2" />
           <p className="text-sm">Sin datos</p>
@@ -132,11 +132,11 @@ export function PieChart({ data, size = 200, className }: PieChartProps) {
     )
   }
 
-  // Renderiza el gráfico de pastel y su leyenda.
+  // Renderiza el gráfico de pastel y su leyenda, centrados en su caja.
   return (
     <div className={className}>
       {/* SVG para el gráfico de pastel */}
-      <svg width={size} height={size} className="drop-shadow-sm">
+      <svg width={size} height={size} className="drop-shadow-sm block mx-auto">
         {paths.map((item, index) => (
           <path
             key={index} // `key` es importante para la eficiencia de React en listas.
@@ -149,7 +149,7 @@ export function PieChart({ data, size = 200, className }: PieChartProps) {
         ))}
       </svg>
       {/* Leyenda del gráfico */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 space-y-2 max-w-xs mx-auto">
         {paths.map((item, index) => (
           <div key={index} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">

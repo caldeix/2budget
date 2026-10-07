@@ -19,6 +19,13 @@ import { subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/clou
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
+import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
+
+/** Indica si la transacción es del mes y año dados. */
+function isInMonth(t: Transaction, month: number, year: number): boolean {
+  const date = parseLocalDate(t.date)
+  return date.getMonth() + 1 === month && date.getFullYear() === year
+}
 
 /**
  * @interface CloudTarget
@@ -55,8 +62,12 @@ export interface CloudTarget {
  * @property {(newData: AppData) => void} replaceAllData - Reemplaza todos los datos de la aplicación (útil para importar o cargar datos de prueba).
  * @property {HouseholdInfo | null} householdInfo - Miembros del hogar en la nube (`null` en local).
  * @property {string | null} syncError - Último error de sincronización con la nube.
+ *
+ * @param {CloudTarget | null} cloud - Hogar en la nube (o `null` para guardar en local).
+ * @param {AppData | null} demoData - Datos ficticios del tour de bienvenida. Mientras se pasan, la
+ *        app los muestra en lugar de los reales y NO se guarda nada (ni en local ni en la nube).
  */
-export function useFinancialData(cloud: CloudTarget | null = null) {
+export function useFinancialData(cloud: CloudTarget | null = null, demoData: AppData | null = null) {
   /**
    * `useState` para almacenar todos los datos de la aplicación.
    * Se arranca con los datos de localStorage; en modo nube los sustituye el primer snapshot.
@@ -65,6 +76,11 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
   // Copia síncrona del estado: varios cambios seguidos (p. ej. copiar gastos fijos) encadenan
   // sobre el último estado sin esperar a que React vuelva a renderizar.
   const dataRef = useRef(data)
+  // Lo que ve la app: los datos ficticios del tour o los reales.
+  const visibleData = demoData ?? data
+  // Copia síncrona para `commit` (estable): con el tour activo no se guarda ningún cambio.
+  const isDemoRef = useRef(false)
+  isDemoRef.current = demoData !== null
   const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
 
@@ -146,6 +162,7 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
    * @param {(prev: AppData) => AppData} compute - Función pura que devuelve el estado nuevo.
    */
   const commit = useCallback((compute: (prev: AppData) => AppData) => {
+    if (isDemoRef.current) return // Tour: los datos son ficticios y nunca se guardan.
     const prev = dataRef.current
     const next = compute(prev)
     if (next === prev) return
@@ -352,18 +369,16 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
           createdAt: new Date().toISOString(),
         }))
 
-        // 2. Combina las nuevas transacciones de ajuste con las transacciones existentes.
-        //    Las nuevas se añaden al principio para que aparezcan primero si se ordenan por fecha de creación.
-        const allTransactions = [...newAdjustmentTransactions, ...prevData.transactions]
+        // 2. Los ajustes de un cierre anterior de este mes se SUSTITUYEN por los nuevos (el modal
+        //    los calcula sin ellos). Las nuevas van al principio, como las más recientes.
+        const { month, year } = reportBaseData
+        const withoutOldAdjustments = prevData.transactions.filter(
+          (t) => !(isClosingAdjustment(t) && isInMonth(t, month, year)),
+        )
+        const allTransactions = [...newAdjustmentTransactions, ...withoutOldAdjustments]
 
         // 3. Obtiene TODAS las transacciones para el mes del informe de la lista *recién actualizada*.
-        const finalReportTransactions = allTransactions.filter((t) => {
-          const transactionDate = parseLocalDate(t.date)
-          return (
-            transactionDate.getMonth() + 1 === reportBaseData.month &&
-            transactionDate.getFullYear() === reportBaseData.year
-          )
-        })
+        const finalReportTransactions = allTransactions.filter((t) => isInMonth(t, month, year))
 
         // 4. RECALCULA los totales del informe basándose en `finalReportTransactions`.
         //    Esto asegura que los ajustes recién añadidos se incluyan en los totales del informe.
@@ -416,12 +431,12 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
    */
   const getTransactionsForMonth = useCallback(
     (month: number, year: number) => {
-      return data.transactions.filter((t) => {
+      return visibleData.transactions.filter((t) => {
         const transactionDate = parseLocalDate(t.date)
         return transactionDate.getMonth() + 1 === month && transactionDate.getFullYear() === year
       })
     },
-    [data.transactions], // Dependencia: se ejecuta si la lista de transacciones cambia.
+    [visibleData.transactions], // Dependencia: se ejecuta si la lista de transacciones cambia.
   )
 
   /**
@@ -433,9 +448,9 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
    */
   const getExistingReport = useCallback(
     (month: number, year: number) => {
-      return data.reports.find((r) => r.month === month && r.year === year)
+      return visibleData.reports.find((r) => r.month === month && r.year === year)
     },
-    [data.reports], // Dependencia: se ejecuta si la lista de informes cambia.
+    [visibleData.reports], // Dependencia: se ejecuta si la lista de informes cambia.
   )
 
   /**
@@ -452,8 +467,31 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
   )
 
   // Devuelve el estado y las funciones para que los componentes puedan utilizarlos.
+  /**
+   * @function deleteReport
+   * @description Borra un informe y las transacciones de ajuste de su cierre: el mes vuelve a
+   *              quedar abierto, como antes de cerrarlo.
+   * @param {string} reportId - El ID del informe.
+   */
+  const deleteReport = useCallback(
+    (reportId: string) => {
+      commit((prevData) => {
+        const report = prevData.reports.find((r) => r.id === reportId)
+        if (!report) return prevData
+        return {
+          ...prevData,
+          transactions: prevData.transactions.filter(
+            (t) => !(isClosingAdjustment(t) && isInMonth(t, report.month, report.year)),
+          ),
+          reports: prevData.reports.filter((r) => r.id !== reportId),
+        }
+      })
+    },
+    [commit],
+  )
+
   return {
-    data,
+    data: visibleData,
     isLoading,
     addTransaction,
     updateTransaction,
@@ -461,6 +499,7 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
+    deleteReport,
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,

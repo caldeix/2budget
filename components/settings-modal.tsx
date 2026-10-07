@@ -2,7 +2,7 @@
  * @file components/settings-modal.tsx
  * @description Este archivo define el componente `SettingsModal`, un modal
  *              que permite al usuario configurar nombres y el modo individual, exportar/importar datos,
- *              cargar datos de prueba y eliminar todos los datos de la aplicación.
+ *              y eliminar todos los datos de la aplicación.
  *              Incluye un modal de confirmación para la eliminación de datos.
  *              Es un Client Component (`"use client"`) debido al uso de estados, refs y eventos.
  */
@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Switch } from "@/components/ui/switch" // Interruptor para el modo individual.
 import { downloadAppData } from "@/lib/storage" // Descarga del JSON de copia de seguridad.
-import { Download, Upload, Trash2, Database, AlertTriangle } from "lucide-react" // Iconos.
+import { Download, Upload, Trash2, AlertTriangle } from "lucide-react" // Iconos.
 
 /**
  * @interface SettingsModalProps
@@ -31,7 +31,6 @@ import { Download, Upload, Trash2, Database, AlertTriangle } from "lucide-react"
  * @property {AppData} appData - Los datos actuales, para exportarlos.
  * @property {(content: string) => boolean} onImportData - Importa el contenido de un JSON; devuelve si fue válido.
  * @property {boolean} isCloud - Los datos se guardan en la nube (hogar compartido) y no solo en este navegador.
- * @property {() => void} onLoadSampleData - Función para cargar datos de prueba.
  * @property {() => void} onClearData - Función para eliminar todos los datos.
  * @property {number} person2OpenTransactionsCount - Transacciones `person2`/`both` de meses sin informe,
  *           para avisar al activar el modo individual.
@@ -44,7 +43,6 @@ interface SettingsModalProps {
   appData: AppData
   onImportData: (content: string) => boolean
   isCloud: boolean
-  onLoadSampleData: () => void
   onClearData: () => void
   person2OpenTransactionsCount: number
 }
@@ -65,7 +63,6 @@ export function SettingsModal({
   appData,
   onImportData,
   isCloud,
-  onLoadSampleData,
   onClearData,
   person2OpenTransactionsCount,
 }: SettingsModalProps) {
@@ -138,17 +135,6 @@ export function SettingsModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
-  }
-
-  /**
-   * @function handleLoadSampleData
-   * @description Manejador para cargar datos de prueba.
-   *              Llama a la función `onLoadSampleData` del padre y cierra el modal.
-   * @returns {void}
-   */
-  const handleLoadSampleData = () => {
-    onLoadSampleData()
-    onClose()
   }
 
   /**
@@ -262,11 +248,6 @@ export function SettingsModal({
                 </Button>
               </div>
 
-              <Button onClick={handleLoadSampleData} variant="outline" className="flex items-center gap-2">
-                <Database className="h-4 w-4" />
-                Cargar datos de prueba
-              </Button>
-
               <Button
                 onClick={handleClearDataClick} // Abre el modal de confirmación.
                 variant="outline"
@@ -290,7 +271,6 @@ export function SettingsModal({
                   : "Los datos se guardan automáticamente en tu navegador"}
               </li>
               <li>• Usa exportar/importar para hacer copias de seguridad</li>
-              <li>• Los datos de prueba incluyen transacciones de ejemplo de un año completo</li>
               <li>• Eliminar datos borrará toda la información permanentemente</li>
             </ul>
           </div>
