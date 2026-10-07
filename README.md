@@ -48,6 +48,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 
 - **Dos cifras en el resumen** — Las tarjetas de Balance, Gastos y Balance individual muestran lo que hay **hoy** (solo con los gastos marcados como pagados) y lo **previsto** a final de mes (con todos los gastos). Los ingresos cuentan siempre y los ajustes de cierre nunca quedan pendientes
 - Si no queda nada por pagar, o el mes aún no ha empezado, se ve solo una cifra, como antes
+- En PC, las filas de las cuatro tarjetas quedan a la misma altura aunque alguna no tenga la línea "Hoy"
 - SemVer: 2.0.1 → 2.1.0 (MINOR)
 
 ### v2.0.1 — App Check con reCAPTCHA Enterprise
