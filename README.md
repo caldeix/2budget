@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.4.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.5.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.5.0 — Menos lecturas de Firestore
+
+- **Meses cerrados archivados** — Las transacciones de un mes pasado con informe se guardan dentro del documento cifrado de su informe y se borran sus documentos sueltos. Al abrir la app solo se leen las transacciones de los meses abiertos y un documento por mes cerrado: con dos años de datos, unas 15 veces menos lecturas, y el coste casi deja de crecer con la historia
+- **Sin cambios visibles** — La app ve los mismos datos. La migración se hace sola al abrir la app (con datos del servidor, no de la caché), es segura si se corta a medias y no se repite. Al borrar el informe de un mes archivado, sus transacciones vuelven a ser documentos sueltos
+- SemVer: 2.4.0 → 2.5.0 (MINOR)
 
 ### v2.4.0 — Tour de bienvenida y ayuda al día
 
