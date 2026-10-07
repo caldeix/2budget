@@ -11,6 +11,7 @@
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades para formatear moneda y fecha.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Iconos.
+import type { TodayFigures } from "@/hooks/use-calculations" // Cifras "a día de hoy".
 
 /**
  * @interface SummaryCardsProps
@@ -29,6 +30,8 @@ import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Ic
  * @property {number} selectedMonth - El mes actualmente seleccionado para el resumen.
  * @property {number} selectedYear - El año actualmente seleccionado para el resumen.
  * @property {boolean} [singleMode] - Modo individual: oculta el desglose por persona si la Persona 2 no tiene cifras.
+ * @property {TodayFigures} today - Gastos y balances solo con lo ya pagado ("Hoy").
+ * @property {boolean} showToday - Si se muestran las dos cifras ("Hoy" y "Previsto"); si no, solo la prevista.
  */
 interface SummaryCardsProps {
   totalIncome: number
@@ -46,6 +49,68 @@ interface SummaryCardsProps {
   selectedYear: number
   nonComputableExpenses: number
   singleMode?: boolean
+  today: TodayFigures
+  showToday: boolean
+}
+
+/** Color de un balance: verde si es positivo o cero, rojo si es negativo. */
+const balanceColor = (value: number) => (value >= 0 ? "text-green-600" : "text-red-600")
+
+/**
+ * @function TodayLine
+ * @description Línea pequeña bajo la cifra grande de una tarjeta con su valor "a día de hoy".
+ */
+function TodayLine({ value, className }: { value: number; className?: string }) {
+  return (
+    <p className="text-xs text-muted-foreground">
+      Hoy: <span className={`font-medium ${className ?? "text-foreground"}`}>{formatCurrency(value)}</span>
+    </p>
+  )
+}
+
+/**
+ * @function PersonFigures
+ * @description Cifras por persona. Con `showToday`, dos columnas ("Hoy" y "Previsto");
+ *              si no, una sola, como siempre.
+ */
+function PersonFigures({
+  rows,
+  showToday,
+  colored = false,
+}: {
+  rows: { name: string; today: number; expected: number }[]
+  showToday: boolean
+  colored?: boolean
+}) {
+  const color = (value: number) => (colored ? balanceColor(value) : "text-foreground")
+
+  if (!showToday) {
+    return (
+      <div className="mt-4 space-y-1">
+        {rows.map((row, i) => (
+          <div key={i} className="flex justify-between text-sm">
+            <span className="text-muted-foreground">{row.name}:</span>
+            <span className={`font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-4 grid grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1 text-sm tabular-nums">
+      <span />
+      <span className="text-right text-xs text-muted-foreground">Hoy</span>
+      <span className="text-right text-xs text-muted-foreground">Previsto</span>
+      {rows.map((row, i) => (
+        <div key={i} className="contents">
+          <span className="text-muted-foreground truncate">{row.name}</span>
+          <span className={`text-right font-medium ${color(row.today)}`}>{formatCurrency(row.today)}</span>
+          <span className={`text-right font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -71,6 +136,8 @@ export function SummaryCards({
   selectedYear,
   nonComputableExpenses,
   singleMode,
+  today,
+  showToday,
 }: SummaryCardsProps) {
   // En modo individual, el desglose por persona sobra salvo que la Persona 2 tenga cifras este mes.
   const showPerson2 = shouldShowPerson2(singleMode, person2Income, person2Expenses)
@@ -98,9 +165,8 @@ export function SummaryCards({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Balance</p>
               {/* Muestra el balance formateado, en verde si es positivo, rojo si es negativo. */}
-              <p className={`text-2xl font-bold ${balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                {formatCurrency(balance)}
-              </p>
+              <p className={`text-2xl font-bold ${balanceColor(balance)}`}>{formatCurrency(balance)}</p>
+              {showToday && <TodayLine value={today.balance} className={balanceColor(today.balance)} />}
             </div>
           </div>
           <div className="mt-4 space-y-1">
@@ -157,19 +223,17 @@ export function SummaryCards({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Gastos</p>
               <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
+              {showToday && <TodayLine value={today.totalExpenses} />}
             </div>
           </div>
           {showPerson2 && (
-            <div className="mt-4 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{person1Name}:</span>
-                <span className="font-medium text-foreground">{formatCurrency(person1Expenses)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{person2Name}:</span>
-                <span className="font-medium text-foreground">{formatCurrency(person2Expenses)}</span>
-              </div>
-            </div>
+            <PersonFigures
+              showToday={showToday}
+              rows={[
+                { name: person1Name, today: today.person1Expenses, expected: person1Expenses },
+                { name: person2Name, today: today.person2Expenses, expected: person2Expenses },
+              ]}
+            />
           )}
         </div>
 
@@ -186,20 +250,14 @@ export function SummaryCards({
                 <p className="text-lg font-bold text-foreground">Por persona</p>
               </div>
             </div>
-            <div className="mt-4 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{person1Name}:</span>
-                <span className={`font-medium ${person1Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(person1Balance)}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{person2Name}:</span>
-                <span className={`font-medium ${person2Balance >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(person2Balance)}
-                </span>
-              </div>
-            </div>
+            <PersonFigures
+              showToday={showToday}
+              colored
+              rows={[
+                { name: person1Name, today: today.person1Balance, expected: person1Balance },
+                { name: person2Name, today: today.person2Balance, expected: person2Balance },
+              ]}
+            />
           </div>
         )}
       </div>

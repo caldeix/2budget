@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.0.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.1.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.1.0 — "Hoy" y "Previsto" en el resumen del mes
+
+- **Dos cifras en el resumen** — Las tarjetas de Balance, Gastos y Balance individual muestran lo que hay **hoy** (solo con los gastos marcados como pagados) y lo **previsto** a final de mes (con todos los gastos). Los ingresos cuentan siempre y los ajustes de cierre nunca quedan pendientes
+- Si no queda nada por pagar, o el mes aún no ha empezado, se ve solo una cifra, como antes
+- SemVer: 2.0.1 → 2.1.0 (MINOR)
 
 ### v2.0.1 — App Check con reCAPTCHA Enterprise
 

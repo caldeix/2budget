@@ -52,6 +52,24 @@ export interface AggregateOptions {
 }
 
 /**
+ * @function isClosingAdjustment
+ * @description Transacción de ajuste creada al cerrar un mes (ver `monthly-report-modal`).
+ *              Es un apunte contable: no se copia al mes siguiente ni queda pendiente de pagar.
+ */
+export function isClosingAdjustment(t: Transaction): boolean {
+  return /^Ajuste .+ - Cierre /.test(t.name)
+}
+
+/**
+ * @function isSettled
+ * @description Indica si una transacción ya cuenta "a día de hoy": los ingresos (se dan por
+ *              cobrados), los gastos marcados como pagados y los ajustes de cierre.
+ */
+export function isSettled(t: Transaction): boolean {
+  return t.type === "income" || Boolean(t.paid) || isClosingAdjustment(t)
+}
+
+/**
  * @function exactShareOfPerson1
  * @description Parte EXACTA de la Persona 1 en una transacción, en centésimas de céntimo
  *              (céntimos × porcentaje), sin redondear. `owner: "both"` y cualquier valor
