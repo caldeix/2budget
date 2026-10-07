@@ -54,10 +54,12 @@ export interface AggregateOptions {
 /**
  * @function isClosingAdjustment
  * @description Transacción de ajuste creada al cerrar un mes (ver `monthly-report-modal`).
- *              Es un apunte contable: no se copia al mes siguiente ni queda pendiente de pagar.
+ *              Es un apunte contable: no se copia al mes siguiente, no queda pendiente de pagar
+ *              y no se edita ni se borra a mano (la gestiona el informe). Las anteriores a la
+ *              marca `closingAdjustment` se reconocen por el nombre que les da el cierre.
  */
 export function isClosingAdjustment(t: Transaction): boolean {
-  return /^Ajuste .+ - Cierre /.test(t.name)
+  return Boolean(t.closingAdjustment) || /^Ajuste .+ - Cierre /.test(t.name)
 }
 
 /**

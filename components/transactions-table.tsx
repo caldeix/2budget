@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
-import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
+import { aggregateTransactions, isClosingAdjustment } from "@/lib/aggregations" // Núcleo único de agregación.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
@@ -35,6 +35,9 @@ import {
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 
+/** Los ajustes de cierre los gestiona el informe: no se editan ni se borran a mano. */
+const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes\" o borrando el informe"
+
 /**
  * @interface TransactionsTableProps
  * @description Define las propiedades que acepta el componente `TransactionsTable`.
@@ -51,6 +54,7 @@ import { TransactionMonthNavigator } from "@/components/transaction-month-naviga
  * @property {() => void} onLoadMore - Función de callback para cargar más transacciones.
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
+ * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -67,6 +71,7 @@ interface TransactionsTableProps {
   onLoadMore: () => void
   hasMore: boolean
   singleMode?: boolean
+  locked?: boolean
 }
 
 /**
@@ -103,6 +108,7 @@ export function TransactionsTable({
   onLoadMore, // Función para cargar más.
   hasMore, // Si hay más transacciones para cargar.
   singleMode = false,
+  locked = false,
 }: TransactionsTableProps) {
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
@@ -149,6 +155,7 @@ export function TransactionsTable({
    * @returns {void}
    */
   const handleTouchEndRow = (e: React.TouchEvent, transactionId: string) => {
+    if (locked) return // Mes cerrado: no hay acciones que mostrar.
     const touchEndX = e.changedTouches[0].clientX
     const deltaX = touchEndX - touchStartXRow // Distancia horizontal del swipe.
 
@@ -630,8 +637,9 @@ export function TransactionsTable({
                       {transaction.type === "income" ? "+" : "-"}
                       {formatCurrency(transaction.amount)}
                     </div>
+                    {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
-                      {transaction.type === "expense" && (
+                      {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -648,22 +656,30 @@ export function TransactionsTable({
                           <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onEdit(transaction)}
-                        className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => onDelete(transaction.id)}
-                        className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!locked && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEdit(transaction)}
+                            disabled={isClosingAdjustment(transaction)}
+                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Editar"}
+                            className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDelete(transaction.id)}
+                            disabled={isClosingAdjustment(transaction)}
+                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Eliminar"}
+                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -715,7 +731,7 @@ export function TransactionsTable({
                                 NC
                               </span>
                             )}
-                            {transaction.type === "expense" && (
+                            {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                               <button
                                 type="button"
                                 onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
@@ -757,6 +773,7 @@ export function TransactionsTable({
                         <Button
                           size="sm"
                           className="flex-1 bg-amber-600 text-primary-foreground hover:bg-amber-700"
+                          disabled={isClosingAdjustment(transaction)}
                           onClick={() => {
                             onEdit(transaction)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.
@@ -769,6 +786,7 @@ export function TransactionsTable({
                           size="sm"
                           variant="destructive"
                           className="flex-1"
+                          disabled={isClosingAdjustment(transaction)}
                           onClick={() => {
                             onDelete(transaction.id)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.

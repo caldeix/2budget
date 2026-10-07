@@ -329,6 +329,7 @@ export function createRoundingAdjustmentsForClosedReports(data: AppData): Transa
         person2Percentage: owner === "person1" ? 0 : 100,
         nonComputable: false,
         paid: true, // Apunte contable de un mes ya cerrado: no queda nada pendiente de pagar.
+        closingAdjustment: true,
         date,
         createdAt: new Date().toISOString(),
       })

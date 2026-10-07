@@ -44,8 +44,13 @@ export interface Transaction {
   date: string
   createdAt: string
   nonComputable: boolean
-  /** Indica si el gasto ya se ha pagado/ejecutado este mes. Es visual; no afecta a ningún cálculo. */
+  /** Indica si el gasto ya se ha pagado este mes. Cuenta para las cifras de "Hoy" del resumen. */
   paid?: boolean
+  /**
+   * Ajuste creado al cerrar el mes (ver `monthly-report-modal`). Los ajustes anteriores a esta
+   * marca se reconocen por su nombre (ver `isClosingAdjustment`).
+   */
+  closingAdjustment?: boolean
 }
 
 /**
