@@ -69,6 +69,25 @@ function TodayLine({ value, className }: { value: number; className?: string }) 
 }
 
 /**
+ * @function TodaySpacer
+ * @description Hueco invisible del alto de la línea "Hoy", para las tarjetas que no la tienen:
+ *              así las filas de todas las tarjetas quedan a la misma altura en PC.
+ */
+function TodaySpacer() {
+  return (
+    <p aria-hidden className="hidden md:block text-xs invisible">
+      Hoy
+    </p>
+  )
+}
+
+/**
+ * Margen de las filas de una tarjeta. Con "Hoy", las tarjetas sin la cabecera "Hoy / Previsto"
+ * dejan su hueco en PC (16 px de margen + 20 px de cabecera) para alinear las filas.
+ */
+const rowsMargin = (showToday: boolean) => (showToday ? "mt-4 md:mt-9" : "mt-4")
+
+/**
  * @function PersonFigures
  * @description Cifras por persona. Con `showToday`, dos columnas ("Hoy" y "Previsto");
  *              si no, una sola, como siempre.
@@ -169,7 +188,7 @@ export function SummaryCards({
               {showToday && <TodayLine value={today.balance} className={balanceColor(today.balance)} />}
             </div>
           </div>
-          <div className="mt-4 space-y-1">
+          <div className={`${rowsMargin(showToday)} space-y-1`}>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Ingresos:</span>
               <span className="text-green-600 font-medium">{formatCurrency(totalIncome)}</span>
@@ -197,10 +216,11 @@ export function SummaryCards({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Ingresos</p>
               <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
+              {showToday && <TodaySpacer />}
             </div>
           </div>
           {showPerson2 && (
-            <div className="mt-4 space-y-1">
+            <div className={`${rowsMargin(showToday)} space-y-1`}>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{person1Name}:</span>
                 <span className="font-medium text-foreground">{formatCurrency(person1Income)}</span>
@@ -247,7 +267,9 @@ export function SummaryCards({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Balance Individual</p>
-                <p className="text-lg font-bold text-foreground">Por persona</p>
+                {/* Mismo alto de línea que las cifras grandes de las otras tarjetas. */}
+                <p className="text-lg leading-8 font-bold text-foreground">Por persona</p>
+                {showToday && <TodaySpacer />}
               </div>
             </div>
             <PersonFigures
