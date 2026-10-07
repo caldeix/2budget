@@ -49,7 +49,7 @@ export function CloudStatus({ session, singleMode, onOpenAccount }: CloudStatusP
       }
 
   return (
-    <div className="absolute right-0 flex items-center gap-1">
+    <div data-tour="account" className="absolute right-0 flex items-center gap-1">
       {warning && (
         <Popover open={isWarningOpen} onOpenChange={setIsWarningOpen}>
           <PopoverTrigger asChild>

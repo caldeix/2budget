@@ -191,11 +191,13 @@ export function SummaryCards({
           Desde tablet: cuadrícula. */}
       <div
         ref={carouselRef}
+        data-tour="summary"
         onScroll={handleCarouselScroll}
         className={cn(
           "flex gap-4 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           "md:grid md:grid-cols-2 md:gap-6 md:overflow-visible md:mx-0 md:px-0 md:pb-0",
-          showPerson2 ? "lg:grid-cols-4" : "lg:grid-cols-3",
+          // Cuatro en línea solo con ancho de sobra: entre 1024 y 1280 px los nombres no cabrían.
+          showPerson2 ? "xl:grid-cols-4" : "lg:grid-cols-3",
         )}
       >
         {/* Tarjeta de Balance General */}
@@ -258,7 +260,7 @@ export function SummaryCards({
         </div>
 
         {/* Tarjeta de Gastos Totales */}
-        <div className="relative shrink-0 w-[85%] md:w-auto snap-center bg-card-expense-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
+        <div data-tour="card-expenses" className="relative shrink-0 w-[85%] md:w-auto snap-center bg-card-expense-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
           {/* Icono de fondo (TrendingDown) */}
           <div className="absolute bottom-4 right-4 text-muted-foreground opacity-10">
             <TrendingDown className="h-24 w-24" />
@@ -283,7 +285,10 @@ export function SummaryCards({
 
         {/* Tarjeta de Balance Individual (oculta en modo individual si la Persona 2 no tiene cifras) */}
         {showPerson2 && (
-          <div className="relative shrink-0 w-[85%] md:w-auto snap-center bg-card-balance-bg rounded-2xl shadow-lg border p-6 overflow-hidden">
+          <div
+            data-tour="card-individual"
+            className="relative shrink-0 w-[85%] md:w-auto snap-center bg-card-balance-bg rounded-2xl shadow-lg border p-6 overflow-hidden"
+          >
             {/* Icono de fondo (Users) */}
             <div className="absolute bottom-4 right-4 text-muted-foreground opacity-10">
               <Users className="h-24 w-24" />

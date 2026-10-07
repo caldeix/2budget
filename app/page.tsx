@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import type { Transaction, MonthlyReport, TransactionFormData } from "@/types"
+import type { AppData, Transaction, MonthlyReport, TransactionFormData } from "@/types"
 import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financial-data"
 import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
@@ -10,7 +10,9 @@ import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBa
 import {
   getLastSeenMonth,
   hasAccountPromptBeenShown,
+  hasSeenTourOnDevice,
   markAccountPromptShown,
+  markTourSeenOnDevice,
   parseImportedData,
   setLastSeenMonth,
 } from "@/lib/storage"
@@ -36,7 +38,10 @@ import { AuthScreen } from "@/components/auth-screen"
 import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 import { MasterCheckDialog } from "@/components/master-check-dialog"
 import { isMasterCheckDue } from "@/lib/cloud/master-check"
-import { recordMasterCheck } from "@/lib/cloud/repository"
+import { recordMasterCheck, recordTourCompleted } from "@/lib/cloud/repository"
+import { AppTour, type TourStep } from "@/components/app-tour"
+import { getTourSteps } from "@/components/tour-steps"
+import { createTourData } from "@/lib/tour-data"
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
@@ -69,6 +74,10 @@ export default function HomePage() {
     [session.services, session.householdId, vault.dek],
   )
 
+  // Tour de bienvenida: mientras dura, la app enseña datos ficticios (y no guarda nada).
+  const [tourData, setTourData] = useState<AppData | null>(null)
+  const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null)
+
   const {
     data,
     isLoading: isDataLoading,
@@ -84,7 +93,7 @@ export default function HomePage() {
     replaceAllData,
     householdInfo,
     syncError,
-  } = useFinancialDataContext(cloudTarget)
+  } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
   const needsAuth = session.enabled && (!session.user || !session.emailVerified)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
@@ -380,6 +389,63 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading])
 
+  // --- Tour de bienvenida ---
+  // Se muestra una sola vez por usuario: queda marcado en su perfil (en todos sus dispositivos)
+  // y en este dispositivo. Sin cuenta (build solo local), solo en el dispositivo.
+  const uid = session.user?.uid ?? null
+  const isTourActive = tourData !== null
+  const hasSeenTour = hasSeenTourOnDevice(uid) || Boolean(profile?.tourCompletedAt)
+  // Con cuenta, hay que esperar al perfil para saber si ya lo vio.
+  const isProfileReady = !session.enabled || profile !== null
+  const isAnyModalOpen =
+    isMasterCheckOpen ||
+    recoveryCodeToShow !== null ||
+    isPaidReconcileOpen ||
+    isAccountModalOpen ||
+    isTransactionFormOpen ||
+    isReportModalOpen ||
+    selectedReport !== null ||
+    isReportsListOpen ||
+    isSettingsModalOpen ||
+    isDocumentationModalOpen ||
+    isConfirmCopyModalOpen
+  const canAutoStartTour =
+    !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
+
+  const startTour = useCallback(() => {
+    // Siempre sobre el mes actual, con los nombres y el modo de la configuración real.
+    setSelectedMonth(getCurrentMonth())
+    setSelectedYear(getCurrentYear())
+    setIsFabMenuOpen(false)
+    window.scrollTo({ top: 0 })
+    setTourData(createTourData(new Date(), data.config))
+    setTourSteps(
+      getTourSteps({
+        person1Name: data.config.person1Name,
+        person2Name: data.config.person2Name,
+        singleMode: Boolean(data.config.singleMode),
+        cloud: session.enabled,
+        isDesktop: window.matchMedia("(min-width: 640px)").matches,
+      }),
+    )
+  }, [data.config, session.enabled])
+
+  const finishTour = useCallback(() => {
+    setTourData(null)
+    setTourSteps(null)
+    markTourSeenOnDevice(uid)
+    if (session.services && uid) recordTourCompleted(session.services.db, uid)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [uid, session.services])
+
+  // Arranca solo la primera vez, cuando no hay ninguna otra ventana abierta. La espera deja que
+  // se abran antes las que salen al cargar (p. ej. la de gastos pagados del mes anterior).
+  useEffect(() => {
+    if (!canAutoStartTour) return
+    const timer = setTimeout(startTour, 600)
+    return () => clearTimeout(timer)
+  }, [canAutoStartTour, startTour])
+
   // La app exige una cuenta con el email verificado (si la build trae Firebase; si no, es solo local).
   if (session.ready && needsAuth) {
     return <AuthScreen session={session} />
@@ -467,7 +533,7 @@ export default function HomePage() {
               singleMode={data.config.singleMode}
             />
 
-            <div className="bg-card rounded-2xl shadow-lg border">
+            <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
@@ -483,6 +549,7 @@ export default function HomePage() {
                       variant="outline"
                       className="shrink-0 flex items-center gap-2 lg:px-3"
                       title="Ver todos los informes"
+                      data-tour="reports-all"
                       aria-label="Ver todos los informes"
                     >
                       <List className="h-4 w-4" />
@@ -533,7 +600,8 @@ export default function HomePage() {
             </div>
           </aside>
 
-          <div className="flex-1 space-y-8">
+          {/* `min-w-0`: sin él, la tabla ensancha la columna y la página entera se desplaza en horizontal. */}
+          <div className="flex-1 min-w-0 space-y-8">
             <TransactionsTable
               transactions={allTransactionsForSelectedMonth}
               person1Name={data.config.person1Name}
@@ -563,6 +631,7 @@ export default function HomePage() {
           variant="secondary"
           size="icon"
           className="shadow-lg order-2 sm:order-1"
+          data-tour="fab-add"
         >
           <Plus className="h-5 w-5" />
           <span className="sr-only">Nueva Transacción</span>
@@ -578,6 +647,7 @@ export default function HomePage() {
             size="icon"
             className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
             disabled={hasNothingToCopy || isCopyBlockedByFuture}
+            data-tour="fab-copy"
             title={
               hasNothingToCopy
                 ? "Ya hay gastos fijos e ingresos este mes"
@@ -590,7 +660,9 @@ export default function HomePage() {
             <span className="sr-only">Copiar gastos fijos e ingresos</span>
           </Button>
 
-          <ThemeToggle />
+          <div data-tour="fab-theme" className="flex">
+            <ThemeToggle />
+          </div>
 
           <Button
             onClick={() => {
@@ -600,6 +672,7 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className="shadow-lg"
+            data-tour="fab-settings"
           >
             <Settings className="h-4 w-4" />
             <span className="sr-only">Configuración</span>
@@ -613,6 +686,7 @@ export default function HomePage() {
             variant="outline"
             size="icon"
             className="shadow-lg"
+            data-tour="fab-info"
           >
             <Info className="h-4 w-4" />
             <span className="sr-only">Documentación</span>
@@ -625,6 +699,7 @@ export default function HomePage() {
           size="icon"
           className="shadow-lg order-3 sm:hidden"
           aria-expanded={isFabMenuOpen}
+          data-tour="fab-menu"
         >
           {isFabMenuOpen ? <X className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
           <span className="sr-only">{isFabMenuOpen ? "Cerrar menú" : "Más opciones"}</span>
@@ -750,7 +825,13 @@ export default function HomePage() {
         onClose={() => setIsDocumentationModalOpen(false)}
         person1Name={data.config.person1Name}
         person2Name={data.config.person2Name}
+        onStartTour={() => {
+          setIsDocumentationModalOpen(false)
+          startTour()
+        }}
       />
+
+      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} />}
     </div>
   )
 }
