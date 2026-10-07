@@ -470,20 +470,22 @@ export default function HomePage() {
               <div className="p-4">
                 <div className="mb-4 flex gap-2">
                   {data.reports.length > 0 && (
+                    // En PC la columna es estrecha: solo el icono, para que el otro botón quepa entero.
                     <Button
                       onClick={() => setIsReportsListOpen(true)}
                       variant="outline"
-                      className="flex items-center gap-2"
+                      className="shrink-0 flex items-center gap-2 lg:px-3"
                       title="Ver todos los informes"
+                      aria-label="Ver todos los informes"
                     >
                       <List className="h-4 w-4" />
-                      Todos
+                      <span className="lg:hidden">Todos</span>
                     </Button>
                   )}
                   <Button
                     onClick={handleOpenReportModalForCurrentMonth}
                     variant="secondary"
-                    className="flex-1 flex items-center gap-2"
+                    className="flex-1 min-w-0 flex items-center gap-2"
                   >
                     <FileText className="h-4 w-4" />
                     {existingReportForActualMonth ? "Actualizar Mes Actual" : "Cerrar Mes Actual"}
