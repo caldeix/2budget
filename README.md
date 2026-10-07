@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.1.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.2.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,16 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.2.0 — Estilo y limpieza
+
+- **Informes** — Los gráficos del informe salen centrados (también en móvil) y el título del informe, centrado. La tarjeta pasa a llamarse "Informes" y muestra solo los 3 últimos; el botón "Todos", junto a "Cerrar mes actual", abre un modal con todos los informes y un filtro por año
+- **Autocompletado del nombre** — Al escribir el nombre de una transacción se sugieren los nombres ya usados del mismo tipo (sin tildes ni mayúsculas); se elige con un toque o con las flechas y Enter
+- **Móvil** — Cabecera más baja y el mes centrado y más cerca de ella. Las tarjetas del resumen van en un carrusel deslizable con puntos. En transacciones, el buscador ocupa todo el ancho e Ingresos y Gastos van en una línea con el Balance debajo. Los botones flotantes se recogen en un menú (solo queda "+" a la vista) para no tapar el contenido
+- **Textos** — "Resumen del mes de…" centrado, "Total acumulado", "No computables", contador de transacciones como "10/29" y totales de transacciones sin la palabra "filtrados"
+- Margen entre la lista de transacciones y el footer, en móvil y en PC
+- **Se quita "Cargar datos de prueba"** de los ajustes, con toda su lógica
+- SemVer: 2.1.0 → 2.2.0 (MINOR)
 
 ### v2.1.0 — "Hoy" y "Previsto" en el resumen del mes
 

@@ -54,7 +54,7 @@ export function CumulativeBalanceCard({
       {/* Título de la tarjeta con icono de cartera. */}
       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
         <Wallet className="h-5 w-5" />
-        Balance Total Acumulado
+        Total Acumulado
       </h3>
       {/* Contenedor de los balances individuales, con espacio vertical entre ellos. */}
       <div className="space-y-4">

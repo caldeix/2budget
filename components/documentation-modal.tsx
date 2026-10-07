@@ -406,10 +406,6 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }
                   <strong>Importar datos:</strong> Suban un archivo JSON previamente exportado para restaurar sus datos.
                 </li>
                 <li>
-                  <strong>Cargar datos de prueba:</strong> Si quieren explorar la aplicación sin añadir sus propios
-                  datos, pueden cargar un conjunto de transacciones e informes de ejemplo.
-                </li>
-                <li>
                   <strong>Eliminar todos los datos:</strong> Esta opción borrará permanentemente todas las
                   transacciones, informes y configuraciones de la aplicación. Se les pedirá una confirmación para evitar
                   eliminaciones accidentales.

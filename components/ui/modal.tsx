@@ -31,6 +31,8 @@ interface ModalProps {
   title: string
   children: React.ReactNode
   size?: "sm" | "md" | "lg" | "xl"
+  /** Centra el título en la cabecera (por defecto, alineado a la izquierda). */
+  centerTitle?: boolean
   /** Si es `false`, el modal no se puede cerrar con Escape, clic en el fondo ni botón X (modal forzado). Por defecto `true`. */
   dismissible?: boolean
 }
@@ -42,7 +44,7 @@ interface ModalProps {
  * @param {ModalProps} props - Propiedades del componente.
  * @returns {JSX.Element | null} El componente modal si `isOpen` es `true`, de lo contrario `null`.
  */
-export function Modal({ isOpen, onClose, title, children, size = "md", dismissible = true }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = "md", dismissible = true, centerTitle = false }: ModalProps) {
   /**
    * `useEffect` para controlar el scroll del cuerpo de la página.
    * Cuando el modal está abierto (`isOpen` es `true`), el scroll del `body` se oculta (`overflow = "hidden"`).
@@ -113,7 +115,9 @@ export function Modal({ isOpen, onClose, title, children, size = "md", dismissib
       >
         {/* Cabecera del modal: título y botón de cierre. */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
+          {/* Hueco del ancho del botón de cerrar: así el título queda centrado de verdad. */}
+          {centerTitle && dismissible && <span aria-hidden className="w-9 shrink-0" />}
+          <h2 className={cn("text-xl font-semibold text-foreground", centerTitle && "flex-1 text-center")}>{title}</h2>
           {dismissible && (
             <button
               onClick={onClose} // Cierra el modal al hacer clic.
