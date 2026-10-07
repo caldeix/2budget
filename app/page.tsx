@@ -27,7 +27,7 @@ import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
-import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
+import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
@@ -78,6 +78,7 @@ export default function HomePage() {
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
+    deleteReport,
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
@@ -166,6 +167,11 @@ export default function HomePage() {
   const isPreviousMonthClosed = !!getExistingReport(prevOfSelectedMonth, prevOfSelectedYear)
   // Un mes futuro solo se bloquea para copiar si el mes anterior aún no tiene informe cerrado.
   const isCopyBlockedByFuture = isSelectedMonthFuture && !isPreviousMonthClosed
+  // Un mes pasado con informe está cerrado: sus transacciones son de solo lectura. Para cambiar
+  // algo se borra su informe (si es el último), y el mes vuelve a quedar abierto.
+  const isSelectedMonthLocked = !!existingReportForSelectedMonth && !isSelectedMonthCurrent && !isSelectedMonthFuture
+  // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
+  const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
@@ -222,7 +228,7 @@ export default function HomePage() {
     setIsConfirmCopyModalOpen(true)
   }, [selectedMonth, selectedYear, getTransactionsForMonth, hasFixedExpensesInCurrentMonth, hasIncomesInCurrentMonth])
 
-  const confirmCopyTransactions = useCallback(() => {
+  const confirmCopyTransactions = useCallback((amounts: CopyAmounts) => {
     // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
     const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
 
@@ -232,7 +238,8 @@ export default function HomePage() {
         category: transaction.category,
         // Se copia con el mismo nombre, limpiando el sufijo " (copiado)" que dejaban versiones anteriores.
         name: transaction.name.replace(/( \(copiado\))+$/, ""),
-        amount: transaction.amount,
+        // Importe revisado en el modal ("Revisar importes"), o el del mes anterior.
+        amount: amounts[transaction.id] ?? transaction.amount,
         owner: transaction.owner,
         person1Percentage: transaction.person1Percentage ?? 50,
         person2Percentage: transaction.person2Percentage ?? 50,
@@ -542,6 +549,7 @@ export default function HomePage() {
               onLoadMore={handleLoadMoreTransactions}
               hasMore={hasMoreTransactions}
               singleMode={data.config.singleMode}
+              locked={isSelectedMonthLocked}
             />
           </div>
         </div>
@@ -629,6 +637,7 @@ export default function HomePage() {
         onConfirm={confirmCopyTransactions}
         monthName={getMonthName(selectedMonth - 1)}
         year={selectedYear}
+        transactions={transactionsToCopy}
         expenseCount={transactionsToCopy.filter(isFixedExpense).length}
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
       />
@@ -686,6 +695,14 @@ export default function HomePage() {
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
           singleMode={data.config.singleMode}
+          onDelete={
+            selectedReport.id === latestReportId
+              ? () => {
+                  deleteReport(selectedReport.id)
+                  setSelectedReport(null)
+                }
+              : undefined
+          }
         />
       )}
 

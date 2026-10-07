@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.2.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.3.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,15 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.3.0 — Cierre de mes
+
+- **Borrar el último informe** — Desde el detalle del último informe se puede borrar (con confirmación), junto con sus transacciones de ajuste, por si se cerró el mes sin querer. El mes vuelve a quedar abierto
+- **"Actualizar mes" sustituye los ajustes** — Antes, actualizar un informe añadía ajustes nuevos encima de los anteriores; ahora los recalcula sin ellos y los sustituye: siempre queda un ajuste por persona
+- **Ajustes de cierre protegidos** — Llevan una marca propia y sus botones de editar y borrar se ven desactivados: se cambian actualizando el mes o borrando el informe. Nunca quedan pendientes de pagar
+- **Meses cerrados de solo lectura** — En un mes pasado con informe, las transacciones no muestran los botones de pagado, editar ni borrar
+- **Revisar importes al copiar** — El modal de copiar gastos fijos e ingresos (ahora con margen interior) tiene un tercer botón, "Revisar importes", para cambiar el importe de cada uno antes de copiarlos
+- SemVer: 2.2.0 → 2.3.0 (MINOR)
 
 ### v2.2.0 — Estilo y limpieza
 

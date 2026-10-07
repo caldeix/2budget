@@ -19,6 +19,13 @@ import { subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/clou
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
+import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
+
+/** Indica si la transacción es del mes y año dados. */
+function isInMonth(t: Transaction, month: number, year: number): boolean {
+  const date = parseLocalDate(t.date)
+  return date.getMonth() + 1 === month && date.getFullYear() === year
+}
 
 /**
  * @interface CloudTarget
@@ -352,18 +359,16 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
           createdAt: new Date().toISOString(),
         }))
 
-        // 2. Combina las nuevas transacciones de ajuste con las transacciones existentes.
-        //    Las nuevas se añaden al principio para que aparezcan primero si se ordenan por fecha de creación.
-        const allTransactions = [...newAdjustmentTransactions, ...prevData.transactions]
+        // 2. Los ajustes de un cierre anterior de este mes se SUSTITUYEN por los nuevos (el modal
+        //    los calcula sin ellos). Las nuevas van al principio, como las más recientes.
+        const { month, year } = reportBaseData
+        const withoutOldAdjustments = prevData.transactions.filter(
+          (t) => !(isClosingAdjustment(t) && isInMonth(t, month, year)),
+        )
+        const allTransactions = [...newAdjustmentTransactions, ...withoutOldAdjustments]
 
         // 3. Obtiene TODAS las transacciones para el mes del informe de la lista *recién actualizada*.
-        const finalReportTransactions = allTransactions.filter((t) => {
-          const transactionDate = parseLocalDate(t.date)
-          return (
-            transactionDate.getMonth() + 1 === reportBaseData.month &&
-            transactionDate.getFullYear() === reportBaseData.year
-          )
-        })
+        const finalReportTransactions = allTransactions.filter((t) => isInMonth(t, month, year))
 
         // 4. RECALCULA los totales del informe basándose en `finalReportTransactions`.
         //    Esto asegura que los ajustes recién añadidos se incluyan en los totales del informe.
@@ -452,6 +457,29 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
   )
 
   // Devuelve el estado y las funciones para que los componentes puedan utilizarlos.
+  /**
+   * @function deleteReport
+   * @description Borra un informe y las transacciones de ajuste de su cierre: el mes vuelve a
+   *              quedar abierto, como antes de cerrarlo.
+   * @param {string} reportId - El ID del informe.
+   */
+  const deleteReport = useCallback(
+    (reportId: string) => {
+      commit((prevData) => {
+        const report = prevData.reports.find((r) => r.id === reportId)
+        if (!report) return prevData
+        return {
+          ...prevData,
+          transactions: prevData.transactions.filter(
+            (t) => !(isClosingAdjustment(t) && isInMonth(t, report.month, report.year)),
+          ),
+          reports: prevData.reports.filter((r) => r.id !== reportId),
+        }
+      })
+    },
+    [commit],
+  )
+
   return {
     data,
     isLoading,
@@ -461,6 +489,7 @@ export function useFinancialData(cloud: CloudTarget | null = null) {
     deleteTransaction,
     updateConfig,
     createOrUpdateReport,
+    deleteReport,
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,

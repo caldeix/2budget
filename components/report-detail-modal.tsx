@@ -9,7 +9,10 @@
 
 "use client"
 
+import { useState } from "react"
 import type { MonthlyReport } from "@/types"
+import { Button } from "@/components/ui/button" // Componente de botón.
+import { Trash2 } from "lucide-react" // Icono de borrar.
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { PieChart } from "@/components/ui/chart" // Componente de gráfico de pastel.
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
@@ -25,6 +28,7 @@ import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Perso
  * @property {string} person1Name - Nombre de la Persona 1.
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta la Persona 2 si el informe no tiene cifras suyas.
+ * @property {() => void} [onDelete] - Borra el informe y sus ajustes. Solo se pasa para el último informe.
  */
 interface ReportDetailModalProps {
   isOpen: boolean
@@ -33,6 +37,7 @@ interface ReportDetailModalProps {
   person1Name: string
   person2Name: string
   singleMode?: boolean
+  onDelete?: () => void
 }
 
 /**
@@ -49,7 +54,11 @@ export function ReportDetailModal({
   person1Name,
   person2Name,
   singleMode,
+  onDelete,
 }: ReportDetailModalProps) {
+  // Borrar pide una segunda confirmación dentro del propio modal.
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
+
   // Un informe cerrado en pareja conserva su desglose aunque luego se active el modo individual.
   const showPerson2 = shouldShowPerson2(
     singleMode,
@@ -245,6 +254,39 @@ export function ReportDetailModal({
             </div>
           </div>
         </div>
+
+        {/* Borrar el informe (solo el último): por si se cerró el mes sin querer. */}
+        {onDelete && (
+          <div className="border-t pt-6">
+            {isConfirmingDelete ? (
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+                <p className="text-sm text-foreground">
+                  Se borrará el informe de {formatMonthYear(report.month, report.year)} y sus transacciones de ajuste.
+                  El mes volverá a quedar abierto, como antes de cerrarlo.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsConfirmingDelete(false)}>
+                    Cancelar
+                  </Button>
+                  <Button variant="destructive" onClick={onDelete}>
+                    Borrar informe
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsConfirmingDelete(true)}
+                  className="flex items-center gap-2 text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Borrar informe
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Modal>
   )
