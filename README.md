@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.3.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.4.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,14 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.4.0 — Tour de bienvenida y ayuda al día
+
+- **Tour guiado** — La primera vez que se entra (o si nunca se ha visto), un tour recorre la app paso a paso: resalta cada parte con un borde dorado y explica qué hace en un tooltip con el paso ("3/15") y "Siguiente" ("Finalizar" en el último). No se puede saltar. Usa datos de ejemplo que solo viven en memoria: los datos reales no se tocan ni se guarda nada. En móvil tiene sus propios pasos (carrusel, deslizar, menú ⋮)
+- **Solo una vez** — Queda marcado en el perfil de la cuenta, así que no vuelve a salir en otros dispositivos. Se puede repetir desde la ayuda
+- **Ayuda revisada** — Reescrita entera para la app actual: "Hoy" y "Previsto", marcar como pagado, autocompletado, revisar importes al copiar, meses cerrados, borrar el último informe, el menú del móvil… Corrige dos secciones con el mismo número que se abrían a la vez
+- **Diseño entre 1024 y 1280 px** — Las tarjetas del resumen van de dos en dos (los nombres ya no se cortan), los filtros de transacciones bajan debajo del título y la página ya no se desplaza en horizontal
+- SemVer: 2.3.0 → 2.4.0 (MINOR)
 
 ### v2.3.0 — Cierre de mes
 

@@ -433,14 +433,18 @@ export function TransactionsTable({
         onTouchEnd={handleTouchEndMonthNav}
       >
         {/* Navegador de Mes/Año */}
-        <TransactionMonthNavigator
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onMonthChange={onMonthChange}
-          onYearChange={onYearChange}
-        />
+        <div data-tour="month-nav">
+          <TransactionMonthNavigator
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onMonthChange={onMonthChange}
+            onYearChange={onYearChange}
+          />
+        </div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mt-4">
+        {/* Título y filtros en una línea solo con ancho de sobra (desde 1280 px); si no, los filtros
+            se salían de la tarjeta. */}
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mt-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Transacciones</h2>
             <p className="text-sm text-muted-foreground">
@@ -448,7 +452,7 @@ export function TransactionsTable({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div data-tour="filters" className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
             {/* Campo de búsqueda (a todo el ancho en móvil, como los selectores) */}
             <div className="relative w-full sm:w-auto">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -582,10 +586,10 @@ export function TransactionsTable({
 
             {/* Lista de Transacciones (renderiza filas para escritorio y móvil) */}
             <div className="divide-y divide-border">
-              {filteredAndSortedTransactions.map((transaction) => (
+              {filteredAndSortedTransactions.map((transaction, index) => (
                 <React.Fragment key={transaction.id}>
                   {/* Fila de escritorio (diseño de tarjeta, visible solo en pantallas grandes) */}
-                  <div className={cn(
+                  <div data-tour={index === 0 ? "tx-row" : undefined} className={cn(
                     "hidden sm:grid items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
                     desktopGridCols,
                     transaction.nonComputable && "opacity-70"
@@ -643,6 +647,7 @@ export function TransactionsTable({
                         <Button
                           size="sm"
                           variant="ghost"
+                          data-tour="paid"
                           onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
                           className={cn(
                             "h-8 w-8 p-0",
@@ -684,7 +689,7 @@ export function TransactionsTable({
                   </div>
 
                   {/* Fila móvil (diseño con swipe, visible solo en pantallas pequeñas) */}
-                  <div className="sm:hidden">
+                  <div data-tour={index === 0 ? "tx-row" : undefined} className="sm:hidden">
                     <div className="p-0 relative overflow-hidden">
                       <div
                         className={cn(
@@ -734,6 +739,7 @@ export function TransactionsTable({
                             {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                               <button
                                 type="button"
+                                data-tour="paid"
                                 onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
                                 className={cn(
                                   "ml-1 p-0.5",

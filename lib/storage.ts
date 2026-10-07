@@ -354,3 +354,35 @@ export function markAccountPromptShown(uid: string, stage: "household"): void {
     console.error("Error saving account prompt flag:", error)
   }
 }
+
+/**
+ * @function hasSeenTourOnDevice
+ * @description Indica si este dispositivo ya completó el tour de bienvenida (como usuario `uid`,
+ *              o sin cuenta si es `null`). Con cuenta, la fuente de verdad es el perfil; esto
+ *              solo evita esperar a que llegue.
+ * @param {string | null} uid - Usuario de Firebase, o `null` en modo solo local.
+ * @returns {boolean}
+ */
+export function hasSeenTourOnDevice(uid: string | null): boolean {
+  if (typeof window === "undefined") return true
+  try {
+    return localStorage.getItem(`2budget:tour-done:${uid ?? "local"}`) === "1"
+  } catch {
+    return false
+  }
+}
+
+/**
+ * @function markTourSeenOnDevice
+ * @description Recuerda en este dispositivo que el tour ya se completó.
+ * @param {string | null} uid - Usuario de Firebase, o `null` en modo solo local.
+ * @returns {void}
+ */
+export function markTourSeenOnDevice(uid: string | null): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(`2budget:tour-done:${uid ?? "local"}`, "1")
+  } catch (error) {
+    console.error("Error saving tour flag:", error)
+  }
+}

@@ -73,6 +73,8 @@ export interface UserProfile extends MasterCheckState, UsageState {
   /** Email nuevo pendiente de confirmar por enlace (ver `requestEmailChange`). */
   pendingEmail?: string | null
   createdAt: string
+  /** Cuándo completó el tour de bienvenida (si no existe, se le muestra al entrar). */
+  tourCompletedAt?: string | null
 }
 
 /**
@@ -210,6 +212,17 @@ export async function setPendingEmail(db: Firestore, uid: string, pendingEmail: 
 export function recordVisit(db: Firestore, uid: string): void {
   setDoc(userRef(db, uid), { lastSeenAt: new Date().toISOString(), visitDays: increment(1) }, { merge: true }).catch(
     (error) => console.error("Error recording visit:", error),
+  )
+}
+
+/**
+ * @function recordTourCompleted
+ * @description Registra que el usuario ha completado el tour de bienvenida: ya no se le vuelve a
+ *              mostrar en ningún dispositivo. Si falla (p. ej. sin conexión), no afecta al uso.
+ */
+export function recordTourCompleted(db: Firestore, uid: string): void {
+  setDoc(userRef(db, uid), { tourCompletedAt: new Date().toISOString() }, { merge: true }).catch((error) =>
+    console.error("Error recording tour completion:", error),
   )
 }
 

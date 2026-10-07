@@ -11,10 +11,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion" // Componentes de acordeón de Shadcn UI.
-import { formatCurrency } from "@/lib/utils" // Utilidad para formatear moneda.
+import { Compass } from "lucide-react" // Icono del tour.
 
 /**
  * @interface DocumentationModalProps
@@ -23,12 +22,24 @@ import { formatCurrency } from "@/lib/utils" // Utilidad para formatear moneda.
  * @property {() => void} onClose - Función para cerrar el modal.
  * @property {string} person1Name - Nombre de la Persona 1, para personalizar la documentación.
  * @property {string} person2Name - Nombre de la Persona 2, para personalizar la documentación.
+ * @property {() => void} onStartTour - Cierra la ayuda y vuelve a mostrar el tour de bienvenida.
  */
 interface DocumentationModalProps {
   isOpen: boolean
   onClose: () => void
   person1Name: string
   person2Name: string
+  onStartTour: () => void
+}
+
+/** Título de cada sección del acordeón. */
+function SectionTrigger({ children }: { children: React.ReactNode }) {
+  return <AccordionTrigger className="text-lg font-semibold text-primary text-left">{children}</AccordionTrigger>
+}
+
+/** Subtítulo dentro de una sección. */
+function Subtitle({ children }: { children: React.ReactNode }) {
+  return <h4 className="font-medium text-foreground">{children}</h4>
 }
 
 /**
@@ -38,441 +49,284 @@ interface DocumentationModalProps {
  * @param {DocumentationModalProps} props - Propiedades del componente.
  * @returns {JSX.Element} El componente modal de documentación.
  */
-export function DocumentationModal({ isOpen, onClose, person1Name, person2Name }: DocumentationModalProps) {
+export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, onStartTour }: DocumentationModalProps) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Documentación de 2Budget" size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title="Ayuda de 2Budget" size="xl">
       <div className="p-6 space-y-6">
-        {/* Introducción a 2Budget */}
-        <p className="text-lg text-foreground leading-relaxed">
-          Bienvenido a <strong>2Budget</strong>, la aplicación definitiva diseñada para simplificar y optimizar la
-          gestión de las finanzas en pareja. ¿Cansados de las discusiones por el dinero o de no saber quién pagó qué?
-          2Budget está aquí para solucionar esos problemas. Nuestra misión es ofrecer una herramienta intuitiva y
-          potente que les permita tener un control total sobre sus ingresos y gastos, facilitando la organización del
-          presupuesto y promoviendo la transparencia financiera. Con 2Budget, podrán tomar decisiones informadas,
-          alcanzar sus metas económicas juntos y disfrutar de una vida financiera más armoniosa. ¡Descubran cómo
-          funciona!
-        </p>
         <p className="text-foreground leading-relaxed">
-          ¿Vas por tu cuenta? Activa el <strong>modo individual</strong> en Configuración y 2Budget funcionará para una
-          sola persona, sin propietarios ni repartos.
+          <strong>2Budget</strong> sirve para llevar las finanzas en pareja: qué entra, qué sale, quién paga qué y
+          cuánto le queda a cada uno, mes a mes. ¿Vas por tu cuenta? Activa el <strong>modo individual</strong> en
+          Configuración y la app funcionará para una sola persona.
         </p>
 
-        {/* Componente Accordion para organizar las secciones de la documentación */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl bg-muted p-4">
+          <p className="text-sm text-muted-foreground">¿Prefieres verlo sobre la propia app? Repite el tour guiado.</p>
+          <Button onClick={onStartTour} variant="outline" className="flex items-center gap-2 shrink-0">
+            <Compass className="h-4 w-4" />
+            Repetir el tour
+          </Button>
+        </div>
+
         <Accordion type="multiple" className="w-full">
-          {/* Sección: Inicio y Resumen General */}
-          <AccordionItem value="item-1">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              1. Inicio y Resumen General
-            </AccordionTrigger>
+          {/* 1. Resumen */}
+          <AccordionItem value="resumen">
+            <SectionTrigger>1. Resumen del mes</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
-                La pantalla de inicio de 2Budget les ofrece una visión clara y concisa de su estado financiero actual.
-                Está diseñada para que, de un vistazo, puedan entender dónde están sus finanzas.
+                Arriba ves el resumen del mes seleccionado. En el móvil, las tarjetas van en un carrusel: deslízalas o
+                pulsa los puntos de debajo.
               </p>
-              <h4 className="font-medium text-foreground">Tarjetas de Resumen Mensual:</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  <strong>Balance:</strong> Muestra la diferencia entre los ingresos y gastos totales del mes
-                  seleccionado. Si es positivo, se muestra en <span className="text-green-600">verde</span>; si es
-                  negativo, en <span className="text-red-600">rojo</span>.
+                  <strong>Balance:</strong> ingresos menos gastos del mes, en <span className="text-green-600">verde</span>{" "}
+                  si es positivo y en <span className="text-red-600">rojo</span> si es negativo. Debajo, los totales y la
+                  parte de gastos no computables.
                 </li>
                 <li>
-                  <strong>Ingresos:</strong> Suma total de todos los ingresos registrados en el mes.
+                  <strong>Ingresos:</strong> el total del mes y lo que aporta cada uno.
                 </li>
                 <li>
-                  <strong>Gastos:</strong> Suma total de todos los gastos registrados en el mes.
+                  <strong>Gastos:</strong> el total del mes y la parte de cada uno según el reparto de cada gasto.
                 </li>
                 <li>
-                  <strong>Balance Individual:</strong> Desglosa el balance (ingresos - gastos) para cada persona,{" "}
-                  {person1Name} y {person2Name}, permitiendo ver quién ha aportado o gastado más.
+                  <strong>Balance individual:</strong> lo que le queda a {person1Name} y a {person2Name} (sus ingresos
+                  menos su parte de los gastos).
                 </li>
               </ul>
-              <h4 className="font-medium text-foreground">Tarjeta de Balance Total Acumulado:</h4>
+              <Subtitle>Hoy y Previsto</Subtitle>
               <p>
-                Ubicada sobre la sección de "Informes Mensuales", esta tarjeta muestra el balance total acumulado de
-                TODAS las transacciones registradas en la aplicación, desde el principio. Es ideal para tener una
-                perspectiva a largo plazo de su salud financiera conjunta e individual.
+                Mientras quedan gastos por pagar, las tarjetas muestran dos cifras: <strong>Hoy</strong>, solo con los
+                gastos marcados como pagados, y <strong>Previsto</strong>, con todos, como acabará el mes. Los ingresos
+                cuentan siempre. Si ya está todo pagado, o el mes aún no ha empezado, se ve una sola cifra.
+              </p>
+              <Subtitle>Total acumulado</Subtitle>
+              <p>
+                La tarjeta <strong>Total acumulado</strong> suma el balance de todos los meses desde el principio: lo
+                ahorrado en total y por persona. No cuenta los gastos no computables.
               </p>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Gestión de Transacciones */}
-          <AccordionItem value="item-2">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              2. Gestión de Transacciones
-            </AccordionTrigger>
+          {/* 2. Transacciones */}
+          <AccordionItem value="transacciones">
+            <SectionTrigger>2. Transacciones</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
-              <p>
-                La tabla de transacciones es el corazón de 2Budget, donde pueden ver, añadir, editar y eliminar cada
-                movimiento de dinero.
-              </p>
-              <h4 className="font-medium text-foreground">Navegador de Meses:</h4>
+              <Subtitle>Cambiar de mes</Subtitle>
               <ul className="list-disc list-inside space-y-1">
+                <li>Usa las flechas junto al mes, o pulsa su nombre para ir a cualquier mes y año.</li>
+                <li>En el móvil también puedes deslizar el dedo sobre la cabecera de la lista.</li>
+              </ul>
+              <Subtitle>Buscar y filtrar</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Busca por nombre, o filtra por tipo (ingresos o gastos) y por categoría (fijo o variable).</li>
                 <li>
-                  En la parte superior de la tabla, pueden cambiar el mes y año que están visualizando usando las
-                  flechas de navegación.
+                  El contador (por ejemplo <strong>10/29</strong>) indica cuántas transacciones se ven de las que hay en
+                  el mes, y las cajas de Ingresos, Gastos y Balance suman solo lo filtrado.
                 </li>
+                <li>En PC puedes ordenar la lista pulsando en las cabeceras de las columnas.</li>
+                <li>La lista carga de 5 en 5 a medida que bajas.</li>
+              </ul>
+              <Subtitle>Marcar como pagado</Subtitle>
+              <p>
+                Pulsa el círculo de un gasto cuando lo pagues (se pone verde). Cuenta para la cifra de «Hoy». Al abrir la
+                app en un mes nuevo, si del mes anterior quedaron gastos sin marcar, la app te pregunta cuáles se pagaron.
+              </p>
+              <Subtitle>Editar y borrar</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>En PC, con los botones del lápiz y la papelera a la derecha de cada transacción.</li>
+                <li>En el móvil, desliza la transacción hacia la izquierda para que aparezcan.</li>
                 <li>
-                  Haciendo clic en el nombre del mes y año (ej. "JUNIO 2025"), se abrirá un selector de calendario para
-                  ir a cualquier mes y año rápidamente.
-                </li>
-                <li>
-                  <strong>Navegación Táctil (Móvil):</strong> Pueden deslizar el dedo horizontalmente sobre el
-                  encabezado de la tabla para cambiar de mes (deslizar a la derecha para el mes anterior, a la izquierda
-                  para el siguiente).
+                  Las transacciones de un <strong>mes pasado ya cerrado</strong> no se pueden editar, borrar ni marcar: el
+                  mes es de solo lectura (ver Informes).
                 </li>
               </ul>
-              <h4 className="font-medium text-foreground">Filtros y Búsqueda:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <strong>Búsqueda:</strong> Escriban en la barra de búsqueda para encontrar transacciones por nombre.
-                </li>
-                <li>
-                  <strong>Filtro por Tipo:</strong> Seleccionen "Ingresos" o "Gastos" para ver solo un tipo de
-                  transacción.
-                </li>
-                <li>
-                  <strong>Filtro por Categoría:</strong> Para gastos, pueden filtrar por "fijo" o "variable".
-                </li>
-              </ul>
-              <h4 className="font-medium text-foreground">Ordenación de la Tabla:</h4>
+              <Subtitle>Botones flotantes</Subtitle>
               <p>
-                En la vista de escritorio, pueden hacer clic en los encabezados de las columnas (Fecha, Descripción,
-                Importe, Categoría) para ordenar las transacciones de forma ascendente o descendente.
-              </p>
-              <h4 className="font-medium text-foreground">Diseño de la Tabla:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <strong>Escritorio:</strong> Las transacciones se muestran en un formato de tarjeta, con toda la
-                  información relevante y los botones de acción (Editar y Eliminar) siempre visibles a la derecha.
-                </li>
-                <li>
-                  <strong>Móvil:</strong> Para optimizar el espacio, los botones de acción están ocultos. Pueden
-                  deslizar el dedo hacia la izquierda sobre una transacción para revelar los botones de "Editar" y
-                  "Eliminar". Un ligero efecto visual indica que el menú se ha abierto.
-                </li>
-                <li>
-                  <strong>Carga Infinita:</strong> En la vista de transacciones, solo se muestran 5 transacciones
-                  inicialmente. A medida que se desplazan hacia abajo (scroll), se cargarán más transacciones de 5 en 5,
-                  permitiendo una navegación fluida sin cargar todos los datos de golpe.
-                </li>
-              </ul>
-              <h4 className="font-medium text-foreground">Añadir Nueva Transacción:</h4>
-              <p>
-                Hagan clic en el botón flotante <strong className="text-primary">"+"</strong> en la esquina inferior
-                izquierda para abrir el formulario de nueva transacción.
-              </p>
-              <h4 className="font-medium text-foreground">Editar Transacción:</h4>
-              <p>
-                Hagan clic en el icono de lápiz (<strong className="text-primary">Editar</strong>) junto a cualquier
-                transacción para abrir el formulario con los datos precargados y realizar cambios.
-              </p>
-              <h4 className="font-medium text-foreground">Eliminar Transacción:</h4>
-              <p>
-                Hagan clic en el icono de papelera (<strong className="text-red-600">Eliminar</strong>) junto a
-                cualquier transacción para borrarla permanentemente.
-              </p>
-              <h4 className="font-medium text-foreground">Copiar Gastos Fijos e Ingresos:</h4>
-              <p>
-                Utilice el botón de copia en la barra lateral para duplicar automáticamente los gastos fijos y los
-                ingresos del mes anterior al mes actual (los ajustes de cierre de informe no se copian). Si el mes ya
-                tiene gastos fijos o ingresos, ese tipo no se vuelve a copiar. Si el mes en curso ya tiene el informe cerrado, pueden navegar al mes
-                siguiente y copiar sus gastos fijos sin esperar al día 1.
+                Abajo a la izquierda: <strong className="text-secondary">+</strong> para añadir una transacción, copiar
+                gastos fijos e ingresos, modo claro u oscuro, Configuración y esta ayuda. En el móvil, todos menos el «+»
+                van dentro del botón <strong>⋮</strong>.
               </p>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Añadir y Editar Transacciones (Formulario) */}
-          <AccordionItem value="item-3">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              3. Formulario de Transacciones
-            </AccordionTrigger>
+          {/* 3. Formulario */}
+          <AccordionItem value="formulario">
+            <SectionTrigger>3. Añadir una transacción</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
-              <p>Al añadir o editar una transacción, se les presentará un formulario con los siguientes campos:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  <strong>Tipo:</strong> Seleccionen si es un "Gasto" o un "Ingreso". Esto afectará cómo se calcula en
-                  sus balances.
+                  <strong>Tipo:</strong> gasto o ingreso.
                 </li>
                 <li>
-                  <strong>Categoría:</strong>
-                  <ul className="list-circle list-inside ml-4">
-                    <li>
-                      Para <strong>Gastos</strong>: Elijan entre "variable" (ej. supermercado, ocio) o "fijo" (ej.
-                      alquiler, suscripciones).
-                    </li>
-                    <li>
-                      Para <strong>Gastos No Computables</strong>: Marque esta opción para gastos que deben aparecer en el mes actual pero no afectar el balance total acumulado (ej. regalos, vacaciones).
-                    </li>
-                    <li>
-                      Para <strong>Ingresos</strong>: La categoría es automáticamente "ingreso".
-                    </li>
-                  </ul>
+                  <strong>Categoría</strong> (solo gastos): <em>fijo</em> (alquiler, suscripciones…) o <em>variable</em>{" "}
+                  (supermercado, ocio…). Los fijos son los que se copian de un mes a otro.
                 </li>
                 <li>
-                  <strong>Nombre:</strong> Una breve descripción de la transacción (ej. "Cena en restaurante", "Salario
-                  de {person1Name}").
+                  <strong>Gasto no computable:</strong> cuenta en el mes pero no en el total acumulado (ver la sección 4).
                 </li>
                 <li>
-                  <strong>Importe (€):</strong> La cantidad de dinero de la transacción. Asegúrense de usar el formato
-                  correcto (ej. 120.50).
+                  <strong>Nombre:</strong> al escribir te sugiere los nombres que ya has usado en transacciones del mismo
+                  tipo; pulsa uno (o elígelo con las flechas y Enter) para no escribirlo entero.
                 </li>
                 <li>
-                  <strong>Fecha:</strong> La fecha en que ocurrió la transacción.
+                  <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50).
                 </li>
                 <li>
-                  <strong>Propietario:</strong> Indiquen quién realizó o recibió la transacción:
-                  <ul className="list-circle list-inside ml-4">
-                    <li>
-                      <strong>{person1Name}:</strong> La transacción afecta solo el balance de {person1Name}.
-                    </li>
-                    <li>
-                      <strong>{person2Name}:</strong> La transacción afecta solo el balance de {person2Name}.
-                    </li>
-                    <li>
-                      <strong>Ambos:</strong> La transacción se comparte entre los dos.
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  <strong>Distribución de porcentajes (solo si el propietario es "Ambos"):</strong>
-                  <p className="ml-4 mt-1">
-                    Si seleccionan "Ambos", aparecerá un deslizador (slider) para distribuir el porcentaje de la
-                    transacción entre {person1Name} y {person2Name}. Muevan el deslizador para ajustar el porcentaje de{" "}
-                    {person1Name}, y el porcentaje de {person2Name} se ajustará automáticamente para sumar 100%. Los
-                    porcentajes se muestran como números enteros.
-                  </p>
-                  <p className="ml-4 mt-1 text-sm italic">
-                    Ejemplo: Si {person1Name} paga el 70% de un gasto compartido, el deslizador se ajustará a 70% para{" "}
-                    {person1Name} y 30% para {person2Name}.
-                  </p>
+                  <strong>Propietario:</strong> {person1Name}, {person2Name} o Ambos. Con «Ambos», el deslizador reparte
+                  el importe: si {person1Name} paga el 70%, a {person2Name} le toca el 30%.
                 </li>
               </ul>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button variant="outline">Cancelar</Button>
-                <Button type="submit">Crear / Actualizar</Button>
-              </div>
+              <p>En modo individual no se pide propietario ni reparto: todo es tuyo.</p>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Gastos No Computables */}
-          <AccordionItem value="item-4">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              4. Gastos No Computables
-            </AccordionTrigger>
+          {/* 4. No computables */}
+          <AccordionItem value="no-computables">
+            <SectionTrigger>4. Gastos no computables</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
-                Los <strong>Gastos No Computables</strong> son una característica que te permite registrar gastos que deben aparecer en tu balance mensual pero que no afectan tu balance total acumulado.
+                Son gastos que quieres ver en el mes pero que no reducen lo ahorrado, porque el dinero lo sigues teniendo.
+                Por ejemplo, apartar 50 € al mes para las vacaciones.
               </p>
-              <h4 className="font-medium text-foreground">¿Cuándo usar Gastos No Computables?</h4>
               <ul className="list-disc list-inside space-y-1">
-                <li><strong>Regalos o eventos especiales</strong>: Para el aniversario, cumpleaños, etc.</li>
-                <li><strong>Vacaciones o viajes</strong>: Por ejemplo ahorrar 50€ mensuales para gastar en las proximas vacaciones. Es una gasto mensual pero el dinero lo sigues teniendo.</li>
+                <li>Cuentan en el balance y los gastos del mes (aparecen aparte como «No computables»).</li>
+                <li>No cuentan en el total acumulado.</li>
+                <li>En la lista se ven en gris, con la etiqueta «No computable».</li>
               </ul>
-              <h4 className="font-medium text-foreground">¿Cómo funcionan?</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Se incluyen en el <strong>balance mensual</strong> del mes en que ocurrieron.</li>
-                <li>No se incluyen en el <strong>balance total acumulado</strong>.</li>
-                <li>Se muestran en la lista de transacciones con un distintivo "No computable".</li>
-                <li>Aparecen en color gris para una fácil identificación.</li>
-              </ul>
-              <h4 className="font-medium text-foreground">¿Cómo marcar un gasto como No Computable?</h4>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Al crear o editar un gasto, activa la opción "No computable".</li>
-                <li>Guarda la transacción.</li>
-                <li>Verás el gasto marcado como "No computable" en la lista.</li>
-              </ol>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Informes Mensuales */}
-          <AccordionItem value="item-5">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              5. Informes Mensuales
-            </AccordionTrigger>
+          {/* 5. Copiar */}
+          <AccordionItem value="copiar">
+            <SectionTrigger>5. Copiar gastos fijos e ingresos</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
-                Los informes mensuales les permiten cerrar un mes, calcular ajustes y obtener un resumen detallado de
-                sus finanzas.
+                El botón de copiar trae al mes que estás viendo los gastos fijos y los ingresos del mes anterior (los
+                ajustes de cierre no se copian). Si el mes ya tiene gastos fijos o ingresos, ese tipo no se vuelve a
+                copiar.
               </p>
-              <h4 className="font-medium text-foreground">Cerrar Mes Actual / Actualizar Mes Actual:</h4>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Este botón, ubicado en la barra lateral de "Informes Mensuales", les permite generar un informe para
-                  el mes actual del sistema.
-                </li>
-                <li>Si ya existe un informe para el mes actual, el botón cambiará a "Actualizar Mes Actual".</li>
-              </ul>
-              <h4 className="font-medium text-foreground">Generar / Actualizar Informe del Mes Seleccionado:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  Si están viendo un mes diferente al actual en la tabla de transacciones (y no es un mes futuro),
-                  aparecerá un botón para generar o actualizar el informe de ese mes específico.
-                </li>
-              </ul>
-              <h4 className="font-medium text-foreground">Modal de Informe Mensual:</h4>
-              <p>Al hacer clic en los botones de informe, se abrirá un modal donde podrán:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <strong>Resumen del mes (antes de ajustes):</strong> Verán un resumen de ingresos, gastos y balances
-                  calculados automáticamente a partir de las transacciones del mes.
+                  Antes de copiar, <strong>Revisar importes</strong> te deja cambiar el importe de cada uno (por ejemplo,
+                  una factura que este mes sube).
                 </li>
                 <li>
-                  <strong>Dinero real disponible al final del mes:</strong> Aquí deben introducir la cantidad de dinero
-                  real que cada persona tiene disponible al final del mes. Esto es crucial para calcular los ajustes.
-                </li>
-                <li>
-                  <strong>Ajustes calculados:</strong> 2Budget calculará automáticamente la diferencia entre el balance
-                  calculado y el dinero real introducido. Si hay una diferencia significativa (mayor o igual a{" "}
-                  {formatCurrency(0.01)}), se generarán transacciones de ajuste.
-                </li>
-                <li>
-                  <strong>Transacciones de ajuste que se crearán:</strong> Verán una vista previa de las transacciones
-                  que se añadirán automáticamente para equilibrar los balances según el dinero real.
-                </li>
-              </ul>
-              <h4 className="font-medium text-foreground">Ver Informes Anteriores:</h4>
-              <p>
-                En la barra lateral, debajo de los botones de informe, encontrarán una lista de todos los informes
-                mensuales generados previamente. Hagan clic en cualquiera de ellos para abrir el "Modal de Detalle de
-                Informe".
-              </p>
-              <h4 className="font-medium text-foreground">Modal de Detalle de Informe:</h4>
-              <p>Este modal les proporciona un análisis profundo del mes seleccionado:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <strong>Resumen General:</strong> Ingresos, gastos y balance total del mes.
-                </li>
-                <li>
-                  <strong>Gráficos de Distribución:</strong>
-                  <ul className="list-circle list-inside ml-4">
-                    <li>
-                      <strong>Gastos:</strong> Un gráfico de pastel que muestra la proporción de gastos "fijos" y
-                      "variables".
-                    </li>
-                    <li>
-                      <strong>Ingresos:</strong> Un gráfico de pastel que muestra la proporción de ingresos aportados
-                      por {person1Name} y {person2Name}.
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  <strong>Detalles por Persona:</strong> Un desglose completo de ingresos, gastos, balance calculado,
-                  dinero real introducido y el ajuste final para cada persona.
-                </li>
-                <li>
-                  <strong>Estadísticas del mes:</strong> Información adicional como el total de transacciones, número de
-                  gastos fijos, variables e ingresos.
+                  Para copiar a un mes futuro, el mes anterior tiene que estar cerrado: así puedes preparar el mes
+                  siguiente sin esperar al día 1.
                 </li>
               </ul>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Configuración */}
-          <AccordionItem value="item-5">
-            <AccordionTrigger className="text-lg font-semibold text-primary">5. Configuración</AccordionTrigger>
+          {/* 6. Informes */}
+          <AccordionItem value="informes">
+            <SectionTrigger>6. Informes y cierre de mes</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
+              <Subtitle>Cerrar el mes</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  En la tarjeta <strong>Informes</strong>, «Cerrar mes actual» abre el cierre. Si estás viendo un mes
+                  pasado sin informe, aparece también el botón para generar el suyo.
+                </li>
+                <li>
+                  Escribe el <strong>dinero real</strong> que tiene cada uno al final del mes. La app lo compara con el
+                  balance calculado y crea una <strong>transacción de ajuste</strong> por persona con la diferencia, para
+                  que las cuentas cuadren.
+                </li>
+                <li>
+                  Si ya está cerrado, el botón pasa a «Actualizar mes actual»: los ajustes se recalculan y{" "}
+                  <strong>sustituyen</strong> a los anteriores.
+                </li>
+                <li>
+                  Los ajustes de cierre no se editan ni se borran a mano (sus botones se ven desactivados): se cambian
+                  actualizando el mes o borrando el informe.
+                </li>
+              </ul>
+              <Subtitle>Meses cerrados</Subtitle>
               <p>
-                Accedan a la configuración haciendo clic en el icono de engranaje (
-                <strong className="text-primary">Configuración</strong>) en la esquina inferior izquierda. Aquí pueden
-                personalizar la aplicación y gestionar sus datos.
+                Un mes pasado con informe queda de <strong>solo lectura</strong>. Si lo cerraste sin querer, abre el{" "}
+                <strong>último informe</strong> y pulsa «Borrar informe»: se borran el informe y sus ajustes, y el mes
+                vuelve a quedar abierto. Solo se puede borrar el último.
               </p>
-              <h4 className="font-medium text-foreground">Nombres de las personas:</h4>
+              <Subtitle>Ver los informes</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Pueden cambiar los nombres de "Persona 1" y "Persona 2" a sus nombres reales o apodos. Estos nombres
-                  se actualizarán en toda la aplicación.
-                </li>
-                <li>Hagan clic en "Guardar configuración" para aplicar los cambios.</li>
-              </ul>
-              <h4 className="font-medium text-foreground">Modo individual:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  Para usar la app sin pareja. Oculta la segunda persona: el formulario ya no pide propietario ni
-                  reparto, las tarjetas muestran solo los totales y el cierre de mes pide un único dinero real.
+                  La tarjeta muestra los 3 últimos. El botón <strong>Todos</strong> (el icono de lista, en PC) abre la
+                  lista completa, con filtro por año.
                 </li>
                 <li>
-                  No borra ni modifica ningún dato. Si quedan transacciones de la segunda persona o compartidas, siguen
-                  sumando en los totales y se muestran con su etiqueta. Se puede desactivar en cualquier momento.
-                </li>
-              </ul>
-              <h4 className="font-medium text-foreground">Gestión de datos:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  <strong>Exportar datos:</strong> Descarguen un archivo JSON con todas sus transacciones, informes y
-                  configuraciones. Esto es útil para hacer copias de seguridad.
-                </li>
-                <li>
-                  <strong>Importar datos:</strong> Suban un archivo JSON previamente exportado para restaurar sus datos.
-                </li>
-                <li>
-                  <strong>Eliminar todos los datos:</strong> Esta opción borrará permanentemente todas las
-                  transacciones, informes y configuraciones de la aplicación. Se les pedirá una confirmación para evitar
-                  eliminaciones accidentales.
+                  Cada informe tiene el resumen del mes, gráficos de gastos (fijos y variables) y de ingresos por persona,
+                  el detalle de cada uno (balance calculado, dinero real y ajuste) y unas estadísticas.
                 </li>
               </ul>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Cambiar Tema */}
-          <AccordionItem value="item-6">
-            <AccordionTrigger className="text-lg font-semibold text-primary">6. Cambiar Tema</AccordionTrigger>
+          {/* 7. Configuración */}
+          <AccordionItem value="configuracion">
+            <SectionTrigger>7. Configuración</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
-              <p>
-                Pueden alternar entre el modo claro y oscuro de la aplicación haciendo clic en el botón de sol/luna
-                ubicado en la esquina inferior izquierda. La aplicación recordará su preferencia para futuras sesiones.
-              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Nombres:</strong> cambia «Persona 1» y «Persona 2» por vuestros nombres.
+                </li>
+                <li>
+                  <strong>Modo individual:</strong> oculta la segunda persona (sin propietario ni reparto, y el cierre
+                  pide un solo dinero real). No borra nada y se puede desactivar cuando quieras.
+                </li>
+                <li>
+                  <strong>Exportar datos:</strong> descarga una copia en JSON, sin cifrar, con todas las transacciones,
+                  informes y la configuración.
+                </li>
+                <li>
+                  <strong>Importar datos:</strong> restaura una copia exportada antes (sustituye los datos actuales).
+                </li>
+                <li>
+                  <strong>Eliminar todos los datos:</strong> lo borra todo, tras pedir confirmación.
+                </li>
+              </ul>
+              <p>El modo claro u oscuro se cambia con el botón del sol o la luna, y la app lo recuerda.</p>
             </AccordionContent>
           </AccordionItem>
 
-          {/* Sección: Persistencia de Datos */}
-          <AccordionItem value="item-7">
-            <AccordionTrigger className="text-lg font-semibold text-primary">
-              7. Cuenta, nube y privacidad
-            </AccordionTrigger>
+          {/* 8. Cuenta */}
+          <AccordionItem value="cuenta">
+            <SectionTrigger>8. Cuenta, nube y privacidad</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 Para usar 2Budget hace falta una <strong>cuenta con el email verificado</strong>. El botón de la nube,
-                arriba a la derecha, abre la ventana de <strong className="text-primary">Cuenta</strong>.
+                arriba a la derecha, abre la ventana de <strong className="text-primary">Cuenta</strong>: desde ahí puedes
+                cambiar el email o eliminar la cuenta. Si olvidas la contraseña de la cuenta, recupérala desde la
+                pantalla de inicio de sesión.
               </p>
-
-              <h4 className="font-medium text-foreground">Hogar en la nube:</h4>
+              <Subtitle>Hogar en la nube</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>
                   Los datos se guardan en un <strong>hogar</strong>: lo crea uno y el otro se une con un código de
-                  invitación (en modo individual, es <strong>tu espacio en la nube</strong>). Así se sincronizan al
-                  momento entre dispositivos y entre los dos.
+                  invitación de un solo uso, que caduca en 48 horas (en modo individual es <strong>tu espacio</strong>).
+                  Los cambios se sincronizan al momento entre dispositivos y entre los dos.
                 </li>
                 <li>
-                  Al crear el hogar se pueden subir los datos que ya hubiera en el navegador. Mientras no haya hogar,
-                  los datos solo están en este dispositivo: lo avisa el icono amarillo junto a la nube.
+                  Al crear el hogar puedes subir los datos que ya hubiera en el navegador. Mientras no hay hogar, los
+                  datos solo están en este dispositivo: lo avisa el icono amarillo junto a la nube.
                 </li>
-                <li>Sin conexión se puede seguir usando la app: los cambios se envían solos al volver la red.</li>
+                <li>Sin conexión puedes seguir usando la app: los cambios se envían solos al volver la red.</li>
               </ul>
-
-              <h4 className="font-medium text-foreground">Cifrado y contraseña maestra:</h4>
+              <Subtitle>Cifrado y contraseña maestra</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Los datos se <strong>cifran en el dispositivo</strong> antes de subirlos, con una{" "}
-                  <strong>contraseña maestra</strong> distinta de la de la cuenta. Nadie más puede leerlos, ni
-                  siquiera el administrador de la app. Cada miembro del hogar tiene la suya.
+                  Los datos se <strong>cifran en tu dispositivo</strong> antes de subirlos, con una{" "}
+                  <strong>contraseña maestra</strong> distinta de la de la cuenta. Nadie más puede leerlos, ni siquiera el
+                  administrador de la app. Cada miembro del hogar tiene la suya.
                 </li>
                 <li>
-                  La contraseña maestra <strong>no se guarda en ningún sitio</strong> y no se puede recuperar. Se pide
-                  una vez en cada dispositivo, y una vez al mes para que no se olvide.
+                  La contraseña maestra <strong>no se guarda en ningún sitio</strong>. Se pide una vez en cada dispositivo
+                  y una vez al mes, para que no se olvide.
                 </li>
                 <li>
-                  Al crear el hogar (o al unirse) se muestra un <strong>código de recuperación</strong>: guárdenlo en un
-                  lugar seguro. Con él se puede elegir una contraseña maestra nueva. Desde Cuenta se puede generar uno
-                  nuevo o cambiar la contraseña maestra.
-                </li>
-              </ul>
-
-              <h4 className="font-medium text-foreground">Copias de seguridad:</h4>
-              <ul className="list-disc list-inside space-y-1">
-                <li>
-                  Con <strong>Exportar datos</strong> (en Configuración) se descarga una copia en JSON, sin cifrar,
-                  para guardarla donde quieran o importarla más adelante.
+                  Al crear el hogar o unirte se muestra un <strong>código de recuperación</strong>: guárdalo en un lugar
+                  seguro. Con él puedes elegir una contraseña maestra nueva si la olvidas. Desde Cuenta puedes cambiar la
+                  contraseña maestra o generar un código nuevo.
                 </li>
               </ul>
             </AccordionContent>

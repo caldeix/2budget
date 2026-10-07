@@ -50,7 +50,7 @@ export function CumulativeBalanceCard({
   const showPeople = shouldShowPerson2(singleMode, person2TotalBalance)
 
   return (
-    <div className="bg-card rounded-2xl shadow-lg border p-6 space-y-4">
+    <div data-tour="cumulative" className="bg-card rounded-2xl shadow-lg border p-6 space-y-4">
       {/* Título de la tarjeta con icono de cartera. */}
       <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
         <Wallet className="h-5 w-5" />
