@@ -9,7 +9,9 @@
  *                households/{hid}/keys/{uid}          → clave del hogar envuelta con la contraseña maestra de ese miembro
  *                households/{hid}/recovery/{uid}      → clave del hogar envuelta con el código de recuperación de ese miembro
  *                households/{hid}/transactions/{id}   → `{ enc }`: una transacción cifrada por documento
- *                households/{hid}/reports/{id}        → `{ enc }`: un informe cifrado por documento
+ *                households/{hid}/reports/{id}        → `{ enc }`: un informe cifrado por documento; en los
+ *                                                       meses cerrados, con sus transacciones dentro
+ *                                                       (ver `lib/cloud/archive.ts`)
  *                invites/{id}                         → invitación de un solo uso (48 h), con la clave
  *                                                       envuelta con un secreto que solo va en el código
  *
@@ -40,6 +42,14 @@ import {
 import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
 import { DATA_VERSION, defaultConfig, normalizeReport, normalizeTransaction } from "@/lib/storage"
 import { diffAppData, isEmptyDiff, type AppDataDiff } from "@/lib/cloud/diff"
+import {
+  archivedMonthsOf,
+  fromStored,
+  planArchiving,
+  toStored,
+  type ArchivePlan,
+  type StoredReport,
+} from "@/lib/cloud/archive"
 import {
   decryptJson,
   encryptJson,
@@ -100,6 +110,12 @@ const INVITE_SECRET_LENGTH = 12
  * lecturas. Con 20 operaciones nunca se supera, aunque Firestore no las agrupe.
  */
 const BATCH_LIMIT = 20
+
+/**
+ * Meses archivados en la nube de cada hogar, según el último snapshot de informes. Las escrituras
+ * mantienen esa misma disposición (ver `writeChanges` y `lib/cloud/archive.ts`).
+ */
+const archivedMonthsByHousehold = new Map<string, Set<string>>()
 
 /** Versión del esquema de cifrado, guardada en el hogar (permite cambiarlo en el futuro). */
 const CRYPTO_VERSION = 1
@@ -448,15 +464,32 @@ export function subscribeHousehold(
   onError: (error: Error) => void,
 ): Unsubscribe {
   let household: { config: AppConfig; version: number; info: HouseholdInfo } | null = null
-  let transactions: Transaction[] | null = null
-  let reports: MonthlyReport[] | null = null
+  // Tal cual están en la nube: transacciones sueltas e informes (los cerrados, con su archivo).
+  let live: Transaction[] | null = null
+  let storedReports: StoredReport[] | null = null
+  // Si lo último recibido viene del servidor (no de la caché): solo entonces se archiva.
+  let liveFromServer = false
+  let reportsFromServer = false
+  let hasArchived = false
   let active = true
   // Descifrar es asíncrono: una cola mantiene el orden de los snapshots.
   let queue = Promise.resolve()
 
   const emit = () => {
-    if (!active || !household || !transactions || !reports) return
+    if (!active || !household || !live || !storedReports) return
+    const merged = fromStored(live, storedReports)
+    const transactions = merged.transactions.map(normalizeTransaction).sort(byCreatedAtDesc)
+    const reports = merged.reports.map(normalizeReport).sort(byCreatedAtDesc)
     onData({ transactions, reports, config: household.config, version: household.version }, household.info)
+
+    // Una vez por apertura, con datos del servidor: archiva los meses cerrados pendientes.
+    if (!hasArchived && liveFromServer && reportsFromServer) {
+      hasArchived = true
+      const plan = planArchiving(live, storedReports, new Date())
+      if (plan.reportsToWrite.length > 0 || plan.transactionIdsToDelete.length > 0) {
+        commitArchivePlan(db, hid, dek, plan).catch((error) => console.error("Error archiving closed months:", error))
+      }
+    }
   }
 
   const handleError = (error: Error & { code?: string }) => {
@@ -472,7 +505,7 @@ export function subscribeHousehold(
   }
 
   const decryptTransactions = createDecryptingCache<Transaction>(dek, context.transaction)
-  const decryptReports = createDecryptingCache<MonthlyReport>(dek, context.report)
+  const decryptReports = createDecryptingCache<StoredReport>(dek, context.report)
 
   const unsubscribers = [
     onSnapshot(
@@ -493,7 +526,8 @@ export function subscribeHousehold(
       transactionsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          transactions = (await decryptTransactions(snap)).map(normalizeTransaction).sort(byCreatedAtDesc)
+          live = await decryptTransactions(snap)
+          liveFromServer = !snap.metadata.fromCache
           emit()
         }),
       handleError,
@@ -502,7 +536,9 @@ export function subscribeHousehold(
       reportsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          reports = (await decryptReports(snap)).map(normalizeReport).sort(byCreatedAtDesc)
+          storedReports = await decryptReports(snap)
+          reportsFromServer = !snap.metadata.fromCache
+          archivedMonthsByHousehold.set(hid, archivedMonthsOf(storedReports))
           emit()
         }),
       handleError,
@@ -553,10 +589,14 @@ export async function writeChanges(
   prev: AppData,
   next: AppData,
 ): Promise<{ acknowledged: Promise<void>; changed: boolean }> {
-  const diff = diffAppData(prev, next)
+  // Se compara con la disposición de la nube: lo de los meses archivados va dentro de su informe.
+  const archived = archivedMonthsByHousehold.get(hid) ?? new Set<string>()
+  const storedPrev = toStored(prev, archived)
+  const storedNext = toStored(next, archived)
+  const diff = diffAppData(storedPrev, storedNext)
   if (isEmptyDiff(diff)) return { acknowledged: Promise.resolve(), changed: false }
 
-  const ops = await diffToOps(db, hid, dek, diff, next)
+  const ops = await diffToOps(db, hid, dek, diff, storedNext)
   const commits: Promise<void>[] = []
   for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
     const batch = writeBatch(db)
@@ -564,6 +604,25 @@ export async function writeChanges(
     commits.push(batch.commit())
   }
   return { acknowledged: Promise.all(commits).then(() => undefined), changed: true }
+}
+
+/**
+ * @function commitArchivePlan
+ * @description Archiva meses cerrados: primero reescribe sus informes con las transacciones
+ *              dentro y, después, borra los documentos sueltos. En ese orden nunca se pierde nada:
+ *              si se corta a medias, el archivo ya manda y la próxima apertura termina de borrar.
+ */
+async function commitArchivePlan(db: Firestore, hid: string, dek: CryptoKey, plan: ArchivePlan): Promise<void> {
+  const reportOps: BatchOp[] = []
+  for (const r of plan.reportsToWrite) {
+    const enc = await encryptJson(dek, r, context.report(r.id))
+    reportOps.push((batch) => batch.set(doc(reportsCol(db, hid), r.id), { enc }))
+  }
+  await commitInChunks(db, reportOps)
+  await commitInChunks(
+    db,
+    plan.transactionIdsToDelete.map((id) => (batch: WriteBatch) => batch.delete(doc(transactionsCol(db, hid), id))),
+  )
 }
 
 // ---------------------------------------------------------------------------
