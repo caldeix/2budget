@@ -126,7 +126,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   El contador (por ejemplo <strong>10/29</strong>) indica cuántas transacciones se ven de las que hay en
                   el mes, y las cajas de Ingresos, Gastos y Balance suman solo lo filtrado.
                 </li>
-                <li>En PC puedes ordenar la lista pulsando en las cabeceras de las columnas.</li>
+                <li>
+                  En PC puedes ordenar la lista pulsando en las cabeceras de las columnas. «Pagado» pone primero los
+                  gastos pendientes (púlsalo otra vez para invertir el orden).
+                </li>
                 <li>La lista carga de 5 en 5 a medida que bajas.</li>
               </ul>
               <Subtitle>Marcar como pagado</Subtitle>
