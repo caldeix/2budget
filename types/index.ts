@@ -106,6 +106,11 @@ export interface AppConfig {
    * Opcional para que las configuraciones y JSON anteriores sigan siendo válidos.
    */
   singleMode?: boolean
+  /**
+   * Privacidad en pareja: cada persona decide si su pareja ve el importe de sus transacciones
+   * individuales (las 100% suyas). Lo cambia cada uno desde Cuenta > Tu hogar. Ver `lib/privacy.ts`.
+   */
+  hideIndividualFromPartner?: { person1?: boolean; person2?: boolean }
 }
 
 /**

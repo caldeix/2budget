@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.5.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.6.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.6.0 — Filtro de pagados y privacidad en pareja
+
+- **Filtro por pago** — En las transacciones, un selector más para ver solo los gastos pagados o solo los pendientes
+- **Ocultar mis transacciones individuales a mi pareja** — Opción de cada miembro en Cuenta > Tu hogar. Con ella activada, la pareja ve *** en lugar del importe de las transacciones que son 100% de quien la activa (en la lista, en el aviso de gastos pagados y al revisar importes al copiar) y no puede editarlas. Los totales, balances e informes no cambian; los ajustes de cierre siempre se ven. Con un filtro o una búsqueda que incluya importes ocultos, los totales filtrados también se ocultan para no delatarlos. Es una ocultación en la app, no un cifrado aparte
+- SemVer: 2.5.0 → 2.6.0 (MINOR)
 
 ### v2.5.0 — Menos lecturas de Firestore
 
