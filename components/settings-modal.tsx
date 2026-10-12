@@ -71,6 +71,8 @@ export function SettingsModal({
   const [person2Name, setPerson2Name] = useState(config.person2Name)
   // Estado local del modo individual; se guarda junto con los nombres.
   const [singleMode, setSingleMode] = useState(Boolean(config.singleMode))
+  // Archivo leído y pendiente de confirmar antes de importarlo.
+  const [pendingImport, setPendingImport] = useState<{ name: string; content: string } | null>(null)
   // Estado para controlar la visibilidad del modal de confirmación de eliminación de datos.
   const [isClearDataConfirmModalOpen, setIsClearDataConfirmModalOpen] = useState(false)
   // Ref para el input de tipo archivo, permitiendo activarlo programáticamente.
@@ -123,11 +125,8 @@ export function SettingsModal({
 
     const reader = new FileReader() // Crea un lector de archivos.
     reader.onload = (e) => {
-      const content = e.target?.result as string // Obtiene el contenido del archivo como string.
-      const success = onImportData(content) // El padre valida y guarda los datos importados.
-      if (success) {
-        onClose() // Cierra el modal si la importación fue exitosa.
-      }
+      // Importar sustituye todos los datos: se pide confirmación antes de aplicarlo.
+      setPendingImport({ name: file.name, content: e.target?.result as string })
     }
     reader.readAsText(file) // Lee el contenido del archivo como texto.
 
@@ -145,6 +144,18 @@ export function SettingsModal({
    */
   const handleClearDataClick = () => {
     setIsClearDataConfirmModalOpen(true) // Abre el modal de confirmación.
+  }
+
+  /**
+   * @function handleConfirmImport
+   * @description Aplica la importación pendiente (ya confirmada). Si el archivo no es válido, el
+   *              padre avisa y la configuración se queda abierta.
+   */
+  const handleConfirmImport = () => {
+    if (!pendingImport) return
+    const success = onImportData(pendingImport.content) // El padre valida y guarda los datos importados.
+    setPendingImport(null)
+    if (success) onClose()
   }
 
   /**
@@ -273,6 +284,31 @@ export function SettingsModal({
               <li>• Usa exportar/importar para hacer copias de seguridad</li>
               <li>• Eliminar datos borrará toda la información permanentemente</li>
             </ul>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de confirmación para importar: sustituye todos los datos (y en la nube, los de los dos) */}
+      <Modal isOpen={pendingImport !== null} onClose={() => setPendingImport(null)} title="Confirmar importación" size="sm">
+        <div className="p-6 space-y-6 text-center">
+          <Upload className="h-12 w-12 text-primary mx-auto" />
+          <p className="text-foreground">
+            Se importará <span className="font-bold break-all">{pendingImport?.name}</span> y se{" "}
+            <span className="font-bold">sustituirán todos los datos actuales</span>: transacciones, informes y
+            configuración.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {isCloud
+              ? "Los datos están en el hogar de la nube: el cambio afecta a los dos miembros y a todos vuestros dispositivos. Si quieres conservar lo que hay ahora, exporta una copia antes."
+              : "Si quieres conservar lo que hay ahora, exporta una copia antes."}
+          </p>
+          <div className="flex justify-center gap-3 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setPendingImport(null)}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmImport}>
+              Importar y sustituir
+            </Button>
           </div>
         </div>
       </Modal>

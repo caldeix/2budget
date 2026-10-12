@@ -295,7 +295,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   informes y la configuración.
                 </li>
                 <li>
-                  <strong>Importar datos:</strong> restaura una copia exportada antes (sustituye los datos actuales).
+                  <strong>Importar datos:</strong> restaura una copia exportada antes. Sustituye todos los datos
+                  actuales (en la nube, los de los dos miembros), así que pide confirmación.
                 </li>
                 <li>
                   <strong>Eliminar todos los datos:</strong> lo borra todo, tras pedir confirmación.

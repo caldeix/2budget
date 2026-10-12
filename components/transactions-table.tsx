@@ -476,12 +476,13 @@ export function TransactionsTable({
 
         {/* Título y, debajo, los filtros: la búsqueda en una línea y los tres selectores en la siguiente. */}
         <div className="flex flex-col gap-4 mt-4">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Transacciones</h2>
-            <p className="text-sm text-muted-foreground">
+          {/* Título con el contador en la misma línea: las que se ven de las que hay en el mes */}
+          <h2 className="text-xl font-semibold text-foreground">
+            Transacciones{" "}
+            <span className="text-sm font-normal text-muted-foreground">
               {filteredAndSortedTransactions.length}/{transactions.length}
-            </p>
-          </div>
+            </span>
+          </h2>
 
           <div data-tour="filters" className="space-y-3">
             {/* Campo de búsqueda, a todo el ancho */}
