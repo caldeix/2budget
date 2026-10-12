@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.8.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.9.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,18 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.9.0 — Categorías, evolución y búsqueda en todos los meses
+
+- **Categorías** — Cada transacción tiene una categoría (Supermercado, Casa, Suministros, Transporte, Restaurantes y ocio, Salud, Ropa, Suscripciones, Regalos, Viajes, Ahorro, Otros; Nómina y Otros ingresos para ingresos), editable desde Configuración (renombrar, quitar, añadir). Al elegir un nombre ya usado se rellena sola la categoría de la última vez, y al poner categoría a un nombre que antes no la tenía, la app ofrece aplicarla a las transacciones anteriores (también dentro de los informes cerrados). Las antiguas quedan en "Sin categoría"
+- **Un solo selector de tipo** — Gasto variable, Gasto fijo o Ingreso. En la lista, el tipo va como icono y la categoría como texto; los filtros son por tipo y por categoría
+- **Informe** — Gráfico nuevo de gastos por categoría, a toda la fila y con la leyenda en columnas; orden Ingresos → Gastos → Categorías
+- **Evolución** — Tarjeta en el lateral con los ingresos y gastos de los últimos seis meses; al pulsarla, el año completo con el ahorro de cada mes, los totales y un selector de año
+- **Buscar en todos los meses** — Con texto en el buscador se ven las coincidencias de cualquier mes (fecha en dorado; solo lectura si el mes está cerrado)
+- **Tour** — Pasos nuevos (evolución, categorías, búsqueda, privacidad, instalar la app) y abre por dentro el formulario de transacción y el cierre de mes. Ayuda al día
+- **PC** — Un 20% más de ancho (1536 px) y el lateral alineado con la primera tarjeta del resumen
+- Corregido: "Guardar configuración" borraba la opción de privacidad en pareja
+- SemVer: 2.8.0 → 2.9.0 (MINOR)
 
 ### v2.8.0 — Formulario más simple y meses cerrados de verdad
 
