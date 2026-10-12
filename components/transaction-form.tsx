@@ -19,7 +19,9 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
-import { getTodayDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC) y unión de clases.
+import { DatePicker } from "@/components/ui/date-picker" // Calendario propio de la app.
+import { ownerForShare } from "@/lib/storage" // El propietario sale del reparto.
+import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
 
 /** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
 export interface NameSuggestion {
@@ -49,6 +51,8 @@ const normalize = (text: string) =>
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta el propietario y el reparto.
  * @property {NameSuggestion[]} [nameSuggestions] - Nombres ya usados, para sugerirlos al escribir.
+ * @property {string} [minDate] - Primera fecha admitida (YYYY-MM-DD): no se añaden transacciones a meses
+ *           ya pasados (ver `app/page.tsx`). Al editar, la fecha original de la transacción siempre vale.
  */
 interface TransactionFormProps {
   isOpen: boolean
@@ -59,6 +63,7 @@ interface TransactionFormProps {
   person2Name: string
   singleMode?: boolean
   nameSuggestions?: NameSuggestion[]
+  minDate?: string
 }
 
 /**
@@ -77,14 +82,20 @@ export function TransactionForm({
   person2Name,
   singleMode = false,
   nameSuggestions = [],
+  minDate,
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
   const defaultOwner = singleMode ? "person1" : "both"
   const defaultPerson1Percentage = singleMode ? 100 : 50
 
-  // En modo individual el selector de propietario se oculta, salvo al editar una transacción
-  // antigua que no es solo de la Persona 1: así se puede ver y reasignar.
-  const showOwnerSelector = !singleMode || (transaction !== undefined && transaction.owner !== "person1")
+  // El reparto lo decide solo el deslizador: 100% para uno es "solo suyo"; cualquier otro valor,
+  // compartido. En modo individual se oculta (todo es de la Persona 1), salvo al editar una
+  // transacción antigua que no es solo suya: así se puede ver y reasignar.
+  const showShareSlider = !singleMode || (transaction !== undefined && transaction.owner !== "person1")
+
+  // Posición del deslizador para una transacción existente: los individuales van al 100% o al 0%.
+  const sharePercentageOf = (t: Transaction) =>
+    t.owner === "person1" ? 100 : t.owner === "person2" ? 0 : (t.person1Percentage ?? 50)
 
   // Estado del formulario, inicializado con valores por defecto.
   const [formData, setFormData] = useState<TransactionFormData & { nonComputable: boolean }>({
@@ -93,11 +104,15 @@ export function TransactionForm({
     name: transaction?.name || "",
     amount: transaction?.amount || 0,
     owner: transaction?.owner || defaultOwner,
-    person1Percentage: transaction?.person1Percentage ?? defaultPerson1Percentage,
-    person2Percentage: transaction?.person2Percentage ?? 100 - defaultPerson1Percentage,
+    person1Percentage: transaction ? sharePercentageOf(transaction) : defaultPerson1Percentage,
+    person2Percentage: transaction ? 100 - sharePercentageOf(transaction) : 100 - defaultPerson1Percentage,
     date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
   })
+
+  // Fecha mínima efectiva: al editar, la fecha que ya tenía la transacción no se rechaza.
+  const effectiveMinDate = minDate && transaction && transaction.date < minDate ? transaction.date : minDate
+  const isDateTooEarly = effectiveMinDate !== undefined && formData.date < effectiveMinDate
 
   /**
    * `useEffect` para inicializar el formulario cuando se abre el modal
@@ -112,8 +127,8 @@ export function TransactionForm({
         name: transaction.name,
         amount: transaction.amount,
         owner: transaction.owner,
-        person1Percentage: transaction.person1Percentage ?? 50, // Usa 50% si no está definido.
-        person2Percentage: transaction.person2Percentage ?? 50, // Usa 50% si no está definido.
+        person1Percentage: sharePercentageOf(transaction),
+        person2Percentage: 100 - sharePercentageOf(transaction),
         date: transaction.date,
         nonComputable: transaction.nonComputable || false,
       })
@@ -183,9 +198,16 @@ export function TransactionForm({
     e.preventDefault() // Previene el comportamiento por defecto del formulario.
     // Validación básica: el nombre no puede estar vacío y el importe no puede ser negativo.
     // Se admite 0 € para mantener un gasto habitual que un mes no se cobra.
-    if (!formData.name || formData.amount < 0) return
+    if (!formData.name || formData.amount < 0 || isDateTooEarly) return
 
-    onSubmit(formData) // Llama a la función de envío del padre con los datos del formulario.
+    // El propietario sale del deslizador: 100% para una persona es individual de esa persona.
+    const owner = ownerForShare("both", formData.person1Percentage)
+    onSubmit({
+      ...formData,
+      owner,
+      person1Percentage: owner === "person1" ? 100 : owner === "person2" ? 0 : formData.person1Percentage,
+      person2Percentage: owner === "person1" ? 0 : owner === "person2" ? 100 : formData.person2Percentage,
+    }) // Llama a la función de envío del padre con los datos del formulario.
     onClose() // Cierra el modal.
   }
 
@@ -251,9 +273,9 @@ export function TransactionForm({
             </div>
           )}
 
-          {/* Checkbox para gastos no computables */}
+          {/* Checkbox para gastos no computables (a todo el ancho, debajo de Tipo y Categoría) */}
           {formData.type === "expense" && (
-            <div className="flex items-center space-x-2 mt-4">
+            <div className="col-span-2 flex items-center space-x-2 mt-2">
               <input
                 type="checkbox"
                 id="nonComputable"
@@ -338,39 +360,35 @@ export function TransactionForm({
 
           <div>
             <Label htmlFor="date">Fecha</Label>
-            <Input
+            <DatePicker
               id="date"
-              type="date"
               value={formData.date}
-              onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-              required
+              min={effectiveMinDate}
+              onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
             />
+            {isDateTooEarly && (
+              <p className="mt-1 text-xs text-destructive">
+                Los meses anteriores ya están cerrados: la fecha tiene que ser del {formatDate(effectiveMinDate)} en
+                adelante.
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Campo de Propietario (oculto en modo individual) */}
-        {showOwnerSelector && (
-          <div>
-            <Label htmlFor="owner">Propietario</Label>
-            <select
-              id="owner"
-              value={formData.owner}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, owner: e.target.value as "person1" | "person2" | "both" }))
-              }
-              className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-            >
-              <option value="person1">{person1Name}</option>
-              <option value="person2">{person2Name}</option>
-              <option value="both">Ambos</option>
-            </select>
-          </div>
-        )}
-
-        {/* Deslizador de Porcentajes (solo visible si el propietario es "Ambos") */}
-        {showOwnerSelector && formData.owner === "both" && (
+        {/* Reparto entre los dos (oculto en modo individual). Sustituye al antiguo selector de
+            propietario: 100% para uno equivale a "solo suyo". */}
+        {showShareSlider && (
           <div className="space-y-4">
-            <Label>Distribución de porcentajes</Label>
+            <div className="flex items-center justify-between">
+              <Label>Reparto</Label>
+              <span className="text-xs text-muted-foreground">
+                {formData.person1Percentage >= 100
+                  ? `Solo de ${person1Name}`
+                  : formData.person1Percentage <= 0
+                    ? `Solo de ${person2Name}`
+                    : "Compartido"}
+              </span>
+            </div>
             <div className="flex items-center gap-4">
               <span className="text-sm font-medium text-foreground w-20 text-right">
                 {person1Name}: {formData.person1Percentage}%
@@ -394,7 +412,7 @@ export function TransactionForm({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={!formData.name || formData.amount < 0}>
+          <Button type="submit" disabled={!formData.name || formData.amount < 0 || isDateTooEarly}>
             {transaction ? "Actualizar" : "Crear"} {/* Texto del botón cambia según si es edición o creación. */}
           </Button>
         </div>

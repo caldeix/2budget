@@ -181,14 +181,17 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   tipo; pulsa uno (o elígelo con las flechas y Enter) para no escribirlo entero.
                 </li>
                 <li>
-                  <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50).
+                  <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50). La
+                  fecha puede ser del mes actual o del anterior mientras no esté cerrado; los meses ya cerrados no
+                  admiten transacciones nuevas.
                 </li>
                 <li>
-                  <strong>Propietario:</strong> {person1Name}, {person2Name} o Ambos. Con «Ambos», el deslizador reparte
-                  el importe: si {person1Name} paga el 70%, a {person2Name} le toca el 30%.
+                  <strong>Reparto:</strong> el deslizador dice qué parte es de cada uno. Si {person1Name} paga el 70%, a{" "}
+                  {person2Name} le toca el 30%. Con el 100% para uno, la transacción es solo suya (y así se muestra
+                  en la lista); cualquier otro reparto es compartido.
                 </li>
               </ul>
-              <p>En modo individual no se pide propietario ni reparto: todo es tuyo.</p>
+              <p>En modo individual no se pide reparto: todo es tuyo.</p>
             </AccordionContent>
           </AccordionItem>
 
@@ -238,7 +241,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               <ul className="list-disc list-inside space-y-1">
                 <li>
                   En la tarjeta <strong>Informes</strong>, «Cerrar mes actual» abre el cierre. Si estás viendo un mes
-                  pasado sin informe, aparece también el botón para generar el suyo.
+                  pasado sin informe, aparece también el botón para generar el suyo. Solo se puede actualizar el
+                  informe del mes actual y del anterior; los más antiguos ya no se tocan.
                 </li>
                 <li>
                   Escribe el <strong>dinero real</strong> que tiene cada uno al final del mes. La app lo compara con el
@@ -291,7 +295,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   informes y la configuración.
                 </li>
                 <li>
-                  <strong>Importar datos:</strong> restaura una copia exportada antes (sustituye los datos actuales).
+                  <strong>Importar datos:</strong> restaura una copia exportada antes. Sustituye todos los datos
+                  actuales (en la nube, los de los dos miembros), así que pide confirmación.
                 </li>
                 <li>
                   <strong>Eliminar todos los datos:</strong> lo borra todo, tras pedir confirmación.

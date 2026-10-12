@@ -169,6 +169,14 @@ export default function HomePage() {
   const isSelectedMonthFuture =
     selectedYear > actualCurrentYear ||
     (selectedYear === actualCurrentYear && selectedMonth > actualCurrentMonth)
+  const { month: previousMonth, year: previousYear } = getPreviousMonthYear(actualCurrentMonth, actualCurrentYear)
+  const isSelectedMonthPrevious = selectedMonth === previousMonth && selectedYear === previousYear
+  // Primera fecha admitida al añadir una transacción: el mes anterior mientras no esté cerrado (a
+  // principios de mes aún se apunta algo olvidado); si ya tiene informe, el mes actual.
+  const isPreviousMonthClosedNow = !!getExistingReport(previousMonth, previousYear)
+  const minTransactionDate = isPreviousMonthClosedNow
+    ? `${actualCurrentYear}-${String(actualCurrentMonth).padStart(2, "0")}-01`
+    : `${previousYear}-${String(previousMonth).padStart(2, "0")}-01`
 
   const calculations = useCalculations(allTransactionsForSelectedMonth)
   const existingReportForActualMonth = getExistingReport(actualCurrentMonth, actualCurrentYear)
@@ -581,7 +589,11 @@ export default function HomePage() {
                   </Button>
                 </div>
 
-                {!isSelectedMonthCurrent && !isSelectedMonthFuture && (
+                {/* Un mes pasado sin informe se puede cerrar (generar) siempre; actualizarlo, solo si es
+                    el mes anterior al actual: los más antiguos ya son de solo lectura. */}
+                {!isSelectedMonthCurrent &&
+                  !isSelectedMonthFuture &&
+                  (!existingReportForSelectedMonth || isSelectedMonthPrevious) && (
                   <div className="mb-4">
                     <Button
                       onClick={handleOpenReportModalForSelectedMonth}
@@ -753,6 +765,7 @@ export default function HomePage() {
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
         nameSuggestions={nameSuggestions}
+        minDate={minTransactionDate}
       />
 
       {isReportModalOpen && (

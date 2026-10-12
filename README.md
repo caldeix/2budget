@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.7.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.8.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,17 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.8.0 — Formulario más simple y meses cerrados de verdad
+
+- **Sin selector de propietario** — El reparto lo decide solo el deslizador: 100% para uno es "Solo de Luis/Ana" (se guarda como individual) y cualquier otro valor, "Compartido". Las transacciones individuales antiguas pasan a 100/0 al leerlas, y un "Ambos" al 100% se muestra como individual
+- **Calendario propio** — La fecha se elige en el calendario de la app (en español, igual en PC y móvil), sin escribir a mano. Los días anteriores a la fecha mínima salen en gris
+- **Fecha mínima** — No se añaden transacciones a meses ya pasados: se admite desde el día 1 del mes anterior mientras no esté cerrado y, si lo está, desde el día 1 del mes actual. Al editar, la fecha original siempre vale
+- **Informes** — Solo se puede actualizar el informe del mes actual y del anterior; un mes más antiguo sin informe se puede generar, y con informe ya no se toca
+- **Importar datos pide confirmación** — Avisa de que sustituye todos los datos (en la nube, los de los dos miembros) y recomienda exportar antes
+- **Detalles** — "Transacciones 10/29" en una sola línea y la casilla "Gasto no computable" a todo el ancho del formulario
+- date-fns 3.0.0 → 3.6.0 (fallo de tipos al cargar el idioma del calendario)
+- SemVer: 2.7.0 → 2.8.0 (MINOR)
 
 ### v2.7.0 — Instalable como app
 
