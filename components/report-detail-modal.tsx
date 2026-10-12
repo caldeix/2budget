@@ -196,7 +196,7 @@ export function ReportDetailModal({
                 >
                   {(
                     [
-                      ["shared", "Casa"],
+                      ["shared", "Ambos"],
                       ["person1", person1Name],
                       ["person2", person2Name],
                     ] as [ExpenseScope, string][]
@@ -222,7 +222,7 @@ export function ReportDetailModal({
             )}
             <p className="mb-4 text-center text-xs text-muted-foreground">
               {effectiveScope === "shared"
-                ? "Gastos compartidos: lo que sale de la cuenta de la casa o a medias."
+                ? "Gastos compartidos."
                 : effectiveScope === "all"
                   ? "Todos los gastos del mes."
                   : `Gastos individuales de ${effectiveScope === "person1" ? person1Name : person2Name}.`}

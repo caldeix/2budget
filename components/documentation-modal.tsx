@@ -287,8 +287,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 </li>
                 <li>
                   Cada informe tiene el resumen del mes; los gráficos de ingresos por persona, de gastos fijos y
-                  variables y de <strong>gastos por categoría</strong>; el detalle de cada uno (balance calculado, dinero
-                  real y ajuste) y unas estadísticas.
+                  variables y de <strong>gastos por categoría</strong> (con tres vistas: Ambos, los compartidos, y los
+                  individuales de cada persona); el detalle de cada uno (balance calculado, dinero real y ajuste) y unas
+                  estadísticas.
                 </li>
               </ul>
             </AccordionContent>

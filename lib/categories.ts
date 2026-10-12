@@ -100,8 +100,8 @@ export function lastCategoryForName(
 }
 
 /**
- * De qué cuenta sale el gasto: "shared" son los compartidos (cuenta de la casa, a medias o en el
- * reparto que sea), "person1" y "person2" los individuales de cada uno, y "all" todos.
+ * De qué cuenta sale el gasto: "shared" son los compartidos ("Ambos": a medias o con el reparto que
+ * sea), "person1" y "person2" los individuales de cada uno, y "all" todos.
  */
 export type ExpenseScope = "all" | "shared" | "person1" | "person2"
 
