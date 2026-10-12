@@ -440,47 +440,48 @@ export function TransactionsTable({
    * @param {Transaction} transaction - La transacción.
    * @returns {JSX.Element} El elemento `<span>` del badge.
    */
-  const getCategoryBadge = (transaction: Transaction) => (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      {getTypeBadge(transaction)}
+  /**
+   * Tipo y categoría de una fila: un icono redondo para el tipo (ingreso, gasto fijo o variable;
+   * se explica al pasar el ratón) y, al lado, el nombre de la categoría. En PC, los no computables
+   * llevan además la marca "NC" (en el móvil ya va junto al importe).
+   */
+  const getCategoryBadge = (transaction: Transaction, showNonComputable = false) => (
+    <span className="inline-flex items-center gap-1.5">
+      {getTypeIcon(transaction)}
       {!isClosingAdjustment(transaction) && (
         <span className="text-xs text-muted-foreground">{categoryName(transaction)}</span>
+      )}
+      {showNonComputable && transaction.nonComputable && (
+        <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full" title="No computable">
+          NC
+        </span>
       )}
     </span>
   )
 
-  /** Etiqueta del tipo: ingreso, fijo, variable o no computable. */
-  const getTypeBadge = (transaction: Transaction) => {
-    if (transaction.nonComputable) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-          No computable
-        </span>
-      )
-    }
-
+  /** Icono del tipo: ingreso (verde), gasto fijo (rojo, calendario) o gasto variable (naranja). */
+  const getTypeIcon = (transaction: Transaction) => {
+    const base = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
     if (transaction.type === "income") {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-600">
-          <TrendingUp className="h-3 w-3" />
-          Ingreso
+        <span className={`${base} bg-green-100 text-green-600`} title="Ingreso">
+          <TrendingUp className="h-3.5 w-3.5" />
+          <span className="sr-only">Ingreso</span>
         </span>
       )
     }
-
     if (transaction.category === "fixed") {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">
-          <Calendar className="h-3 w-3" />
-          fijo
+        <span className={`${base} bg-red-100 text-red-600`} title="Gasto fijo">
+          <Calendar className="h-3.5 w-3.5" />
+          <span className="sr-only">Gasto fijo</span>
         </span>
       )
     }
-
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-600">
-        <TrendingDown className="h-3 w-3" />
-        variable
+      <span className={`${base} bg-orange-100 text-orange-600`} title="Gasto variable">
+        <TrendingDown className="h-3.5 w-3.5" />
+        <span className="sr-only">Gasto variable</span>
       </span>
     )
   }
@@ -731,7 +732,7 @@ export function TransactionsTable({
                         </span>
                       )}
                     </div>
-                    <div>{getCategoryBadge(transaction)}</div>
+                    <div>{getCategoryBadge(transaction, true)}</div>
                     {!singleMode && (
                       <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
                         {getOwnerDisplay(transaction)}
