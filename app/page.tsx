@@ -18,6 +18,7 @@ import {
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment } from "@/lib/aggregations"
+import { isHiddenFromViewer, type Person } from "@/lib/privacy"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -183,6 +184,20 @@ export default function HomePage() {
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
+
+  // Privacidad en pareja: mi rol en el hogar y si mi pareja me oculta sus transacciones individuales.
+  const viewerRole: Person | null = (session.user && householdInfo?.roles[session.user.uid]) || null
+  const isAmountHidden = useCallback(
+    (t: Transaction) => isHiddenFromViewer(t, viewerRole, data.config),
+    [viewerRole, data.config],
+  )
+  const handleHideOwnFromPartnerChange = (hidden: boolean) => {
+    if (!viewerRole) return
+    updateConfig({
+      ...data.config,
+      hideIndividualFromPartner: { ...data.config.hideIndividualFromPartner, [viewerRole]: hidden },
+    })
+  }
 
   // Nombres ya usados (sin los ajustes de cierre), del más reciente al más antiguo, para
   // sugerirlos al escribir el nombre de una transacción.
@@ -618,6 +633,7 @@ export default function HomePage() {
               hasMore={hasMoreTransactions}
               singleMode={data.config.singleMode}
               locked={isSelectedMonthLocked}
+              isAmountHidden={isAmountHidden}
             />
           </div>
         </div>
@@ -713,6 +729,7 @@ export default function HomePage() {
         monthName={getMonthName(selectedMonth - 1)}
         year={selectedYear}
         transactions={transactionsToCopy}
+        isAmountHidden={isAmountHidden}
         expenseCount={transactionsToCopy.filter(isFixedExpense).length}
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
       />
@@ -724,6 +741,7 @@ export default function HomePage() {
         expenses={reconcileExpenses}
         onMarkAll={handleReconcileMarkAll}
         onSave={handleReconcileSave}
+        isAmountHidden={isAmountHidden}
       />
 
       <TransactionForm
@@ -805,6 +823,8 @@ export default function HomePage() {
           setIsAccountModalOpen(false)
           setRecoveryCodeToShow(code)
         }}
+        hidesOwnFromPartner={viewerRole ? Boolean(data.config.hideIndividualFromPartner?.[viewerRole]) : false}
+        onHideOwnFromPartnerChange={viewerRole ? handleHideOwnFromPartnerChange : undefined}
       />
 
       <MasterCheckDialog

@@ -45,6 +45,9 @@ interface AccountModalProps {
   person2Name: string
   singleMode?: boolean
   onRecoveryCode: (code: string) => void
+  /** Privacidad en pareja: si quien mira oculta sus transacciones individuales (ver `HouseholdManager`). */
+  hidesOwnFromPartner?: boolean
+  onHideOwnFromPartnerChange?: (hidden: boolean) => void
 }
 
 export function AccountModal({
@@ -56,6 +59,8 @@ export function AccountModal({
   person2Name,
   singleMode,
   onRecoveryCode,
+  hidesOwnFromPartner,
+  onHideOwnFromPartnerChange,
 }: AccountModalProps) {
   const { services, user, profile, householdId } = session
   if (!services) return null
@@ -78,6 +83,8 @@ export function AccountModal({
                 person1Name={person1Name}
                 person2Name={person2Name}
                 singleMode={singleMode}
+                hidesOwnFromPartner={hidesOwnFromPartner}
+                onHideOwnFromPartnerChange={onHideOwnFromPartnerChange}
               />
             ) : (
               <HouseholdSetup services={services} user={user} singleMode={singleMode} onRecoveryCode={onRecoveryCode} />
