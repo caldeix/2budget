@@ -48,6 +48,19 @@ const defaultData: AppData = {
 }
 
 /**
+ * @function ownerForShare
+ * @description Propietario efectivo de una transacción: un reparto "Ambos" con el 100% para una
+ *              persona pasa a ser individual de esa persona (y el 0%, de la otra). Así no se ve
+ *              "Luis (100%) Ana (0%)" y la privacidad en pareja la trata como individual.
+ */
+export function ownerForShare(owner: Transaction["owner"], person1Percentage: number): Transaction["owner"] {
+  if (owner !== "both") return owner
+  if (person1Percentage >= 100) return "person1"
+  if (person1Percentage <= 0) return "person2"
+  return "both"
+}
+
+/**
  * @function normalizeTransaction
  * @description Rellena campos que pueden faltar en transacciones antiguas o importadas,
  *              garantizando un valor por defecto consistente (evita discrepancias tipo/runtime).
@@ -58,8 +71,11 @@ export function normalizeTransaction(t: Transaction): Transaction {
   // El porcentaje de la Persona 2 se deriva del de la Persona 1 para que un dato
   // incoherente (p. ej. 30/60) no rompa el cuadre de los repartos.
   const person1Percentage = normalizePercentage(t.person1Percentage ?? 50)
+  // "Ambos" con el 100% para uno es, en realidad, individual de esa persona (ver `ownerForShare`).
+  const owner = ownerForShare(t.owner, person1Percentage)
   return {
     ...t,
+    owner,
     amount: roundMoney(t.amount),
     person1Percentage,
     person2Percentage: 100 - person1Percentage,

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label" // Componente de etiqueta para inp
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
 import { DatePicker } from "@/components/ui/date-picker" // Calendario propio de la app.
+import { ownerForShare } from "@/lib/storage" // "Ambos" al 100% → individual.
 import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
 
 /** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
@@ -194,7 +195,14 @@ export function TransactionForm({
     // Se admite 0 € para mantener un gasto habitual que un mes no se cobra.
     if (!formData.name || formData.amount < 0 || isDateTooEarly) return
 
-    onSubmit(formData) // Llama a la función de envío del padre con los datos del formulario.
+    // "Ambos" al 100% para una persona se guarda como individual de esa persona.
+    const owner = ownerForShare(formData.owner, formData.person1Percentage)
+    onSubmit({
+      ...formData,
+      owner,
+      person1Percentage: owner === "person1" ? 100 : owner === "person2" ? 0 : formData.person1Percentage,
+      person2Percentage: owner === "person1" ? 0 : owner === "person2" ? 100 : formData.person2Percentage,
+    }) // Llama a la función de envío del padre con los datos del formulario.
     onClose() // Cierra el modal.
   }
 
