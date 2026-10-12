@@ -24,19 +24,20 @@ interface Sample {
   /** Gasto ya pagado (en los meses cerrados, todos lo están). */
   paid?: boolean
   nonComputable?: boolean
+  categoryId?: string
 }
 
 const SAMPLES: Sample[] = [
-  { day: 1, type: "income", category: "income", name: "Nómina", amount: 2100, owner: "person1" },
-  { day: 1, type: "income", category: "income", name: "Nómina", amount: 1850, owner: "person2" },
-  { day: 1, type: "expense", category: "fixed", name: "Alquiler", amount: 950, owner: "both", paid: true },
-  { day: 3, type: "expense", category: "fixed", name: "Internet y móvil", amount: 45.9, owner: "both", paid: true },
-  { day: 4, type: "expense", category: "variable", name: "Supermercado", amount: 124.35, owner: "both", paid: true },
-  { day: 6, type: "expense", category: "variable", name: "Gasolina", amount: 60, owner: "person1", paid: true },
-  { day: 8, type: "expense", category: "fixed", name: "Luz", amount: 68.4, owner: "both" },
-  { day: 10, type: "expense", category: "variable", name: "Cena con amigos", amount: 72.5, owner: "both" },
-  { day: 12, type: "expense", category: "fixed", name: "Gimnasio", amount: 35, owner: "person2" },
-  { day: 14, type: "expense", category: "variable", name: "Ahorro vacaciones", amount: 100, owner: "both", nonComputable: true, paid: true },
+  { day: 1, type: "income", category: "income", name: "Nómina", amount: 2100, owner: "person1", categoryId: "nomina" },
+  { day: 1, type: "income", category: "income", name: "Nómina", amount: 1850, owner: "person2", categoryId: "nomina" },
+  { day: 1, type: "expense", category: "fixed", name: "Alquiler", amount: 950, owner: "both", paid: true, categoryId: "casa" },
+  { day: 3, type: "expense", category: "fixed", name: "Internet y móvil", amount: 45.9, owner: "both", paid: true, categoryId: "suministros" },
+  { day: 4, type: "expense", category: "variable", name: "Supermercado", amount: 124.35, owner: "both", paid: true, categoryId: "supermercado" },
+  { day: 6, type: "expense", category: "variable", name: "Gasolina", amount: 60, owner: "person1", paid: true, categoryId: "transporte" },
+  { day: 8, type: "expense", category: "fixed", name: "Luz", amount: 68.4, owner: "both", categoryId: "suministros" },
+  { day: 10, type: "expense", category: "variable", name: "Cena con amigos", amount: 72.5, owner: "both", categoryId: "ocio" },
+  { day: 12, type: "expense", category: "fixed", name: "Gimnasio", amount: 35, owner: "person2", categoryId: "salud" },
+  { day: 14, type: "expense", category: "variable", name: "Ahorro vacaciones", amount: 100, owner: "both", nonComputable: true, paid: true, categoryId: "ahorro" },
 ]
 
 /** Fecha `YYYY-MM-DD` de un día del mes (sin pasarse del último). */
@@ -82,6 +83,7 @@ export function createTourData(now: Date, config: AppConfig): AppData {
       createdAt: new Date(now.getTime() - seq * 60_000).toISOString(),
       nonComputable: Boolean(s.nonComputable),
       paid: s.type === "expense" && (closed || Boolean(s.paid)),
+      categoryId: s.categoryId,
     }
   }
 

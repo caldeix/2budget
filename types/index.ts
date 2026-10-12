@@ -51,6 +51,8 @@ export interface Transaction {
    * marca se reconocen por su nombre (ver `isClosingAdjustment`).
    */
   closingAdjustment?: boolean
+  /** Categoría (Supermercado, Casa…): id de una de `AppConfig.categories`. Sin ella, "Sin categoría". */
+  categoryId?: string
 }
 
 /**
@@ -111,6 +113,11 @@ export interface AppConfig {
    * individuales (las 100% suyas). Lo cambia cada uno desde Cuenta > Tu hogar. Ver `lib/privacy.ts`.
    */
   hideIndividualFromPartner?: { person1?: boolean; person2?: boolean }
+  /**
+   * Categorías de las transacciones, editables desde Configuración (ver `lib/categories.ts`).
+   * Si falta, se usan las iniciales.
+   */
+  categories?: { id: string; name: string; kind: "expense" | "income" }[]
 }
 
 /**
@@ -155,6 +162,7 @@ export interface TransactionFormData {
   person2Percentage: number
   date: string
   nonComputable?: boolean
+  categoryId?: string
 }
 
 /**
