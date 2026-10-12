@@ -164,18 +164,8 @@ export function ReportDetailModal({
           </div>
         </div>
 
-        {/* Sección de Gráficos */}
+        {/* Sección de Gráficos: ingresos por persona y gastos por tipo en una fila; por categoría, a todo el ancho */}
         <div className={`grid grid-cols-1 gap-8 ${showPerson2 ? "lg:grid-cols-2" : ""}`}>
-          {/* Gráfico de Distribución de Gastos */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Gastos</h3>
-            <PieChart data={expenseChartData} size={250} />
-          </div>
-          {/* Gastos por categoría */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Gastos por categoría</h3>
-            <PieChart data={categoryChartData} size={250} />
-          </div>
           {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2 no aporta nada) */}
           {showPerson2 && (
             <div>
@@ -183,6 +173,16 @@ export function ReportDetailModal({
               <PieChart data={incomeChartData} size={250} />
             </div>
           )}
+          {/* Gráfico de Distribución de Gastos (fijos y variables) */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Gastos</h3>
+            <PieChart data={expenseChartData} size={250} />
+          </div>
+          {/* Gastos por categoría: ocupa la fila entera y la leyenda va en columnas */}
+          <div className={showPerson2 ? "lg:col-span-2" : ""}>
+            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Gastos por categoría</h3>
+            <PieChart data={categoryChartData} size={250} legend="grid" />
+          </div>
         </div>
 
         {/* Sección de Detalles por Persona */}
