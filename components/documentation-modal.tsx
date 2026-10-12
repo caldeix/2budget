@@ -59,6 +59,12 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
           Configuración y la app funcionará para una sola persona.
         </p>
 
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Instálala como una app:</strong> en Android, abre el menú de Chrome y
+          pulsa «Instalar app» (o «Añadir a pantalla de inicio» &gt; «Instalar»); en iPhone, en Safari, Compartir &gt;
+          «Añadir a pantalla de inicio». Se abrirá a pantalla completa, con su icono, y también sin conexión.
+        </p>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl bg-muted p-4">
           <p className="text-sm text-muted-foreground">¿Prefieres verlo sobre la propia app? Repite el tour guiado.</p>
           <Button onClick={onStartTour} variant="outline" className="flex items-center gap-2 shrink-0">
