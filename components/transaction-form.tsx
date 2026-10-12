@@ -260,7 +260,7 @@ export function TransactionForm({
     <Modal isOpen={isOpen} onClose={onClose} title={transaction ? "Editar Transacción" : "Nueva Transacción"} size="md">
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         {/* Tipo (ingreso, gasto fijo o variable: `type` + `category` en un solo selector) y Categoría */}
-        <div className="grid grid-cols-2 gap-4">
+        <div data-tour="form-type" className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="type">Tipo</Label>
             <select
@@ -325,7 +325,7 @@ export function TransactionForm({
         </div>
 
         {/* Campo de Nombre */}
-        <div className="relative">
+        <div data-tour="form-name" className="relative">
           <Label htmlFor="name">Nombre</Label>
           <Input
             id="name"
@@ -381,7 +381,7 @@ export function TransactionForm({
         </div>
 
         {/* Campos de Importe y Fecha */}
-        <div className="grid grid-cols-2 gap-4">
+        <div data-tour="form-amount-date" className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="amount">Importe (€)</Label>
             <AmountInput
@@ -412,7 +412,7 @@ export function TransactionForm({
         {/* Reparto entre los dos (oculto en modo individual). Sustituye al antiguo selector de
             propietario: 100% para uno equivale a "solo suyo". */}
         {showShareSlider && (
-          <div className="space-y-4">
+          <div data-tour="form-share" className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Reparto</Label>
               <span className="text-xs text-muted-foreground">

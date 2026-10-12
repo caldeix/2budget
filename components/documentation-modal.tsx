@@ -110,6 +110,12 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 La tarjeta <strong>Total acumulado</strong> suma el balance de todos los meses desde el principio: lo
                 ahorrado en total y por persona. No cuenta los gastos no computables.
               </p>
+              <Subtitle>Evolución</Subtitle>
+              <p>
+                La tarjeta <strong>Evolución</strong> muestra los ingresos y gastos de los últimos seis meses. Púlsala
+                para ver el año completo: ingresos, gastos y ahorro de cada mes, los totales del año y un selector de
+                año. Se calcula con las transacciones de cada mes, cerrado o no.
+              </p>
             </AccordionContent>
           </AccordionItem>
 
@@ -125,8 +131,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               <Subtitle>Buscar y filtrar</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Busca por nombre, o filtra por tipo (ingresos o gastos), por categoría (fijo o variable) y por pago
-                  (solo los gastos pagados o solo los pendientes).
+                  <strong>Buscar:</strong> mientras hay texto en el buscador se busca en <strong>todos los meses</strong>,
+                  no solo en el que ves. Las transacciones de otros meses llevan la fecha en dorado y, si su mes está
+                  cerrado, no se pueden editar. Al borrar el texto vuelve el mes.
+                </li>
+                <li>
+                  <strong>Filtrar:</strong> por tipo (ingresos, gastos fijos o gastos variables), por categoría
+                  (Supermercado, Casa… o «Sin categoría») y por pago (solo los gastos pagados o solo los pendientes).
                 </li>
                 <li>
                   El contador (por ejemplo <strong>10/29</strong>) indica cuántas transacciones se ven de las que hay en
@@ -167,18 +178,22 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             <AccordionContent className="space-y-4 text-muted-foreground">
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  <strong>Tipo:</strong> gasto o ingreso.
+                  <strong>Tipo:</strong> <em>gasto variable</em> (supermercado, ocio…), <em>gasto fijo</em> (alquiler,
+                  suscripciones…; son los que se copian de un mes a otro) o <em>ingreso</em>.
                 </li>
                 <li>
-                  <strong>Categoría</strong> (solo gastos): <em>fijo</em> (alquiler, suscripciones…) o <em>variable</em>{" "}
-                  (supermercado, ocio…). Los fijos son los que se copian de un mes a otro.
+                  <strong>Categoría:</strong> en qué se va el dinero (Supermercado, Casa, Transporte…). Hay una lista
+                  para gastos y otra para ingresos, y se cambian desde Configuración. Puedes dejarla en «Sin
+                  categoría». La app la usa para el gráfico por categoría del informe y para filtrar la lista.
                 </li>
                 <li>
                   <strong>Gasto no computable:</strong> cuenta en el mes pero no en el total acumulado (ver la sección 4).
                 </li>
                 <li>
                   <strong>Nombre:</strong> al escribir te sugiere los nombres que ya has usado en transacciones del mismo
-                  tipo; pulsa uno (o elígelo con las flechas y Enter) para no escribirlo entero.
+                  tipo; pulsa uno (o elígelo con las flechas y Enter) para no escribirlo entero. Al elegirlo, o al
+                  escribir un nombre que ya existe, se rellena sola la <strong>categoría</strong> de la última vez (si
+                  no has elegido ya otra a mano).
                 </li>
                 <li>
                   <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50). La
@@ -271,8 +286,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   lista completa, con filtro por año.
                 </li>
                 <li>
-                  Cada informe tiene el resumen del mes, gráficos de gastos (fijos y variables) y de ingresos por persona,
-                  el detalle de cada uno (balance calculado, dinero real y ajuste) y unas estadísticas.
+                  Cada informe tiene el resumen del mes; los gráficos de ingresos por persona, de gastos fijos y
+                  variables y de <strong>gastos por categoría</strong>; el detalle de cada uno (balance calculado, dinero
+                  real y ajuste) y unas estadísticas.
                 </li>
               </ul>
             </AccordionContent>
@@ -287,8 +303,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   <strong>Nombres:</strong> cambia «Persona 1» y «Persona 2» por vuestros nombres.
                 </li>
                 <li>
-                  <strong>Modo individual:</strong> oculta la segunda persona (sin propietario ni reparto, y el cierre
-                  pide un solo dinero real). No borra nada y se puede desactivar cuando quieras.
+                  <strong>Modo individual:</strong> oculta la segunda persona (sin reparto, y el cierre pide un solo
+                  dinero real). No borra nada y se puede desactivar cuando quieras.
+                </li>
+                <li>
+                  <strong>Categorías:</strong> la lista que sale al añadir una transacción. Renombra en la propia fila,
+                  quita con la papelera o añade una nueva (de gasto o de ingreso). Al quitar una, sus transacciones
+                  pasan a «Sin categoría». Los cambios se aplican al pulsar «Guardar configuración».
                 </li>
                 <li>
                   <strong>Exportar datos:</strong> descarga una copia en JSON, sin cifrar, con todas las transacciones,
