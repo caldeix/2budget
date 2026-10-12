@@ -87,7 +87,13 @@ const HIDDEN_EDIT_HINT = "Tu pareja ha ocultado el importe de sus transacciones 
  * @typedef {'date' | 'name' | 'amount' | 'type'} SortField
  * @description Tipo para los campos por los que se puede ordenar la tabla.
  */
-type SortField = "date" | "name" | "amount" | "type"
+type SortField = "date" | "name" | "amount" | "type" | "paid"
+
+/**
+ * Orden por pago. El primer clic ordena de mayor a menor: primero los gastos pendientes, luego
+ * los pagados y al final los ingresos (que no se marcan). El segundo clic, al revés.
+ */
+const paidRank = (t: Transaction) => (t.type === "income" ? 0 : isSettled(t) ? 1 : 2)
 /**
  * @typedef {'asc' | 'desc'} SortDirection
  * @description Tipo para la dirección de ordenación (ascendente o descendente).
@@ -326,6 +332,10 @@ export function TransactionsTable({
           aValue = a.type // Compara por tipo (ingreso/gasto).
           bValue = b.type
           break
+        case "paid":
+          aValue = paidRank(a) // Pendientes, pagados e ingresos.
+          bValue = paidRank(b)
+          break
         default:
           return 0 // No hay ordenación por defecto.
       }
@@ -464,9 +474,8 @@ export function TransactionsTable({
           />
         </div>
 
-        {/* Título y filtros en una línea solo con ancho de sobra (desde 1280 px); si no, los filtros
-            se salían de la tarjeta. */}
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mt-4">
+        {/* Título y, debajo, los filtros: la búsqueda en una línea y los tres selectores en la siguiente. */}
+        <div className="flex flex-col gap-4 mt-4">
           <div>
             <h2 className="text-xl font-semibold text-foreground">Transacciones</h2>
             <p className="text-sm text-muted-foreground">
@@ -474,51 +483,54 @@ export function TransactionsTable({
             </p>
           </div>
 
-          <div data-tour="filters" className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
-            {/* Campo de búsqueda (a todo el ancho en móvil, como los selectores) */}
-            <div className="relative w-full sm:w-auto">
+          <div data-tour="filters" className="space-y-3">
+            {/* Campo de búsqueda, a todo el ancho */}
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar transacciones..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 w-full sm:w-64 bg-input text-foreground border-border"
+                className="pl-10 w-full bg-input text-foreground border-border"
               />
             </div>
 
-            {/* Selector de filtro por tipo */}
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as any)}
-              className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-            >
-              <option value="all">Todos los tipos</option>
-              <option value="income">Ingresos</option>
-              <option value="expense">Gastos</option>
-            </select>
+            {/* Tipo, categoría y pago en una línea (en móvil, uno debajo de otro: no caben) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Selector de filtro por tipo */}
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+              >
+                <option value="all">Todos los tipos</option>
+                <option value="income">Ingresos</option>
+                <option value="expense">Gastos</option>
+              </select>
 
-            {/* Selector de filtro por categoría */}
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value as any)}
-              className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-            >
-              <option value="all">Todas las categorías</option>
-              <option value="fixed">fijo</option>
-              <option value="variable">variable</option>
-            </select>
+              {/* Selector de filtro por categoría */}
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value as any)}
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+              >
+                <option value="all">Todas las categorías</option>
+                <option value="fixed">fijo</option>
+                <option value="variable">variable</option>
+              </select>
 
-            {/* Selector de filtro por pago (solo gastos) */}
-            <select
-              value={filterPaid}
-              onChange={(e) => setFilterPaid(e.target.value as "all" | "paid" | "pending")}
-              aria-label="Filtrar por pago"
-              className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-            >
-              <option value="all">Pagados y pendientes</option>
-              <option value="paid">Pagados</option>
-              <option value="pending">Pendientes de pago</option>
-            </select>
+              {/* Selector de filtro por pago (solo gastos) */}
+              <select
+                value={filterPaid}
+                onChange={(e) => setFilterPaid(e.target.value as "all" | "paid" | "pending")}
+                aria-label="Filtrar por pago"
+                className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+              >
+                <option value="all">Pagados y pendientes</option>
+                <option value="paid">Pagados</option>
+                <option value="pending">Pendientes de pago</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -615,7 +627,15 @@ export function TransactionsTable({
                 Importe
                 {getSortIcon("amount")}
               </button>
-              <span className="text-right">Acciones</span>
+              {/* Ordena por pago: el círculo de pagado es la primera acción de cada fila. */}
+              <button
+                onClick={() => handleSort("paid")}
+                className="flex items-center gap-2 hover:text-foreground justify-end"
+                title="Ordenar por pagados y pendientes"
+              >
+                Pagado
+                {getSortIcon("paid")}
+              </button>
             </div>
 
             {/* Lista de Transacciones (renderiza filas para escritorio y móvil) */}
