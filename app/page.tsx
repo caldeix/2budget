@@ -19,7 +19,8 @@ import {
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
-import { categoriesOf } from "@/lib/categories"
+import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
+import { CategorySpreadModal } from "@/components/category-spread-modal"
 import { lastMonths, monthlyEvolution } from "@/lib/evolution"
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
@@ -88,6 +89,7 @@ export default function HomePage() {
     isLoading: isDataLoading,
     addTransaction,
     updateTransaction,
+    applyCategoryToName,
     setTransactionsPaid,
     deleteTransaction,
     updateConfig,
@@ -241,13 +243,35 @@ export default function HomePage() {
     return out
   }, [data.transactions])
 
+  // Al poner categoría a un nombre que ya se usó antes sin ella, se ofrece aplicarla a las anteriores.
+  const [categorySpread, setCategorySpread] = useState<{
+    name: string
+    type: Transaction["type"]
+    categoryId: string
+    count: number
+  } | null>(null)
+
   const handleAddOrUpdateTransaction = (transactionData: TransactionFormData) => {
+    const editedId = editingTransaction?.id
     if (editingTransaction) {
       updateTransaction(editingTransaction.id, transactionData)
       setEditingTransaction(null)
     } else {
       addTransaction(transactionData)
     }
+
+    const { name, type, categoryId } = transactionData
+    if (!categoryId || isTourActive) return
+    const target = normalizeName(name)
+    const count = data.transactions.filter(
+      (t) =>
+        t.id !== editedId &&
+        t.type === type &&
+        !t.categoryId &&
+        !isClosingAdjustment(t) &&
+        normalizeName(t.name) === target,
+    ).length
+    if (count > 0) setCategorySpread({ name: name.trim(), type, categoryId, count })
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -578,8 +602,10 @@ export default function HomePage() {
           showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
         />
 
-        <div className="flex flex-col lg:flex-row gap-8 mt-8">
-          <aside className="w-full lg:w-80 space-y-8">
+        {/* Desde 1280 px, el lateral mide lo mismo que una tarjeta del resumen (4 columnas con
+            separación de 24 px): así la lista de transacciones empieza donde empieza la tarjeta de Ingresos. */}
+        <div className="flex flex-col lg:flex-row gap-8 xl:gap-6 mt-8">
+          <aside className="w-full lg:w-80 xl:w-[calc((100%-72px)/4)] xl:shrink-0 space-y-8">
             <CumulativeBalanceCard
               totalBalance={cumulativeBalances.totalBalance}
               person1TotalBalance={cumulativeBalances.person1TotalBalance}
@@ -782,6 +808,18 @@ export default function HomePage() {
         isAmountHidden={isAmountHidden}
         expenseCount={transactionsToCopy.filter(isFixedExpense).length}
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
+      />
+
+      <CategorySpreadModal
+        isOpen={categorySpread !== null}
+        onClose={() => setCategorySpread(null)}
+        onConfirm={() => {
+          if (categorySpread) applyCategoryToName(categorySpread.name, categorySpread.type, categorySpread.categoryId)
+          setCategorySpread(null)
+        }}
+        name={categorySpread?.name ?? ""}
+        categoryName={categorySpread ? categoryNameOf(data.config, { categoryId: categorySpread.categoryId }) : ""}
+        count={categorySpread?.count ?? 0}
       />
 
       <PaidReconciliationModal
