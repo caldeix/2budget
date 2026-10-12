@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
-import { getTodayDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC) y unión de clases.
+import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
 
 /** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
 export interface NameSuggestion {
@@ -49,6 +49,8 @@ const normalize = (text: string) =>
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta el propietario y el reparto.
  * @property {NameSuggestion[]} [nameSuggestions] - Nombres ya usados, para sugerirlos al escribir.
+ * @property {string} [minDate] - Primera fecha admitida (YYYY-MM-DD): no se añaden transacciones a meses
+ *           ya pasados (ver `app/page.tsx`). Al editar, la fecha original de la transacción siempre vale.
  */
 interface TransactionFormProps {
   isOpen: boolean
@@ -59,6 +61,7 @@ interface TransactionFormProps {
   person2Name: string
   singleMode?: boolean
   nameSuggestions?: NameSuggestion[]
+  minDate?: string
 }
 
 /**
@@ -77,6 +80,7 @@ export function TransactionForm({
   person2Name,
   singleMode = false,
   nameSuggestions = [],
+  minDate,
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
   const defaultOwner = singleMode ? "person1" : "both"
@@ -98,6 +102,10 @@ export function TransactionForm({
     date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
   })
+
+  // Fecha mínima efectiva: al editar, la fecha que ya tenía la transacción no se rechaza.
+  const effectiveMinDate = minDate && transaction && transaction.date < minDate ? transaction.date : minDate
+  const isDateTooEarly = effectiveMinDate !== undefined && formData.date < effectiveMinDate
 
   /**
    * `useEffect` para inicializar el formulario cuando se abre el modal
@@ -183,7 +191,7 @@ export function TransactionForm({
     e.preventDefault() // Previene el comportamiento por defecto del formulario.
     // Validación básica: el nombre no puede estar vacío y el importe no puede ser negativo.
     // Se admite 0 € para mantener un gasto habitual que un mes no se cobra.
-    if (!formData.name || formData.amount < 0) return
+    if (!formData.name || formData.amount < 0 || isDateTooEarly) return
 
     onSubmit(formData) // Llama a la función de envío del padre con los datos del formulario.
     onClose() // Cierra el modal.
@@ -342,9 +350,17 @@ export function TransactionForm({
               id="date"
               type="date"
               value={formData.date}
+              min={effectiveMinDate}
               onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
+              aria-invalid={isDateTooEarly}
               required
             />
+            {isDateTooEarly && (
+              <p className="mt-1 text-xs text-destructive">
+                Los meses anteriores ya están cerrados: la fecha tiene que ser del {formatDate(effectiveMinDate)} en
+                adelante.
+              </p>
+            )}
           </div>
         </div>
 
@@ -394,7 +410,7 @@ export function TransactionForm({
           <Button type="button" variant="outline" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={!formData.name || formData.amount < 0}>
+          <Button type="submit" disabled={!formData.name || formData.amount < 0 || isDateTooEarly}>
             {transaction ? "Actualizar" : "Crear"} {/* Texto del botón cambia según si es edición o creación. */}
           </Button>
         </div>

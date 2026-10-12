@@ -181,7 +181,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   tipo; pulsa uno (o elígelo con las flechas y Enter) para no escribirlo entero.
                 </li>
                 <li>
-                  <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50).
+                  <strong>Importe y fecha.</strong> El importe admite hasta dos decimales (por ejemplo 120,50). La
+                  fecha puede ser del mes actual o del anterior mientras no esté cerrado; los meses ya cerrados no
+                  admiten transacciones nuevas.
                 </li>
                 <li>
                   <strong>Propietario:</strong> {person1Name}, {person2Name} o Ambos. Con «Ambos», el deslizador reparte
