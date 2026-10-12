@@ -100,14 +100,32 @@ export function lastCategoryForName(
 }
 
 /**
+ * De qué cuenta sale el gasto: "shared" son los compartidos ("Ambos": a medias o con el reparto que
+ * sea), "person1" y "person2" los individuales de cada uno, y "all" todos.
+ */
+export type ExpenseScope = "all" | "shared" | "person1" | "person2"
+
+/** Indica si el gasto entra en la vista pedida. */
+export function isInScope(t: Transaction, scope: ExpenseScope): boolean {
+  if (scope === "all") return true
+  if (scope === "shared") return t.owner === "both"
+  return t.owner === scope
+}
+
+/**
  * @function expensesByCategory
  * @description Suma de los gastos por categoría (por nombre), de mayor a menor, para el gráfico
- *              del informe. Los ajustes de cierre no cuentan.
+ *              del informe. Los ajustes de cierre no cuentan. Con `scope`, solo los gastos de esa
+ *              cuenta (compartidos o individuales de una persona); las tres vistas suman el total.
  */
-export function expensesByCategory(transactions: Transaction[], config: AppConfig): { label: string; value: number }[] {
+export function expensesByCategory(
+  transactions: Transaction[],
+  config: AppConfig,
+  scope: ExpenseScope = "all",
+): { label: string; value: number }[] {
   const cents = new Map<string, number>()
   for (const t of transactions) {
-    if (t.type !== "expense" || isClosingAdjustment(t)) continue
+    if (t.type !== "expense" || isClosingAdjustment(t) || !isInScope(t, scope)) continue
     const label = categoryNameOf(config, t)
     cents.set(label, (cents.get(label) ?? 0) + Math.round(t.amount * 100))
   }

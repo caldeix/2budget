@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.9.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.10.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,11 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.10.0 — Gastos por categoría según de quién son
+
+- **Tres vistas en el quesito de categorías del informe** — "Ambos" (los gastos compartidos, con cualquier reparto), y los individuales de cada persona. Las tres suman el total del mes. En modo individual no hay selector
+- SemVer: 2.9.0 → 2.10.0 (MINOR)
 
 ### v2.9.0 — Categorías, evolución y búsqueda en todos los meses
 
