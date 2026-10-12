@@ -512,7 +512,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-center items-center h-12 sm:h-16">
             <h1 className="text-xl sm:text-2xl font-bold text-foreground relative">
               2Budge
@@ -534,7 +534,7 @@ export default function HomePage() {
       </header>
 
       {syncError && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-amber-600">{syncError}</p>
@@ -543,7 +543,7 @@ export default function HomePage() {
       )}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
         <SummaryCards
           totalIncome={calculations.totalIncome}
           totalExpenses={calculations.totalExpenses}
