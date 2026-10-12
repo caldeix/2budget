@@ -20,6 +20,9 @@ import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
 import { categoriesOf } from "@/lib/categories"
+import { lastMonths, monthlyEvolution } from "@/lib/evolution"
+import { EvolutionCard } from "@/components/evolution-card"
+import { EvolutionModal } from "@/components/evolution-modal"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -108,6 +111,7 @@ export default function HomePage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
+  const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
   // Móvil: los botones flotantes secundarios se despliegan con el botón de menú (en PC se ven siempre).
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
@@ -192,6 +196,9 @@ export default function HomePage() {
   // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
+  // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
+  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
+  const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
   // Privacidad en pareja: mi rol en el hogar y si mi pareja me oculta sus transacciones individuales.
@@ -430,6 +437,7 @@ export default function HomePage() {
     isReportModalOpen ||
     selectedReport !== null ||
     isReportsListOpen ||
+    isEvolutionOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     isConfirmCopyModalOpen
@@ -556,6 +564,8 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
             />
+
+            <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
 
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
@@ -785,6 +795,13 @@ export default function HomePage() {
           singleMode={data.config.singleMode}
         />
       )}
+
+      <EvolutionModal
+        isOpen={isEvolutionOpen}
+        onClose={() => setIsEvolutionOpen(false)}
+        points={evolutionPoints}
+        currentYear={actualCurrentYear}
+      />
 
       <ReportsListModal
         isOpen={isReportsListOpen}
