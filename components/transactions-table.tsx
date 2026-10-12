@@ -57,6 +57,10 @@ const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
  * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
+ * @property {Transaction[]} [allTransactions] - Todas las transacciones: con texto en el buscador se
+ *           busca en todos los meses, no solo en el seleccionado.
+ * @property {(t: Transaction) => boolean} [isTransactionLocked] - Si la transacción es de un mes cerrado
+ *           (solo lectura), para las filas de otros meses al buscar.
  * @property {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja (ver `lib/privacy.ts`).
  * @property {Category[]} categories - Categorías del hogar, para mostrarlas y filtrar.
  */
@@ -76,6 +80,8 @@ interface TransactionsTableProps {
   hasMore: boolean
   singleMode?: boolean
   locked?: boolean
+  allTransactions?: Transaction[]
+  isTransactionLocked?: (t: Transaction) => boolean
   isAmountHidden?: (t: Transaction) => boolean
   categories: Category[]
 }
@@ -127,6 +133,8 @@ export function TransactionsTable({
   hasMore, // Si hay más transacciones para cargar.
   singleMode = false,
   locked = false,
+  allTransactions,
+  isTransactionLocked,
   isAmountHidden = neverHidden,
   categories,
 }: TransactionsTableProps) {
@@ -181,7 +189,8 @@ export function TransactionsTable({
    * @returns {void}
    */
   const handleTouchEndRow = (e: React.TouchEvent, transactionId: string) => {
-    if (locked) return // Mes cerrado: no hay acciones que mostrar.
+    const row = filteredAndSortedTransactions.find((t) => t.id === transactionId)
+    if (row && isRowLocked(row)) return // Mes cerrado: no hay acciones que mostrar.
     const touchEndX = e.changedTouches[0].clientX
     const deltaX = touchEndX - touchStartXRow // Distancia horizontal del swipe.
 
@@ -298,8 +307,16 @@ export function TransactionsTable({
    * `useMemo` que filtra las transacciones por búsqueda, tipo y categoría (SIN paginar).
    * Es la base tanto de la lista como de las tarjetas de resumen "Filtradas".
    */
+  // Con texto en el buscador se busca en TODOS los meses (si se han pasado); si no, en el mes.
+  const isSearchingAll = searchTerm.trim() !== "" && allTransactions !== undefined
+  const searchBase = isSearchingAll ? allTransactions : transactions
+  const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`
+  const isOtherMonth = (t: Transaction) => isSearchingAll && t.date.slice(0, 7) !== selectedMonthKey
+  // Solo lectura por fila: el mes seleccionado si está cerrado, o el mes de la fila al buscar.
+  const isRowLocked = (t: Transaction) => (isOtherMonth(t) ? Boolean(isTransactionLocked?.(t)) : locked)
+
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((transaction) => {
+    return searchBase.filter((transaction) => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesType =
         filterType === "all" ||
@@ -316,7 +333,8 @@ export function TransactionsTable({
 
       return matchesSearch && matchesType && matchesCategory && matchesPaid
     })
-  }, [transactions, searchTerm, filterType, filterCategory, filterPaid])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid])
 
   /**
    * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
@@ -504,7 +522,8 @@ export function TransactionsTable({
           <h2 className="text-xl font-semibold text-foreground">
             Transacciones{" "}
             <span className="text-sm font-normal text-muted-foreground">
-              {filteredAndSortedTransactions.length}/{transactions.length}
+              {filteredAndSortedTransactions.length}/{searchBase.length}
+              {isSearchingAll && " · todos los meses"}
             </span>
           </h2>
 
@@ -689,7 +708,14 @@ export function TransactionsTable({
                         }`}
                       />
                       <div>
-                        <div className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                        <div
+                          className={cn(
+                            "text-sm font-medium",
+                            transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
+                            isOtherMonth(transaction) && "text-primary",
+                          )}
+                          title={isOtherMonth(transaction) ? "De otro mes" : undefined}
+                        >
                           {formatDate(transaction.date)}
                         </div>
                       </div>
@@ -727,7 +753,7 @@ export function TransactionsTable({
                     </div>
                     {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
-                      {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                      {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -745,7 +771,7 @@ export function TransactionsTable({
                           <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
                         </Button>
                       )}
-                      {!locked && (
+                      {!isRowLocked(transaction) && (
                         <>
                           <Button
                             size="sm"
@@ -802,7 +828,13 @@ export function TransactionsTable({
                               }`}
                             />
                             <div>
-                              <span className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                              <span
+                                className={cn(
+                                  "text-sm font-medium",
+                                  transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
+                                  isOtherMonth(transaction) && "text-primary",
+                                )}
+                              >
                                 {formatDate(transaction.date)}
                               </span>
                             </div>
@@ -827,7 +859,7 @@ export function TransactionsTable({
                                 NC
                               </span>
                             )}
-                            {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                            {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                               <button
                                 type="button"
                                 data-tour="paid"

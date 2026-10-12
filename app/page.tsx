@@ -193,6 +193,17 @@ export default function HomePage() {
   // Un mes pasado con informe está cerrado: sus transacciones son de solo lectura. Para cambiar
   // algo se borra su informe (si es el último), y el mes vuelve a quedar abierto.
   const isSelectedMonthLocked = !!existingReportForSelectedMonth && !isSelectedMonthCurrent && !isSelectedMonthFuture
+  // Una transacción es de solo lectura si su mes es pasado y tiene informe (para los resultados
+  // de otros meses al buscar).
+  const isTransactionLocked = useCallback(
+    (t: Transaction) => {
+      const month = Number(t.date.slice(5, 7))
+      const year = Number(t.date.slice(0, 4))
+      const isPast = year < actualCurrentYear || (year === actualCurrentYear && month < actualCurrentMonth)
+      return isPast && !!getExistingReport(month, year)
+    },
+    [actualCurrentMonth, actualCurrentYear, getExistingReport],
+  )
   // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
@@ -656,6 +667,8 @@ export default function HomePage() {
               hasMore={hasMoreTransactions}
               singleMode={data.config.singleMode}
               locked={isSelectedMonthLocked}
+              allTransactions={data.transactions}
+              isTransactionLocked={isTransactionLocked}
               isAmountHidden={isAmountHidden}
               categories={categoriesOf(data.config)}
             />
