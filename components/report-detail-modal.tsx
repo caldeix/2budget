@@ -11,7 +11,8 @@
 
 import { useState } from "react"
 import type { AppConfig, MonthlyReport } from "@/types"
-import { expensesByCategory } from "@/lib/categories" // Gastos por categoría.
+import { expensesByCategory, type ExpenseScope } from "@/lib/categories" // Gastos por categoría.
+import { cn } from "@/lib/utils" // Unión de clases.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Trash2 } from "lucide-react" // Icono de borrar.
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
@@ -77,10 +78,6 @@ export function ReportDetailModal({
   config,
 }: ReportDetailModalProps) {
   // Gastos del mes por categoría (sin los ajustes de cierre).
-  const categoryChartData = expensesByCategory(report.transactions, config).map((item, i) => ({
-    ...item,
-    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
-  }))
   // Borrar pide una segunda confirmación dentro del propio modal.
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
 
@@ -92,6 +89,15 @@ export function ReportDetailModal({
     report.person2RealMoney,
     report.person2Adjustment,
   )
+
+  // Vista del quesito por categoría: de qué cuenta sale el gasto (la casa o cada uno). En modo
+  // individual (sin Persona 2) no hay selector: se ve todo.
+  const [categoryScope, setCategoryScope] = useState<ExpenseScope>("shared")
+  const effectiveScope: ExpenseScope = showPerson2 ? categoryScope : "all"
+  const categoryChartData = expensesByCategory(report.transactions, config, effectiveScope).map((item, i) => ({
+    ...item,
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+  }))
 
   /**
    * Datos para el gráfico de pastel de gastos.
@@ -181,6 +187,46 @@ export function ReportDetailModal({
           {/* Gastos por categoría: ocupa la fila entera y la leyenda va en columnas */}
           <div className={showPerson2 ? "lg:col-span-2" : ""}>
             <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Gastos por categoría</h3>
+            {showPerson2 && (
+              <div className="mb-4 flex justify-center">
+                <div
+                  role="tablist"
+                  aria-label="De qué cuenta sale el gasto"
+                  className="inline-flex rounded-full border border-border bg-muted p-1 text-sm"
+                >
+                  {(
+                    [
+                      ["shared", "Casa"],
+                      ["person1", person1Name],
+                      ["person2", person2Name],
+                    ] as [ExpenseScope, string][]
+                  ).map(([scope, label]) => (
+                    <button
+                      key={scope}
+                      type="button"
+                      role="tab"
+                      aria-selected={categoryScope === scope}
+                      onClick={() => setCategoryScope(scope)}
+                      className={cn(
+                        "px-3 py-1 rounded-full transition-colors",
+                        categoryScope === scope
+                          ? "bg-primary text-primary-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <p className="mb-4 text-center text-xs text-muted-foreground">
+              {effectiveScope === "shared"
+                ? "Gastos compartidos: lo que sale de la cuenta de la casa o a medias."
+                : effectiveScope === "all"
+                  ? "Todos los gastos del mes."
+                  : `Gastos individuales de ${effectiveScope === "person1" ? person1Name : person2Name}.`}
+            </p>
             <PieChart data={categoryChartData} size={250} legend="grid" />
           </div>
         </div>
