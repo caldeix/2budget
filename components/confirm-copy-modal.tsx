@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Modal } from "@/components/ui/modal"
 import { AmountInput } from "@/components/ui/amount-input"
 import { formatCurrency } from "@/lib/utils"
+import { HIDDEN_AMOUNT } from "@/lib/privacy"
 
 /** Importe con el que se copia cada transacción, por su id. */
 export type CopyAmounts = Record<string, number>
@@ -25,6 +26,7 @@ export function ConfirmCopyModal({
   transactions,
   expenseCount,
   incomeCount,
+  isAmountHidden = () => false,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -35,6 +37,8 @@ export function ConfirmCopyModal({
   transactions: Transaction[]
   expenseCount: number
   incomeCount: number
+  /** Si el importe está oculto por la pareja: se copia tal cual, sin verlo ni cambiarlo. */
+  isAmountHidden?: (t: Transaction) => boolean
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [amounts, setAmounts] = useState<CopyAmounts>({})
@@ -70,15 +74,20 @@ export function ConfirmCopyModal({
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
                     <p className={`text-xs ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                      {t.type === "income" ? "Ingreso" : "Gasto fijo"} · antes {formatCurrency(t.amount)}
+                      {t.type === "income" ? "Ingreso" : "Gasto fijo"} · antes{" "}
+                      {isAmountHidden(t) ? HIDDEN_AMOUNT : formatCurrency(t.amount)}
                     </p>
                   </div>
-                  <AmountInput
-                    aria-label={`Importe de ${t.name}`}
-                    value={amounts[t.id] ?? t.amount}
-                    onValueChange={(value) => setAmounts((prev) => ({ ...prev, [t.id]: value }))}
-                    className="w-32 shrink-0 text-right"
-                  />
+                  {isAmountHidden(t) ? (
+                    <span className="w-32 shrink-0 text-right text-sm text-muted-foreground">{HIDDEN_AMOUNT}</span>
+                  ) : (
+                    <AmountInput
+                      aria-label={`Importe de ${t.name}`}
+                      value={amounts[t.id] ?? t.amount}
+                      onValueChange={(value) => setAmounts((prev) => ({ ...prev, [t.id]: value }))}
+                      className="w-32 shrink-0 text-right"
+                    />
+                  )}
                 </div>
               ))}
             </div>

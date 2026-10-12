@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
-import { aggregateTransactions, isClosingAdjustment } from "@/lib/aggregations" // Núcleo único de agregación.
+import { aggregateTransactions, isClosingAdjustment, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
+import { HIDDEN_AMOUNT } from "@/lib/privacy" // Importe oculto por la pareja.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
@@ -55,6 +56,7 @@ const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
  * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
+ * @property {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja (ver `lib/privacy.ts`).
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -72,7 +74,14 @@ interface TransactionsTableProps {
   hasMore: boolean
   singleMode?: boolean
   locked?: boolean
+  isAmountHidden?: (t: Transaction) => boolean
 }
+
+/** Sin privacidad activada, nada se oculta. */
+const neverHidden = () => false
+
+/** Texto de los botones de editar de una transacción con el importe oculto. */
+const HIDDEN_EDIT_HINT = "Tu pareja ha ocultado el importe de sus transacciones individuales"
 
 /**
  * @typedef {'date' | 'name' | 'amount' | 'type'} SortField
@@ -109,6 +118,7 @@ export function TransactionsTable({
   hasMore, // Si hay más transacciones para cargar.
   singleMode = false,
   locked = false,
+  isAmountHidden = neverHidden,
 }: TransactionsTableProps) {
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
@@ -126,6 +136,8 @@ export function TransactionsTable({
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all")
   // Estado para el filtro por categoría de gasto ('all', 'fixed', 'variable').
   const [filterCategory, setFilterCategory] = useState<"all" | "fixed" | "variable">("all")
+  // Estado para el filtro por pago: solo gastos pagados o solo pendientes (los ingresos no se marcan).
+  const [filterPaid, setFilterPaid] = useState<"all" | "paid" | "pending">("all")
   // Estado para el ID de la transacción con el menú de swipe abierto (en móvil).
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null)
 
@@ -277,10 +289,14 @@ export function TransactionsTable({
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesType = filterType === "all" || transaction.type === filterType
       const matchesCategory = filterCategory === "all" || transaction.category === filterCategory
+      // "Pagados" incluye los ajustes de cierre, que nunca quedan pendientes (ver `isSettled`).
+      const matchesPaid =
+        filterPaid === "all" ||
+        (transaction.type === "expense" && (filterPaid === "paid") === isSettled(transaction))
 
-      return matchesSearch && matchesType && matchesCategory
+      return matchesSearch && matchesType && matchesCategory && matchesPaid
     })
-  }, [transactions, searchTerm, filterType, filterCategory])
+  }, [transactions, searchTerm, filterType, filterCategory, filterPaid])
 
   /**
    * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
@@ -302,8 +318,9 @@ export function TransactionsTable({
           bValue = b.name.toLowerCase()
           break
         case "amount":
-          aValue = a.amount // Compara por cantidad.
-          bValue = b.amount
+          // Los importes ocultos no revelan su posición: van como si fueran los más bajos.
+          aValue = isAmountHidden(a) ? -1 : a.amount // Compara por cantidad.
+          bValue = isAmountHidden(b) ? -1 : b.amount
           break
         case "type":
           aValue = a.type // Compara por tipo (ingreso/gasto).
@@ -321,7 +338,7 @@ export function TransactionsTable({
 
     // Limita al número de transacciones a mostrar actualmente (clave para la carga infinita).
     return sorted.slice(0, transactionsToShowCount)
-  }, [filteredTransactions, sortField, sortDirection, transactionsToShowCount]) // Dependencias.
+  }, [filteredTransactions, sortField, sortDirection, transactionsToShowCount, isAmountHidden]) // Dependencias.
 
   /**
    * @function handleSort
@@ -422,6 +439,11 @@ export function TransactionsTable({
   const totalIncome = filteredTotals.totalIncome
   const totalExpenses = filteredTotals.totalExpenses
   const filteredBalance = subtractMoney(totalIncome, totalExpenses)
+  // Con un filtro activo, un total que incluye importes ocultos los delataría (p. ej. buscando
+  // una transacción concreta): ese total también se oculta. Sin filtros es el del mes, que se ve.
+  const isFiltering = filteredTransactions.length !== transactions.length
+  const hidesIncome = isFiltering && filteredTransactions.some((t) => t.type === "income" && isAmountHidden(t))
+  const hidesExpenses = isFiltering && filteredTransactions.some((t) => t.type === "expense" && isAmountHidden(t))
 
   return (
     <div className="bg-card rounded-2xl shadow-lg border">
@@ -485,6 +507,18 @@ export function TransactionsTable({
               <option value="fixed">fijo</option>
               <option value="variable">variable</option>
             </select>
+
+            {/* Selector de filtro por pago (solo gastos) */}
+            <select
+              value={filterPaid}
+              onChange={(e) => setFilterPaid(e.target.value as "all" | "paid" | "pending")}
+              aria-label="Filtrar por pago"
+              className="px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+            >
+              <option value="all">Pagados y pendientes</option>
+              <option value="paid">Pagados</option>
+              <option value="pending">Pendientes de pago</option>
+            </select>
           </div>
         </div>
 
@@ -498,7 +532,7 @@ export function TransactionsTable({
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Ingresos</p>
-                <p className="text-base sm:text-lg font-semibold text-green-600">{formatCurrency(totalIncome)}</p>
+                <p className="text-base sm:text-lg font-semibold text-green-600">{hidesIncome ? HIDDEN_AMOUNT : formatCurrency(totalIncome)}</p>
               </div>
             </div>
           </div>
@@ -510,7 +544,7 @@ export function TransactionsTable({
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Gastos</p>
-                <p className="text-base sm:text-lg font-semibold text-red-600">{formatCurrency(totalExpenses)}</p>
+                <p className="text-base sm:text-lg font-semibold text-red-600">{hidesExpenses ? HIDDEN_AMOUNT : formatCurrency(totalExpenses)}</p>
               </div>
             </div>
           </div>
@@ -525,7 +559,7 @@ export function TransactionsTable({
                 <p
                   className={`text-base sm:text-lg font-semibold ${filteredBalance >= 0 ? "text-green-600" : "text-red-600"}`}
                 >
-                  {formatCurrency(filteredBalance)}
+                  {hidesIncome || hidesExpenses ? HIDDEN_AMOUNT : formatCurrency(filteredBalance)}
                 </p>
               </div>
             </div>
@@ -639,7 +673,7 @@ export function TransactionsTable({
                       )}
                     >
                       {transaction.type === "income" ? "+" : "-"}
-                      {formatCurrency(transaction.amount)}
+                      {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
                     </div>
                     {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
@@ -667,8 +701,15 @@ export function TransactionsTable({
                             size="sm"
                             variant="ghost"
                             onClick={() => onEdit(transaction)}
-                            disabled={isClosingAdjustment(transaction)}
-                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Editar"}
+                            // Editar enseñaría el importe: no se puede con los ocultos por la pareja.
+                            disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
+                            title={
+                              isClosingAdjustment(transaction)
+                                ? ADJUSTMENT_LOCKED_HINT
+                                : isAmountHidden(transaction)
+                                  ? HIDDEN_EDIT_HINT
+                                  : "Editar"
+                            }
                             className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                           >
                             <Edit className="h-4 w-4" />
@@ -729,7 +770,7 @@ export function TransactionsTable({
                               )}
                             >
                               {transaction.type === "income" ? "+" : "-"}
-                              {formatCurrency(transaction.amount)}
+                              {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
                             </span>
                             {transaction.nonComputable && (
                               <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
@@ -779,7 +820,7 @@ export function TransactionsTable({
                         <Button
                           size="sm"
                           className="flex-1 bg-amber-600 text-primary-foreground hover:bg-amber-700"
-                          disabled={isClosingAdjustment(transaction)}
+                          disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
                           onClick={() => {
                             onEdit(transaction)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.

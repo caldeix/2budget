@@ -216,6 +216,10 @@ interface HouseholdManagerProps {
   person1Name: string
   person2Name: string
   singleMode?: boolean
+  /** Si quien mira oculta a su pareja el importe de sus transacciones individuales. */
+  hidesOwnFromPartner?: boolean
+  /** Activa o desactiva esa opción (solo la de quien mira). */
+  onHideOwnFromPartnerChange?: (hidden: boolean) => void
 }
 
 /**
@@ -230,6 +234,8 @@ export function HouseholdManager({
   person1Name,
   person2Name,
   singleMode,
+  hidesOwnFromPartner = false,
+  onHideOwnFromPartnerChange,
 }: HouseholdManagerProps) {
   const [invite, setInvite] = useState<{ code: string; expiresAt: Date } | null>(null)
   const [inviteMasterPassword, setInviteMasterPassword] = useState("")
@@ -307,6 +313,27 @@ export function HouseholdManager({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Privacidad en pareja: cada uno decide sobre sus propias transacciones (ver lib/privacy.ts). */}
+      {!isAlone && onHideOwnFromPartnerChange && (
+        <label className="flex items-start gap-3 rounded-2xl border p-4 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hidesOwnFromPartner}
+            onChange={(e) => onHideOwnFromPartnerChange(e.target.checked)}
+            className="mt-1 h-4 w-4 accent-[hsl(var(--primary))]"
+          />
+          <span className="space-y-1">
+            <span className="block text-sm font-medium text-foreground">
+              Ocultar mis transacciones individuales a mi pareja
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Tu pareja verá *** en lugar del importe de las transacciones que son 100% tuyas. Los totales y los
+              balances no cambian. Solo se oculta en la app: no es un cifrado aparte.
+            </span>
+          </span>
+        </label>
       )}
 
       {/* Invitación (solo mientras falta el segundo miembro, y no en modo individual) */}

@@ -118,7 +118,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
               <Subtitle>Buscar y filtrar</Subtitle>
               <ul className="list-disc list-inside space-y-1">
-                <li>Busca por nombre, o filtra por tipo (ingresos o gastos) y por categoría (fijo o variable).</li>
+                <li>
+                  Busca por nombre, o filtra por tipo (ingresos o gastos), por categoría (fijo o variable) y por pago
+                  (solo los gastos pagados o solo los pendientes).
+                </li>
                 <li>
                   El contador (por ejemplo <strong>10/29</strong>) indica cuántas transacciones se ven de las que hay en
                   el mes, y las cajas de Ingresos, Gastos y Balance suman solo lo filtrado.
@@ -312,6 +315,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 </li>
                 <li>Sin conexión puedes seguir usando la app: los cambios se envían solos al volver la red.</li>
               </ul>
+              <Subtitle>Privacidad en pareja</Subtitle>
+              <p>
+                En Cuenta &gt; Tu hogar, cada uno puede activar <strong>«Ocultar mis transacciones individuales a mi
+                pareja»</strong>. Tu pareja verá *** en lugar del importe de las transacciones que son 100% tuyas, y no
+                podrá editarlas. Los totales, los balances y los informes no cambian. Solo se oculta en la app: los datos
+                siguen compartidos y cifrados con la misma clave del hogar.
+              </p>
               <Subtitle>Cifrado y contraseña maestra</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>

@@ -13,6 +13,7 @@ import type { Transaction } from "@/types"
 import { Modal } from "@/components/ui/modal"
 import { Button } from "@/components/ui/button"
 import { formatCurrency } from "@/lib/utils"
+import { HIDDEN_AMOUNT } from "@/lib/privacy"
 
 /**
  * @function PaidReconciliationModal
@@ -22,6 +23,7 @@ import { formatCurrency } from "@/lib/utils"
  * @param {Transaction[]} expenses - Gastos del mes que se cierra (todos, computables y no computables).
  * @param {() => void} onMarkAll - Marca todos los gastos como pagados.
  * @param {(paidIds: string[]) => void} onSave - Aplica el marcado individual (los IDs indicados quedan pagados).
+ * @param {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja.
  */
 export function PaidReconciliationModal({
   isOpen,
@@ -30,6 +32,7 @@ export function PaidReconciliationModal({
   expenses,
   onMarkAll,
   onSave,
+  isAmountHidden = () => false,
 }: {
   isOpen: boolean
   monthName: string
@@ -37,6 +40,7 @@ export function PaidReconciliationModal({
   expenses: Transaction[]
   onMarkAll: () => void
   onSave: (paidIds: string[]) => void
+  isAmountHidden?: (t: Transaction) => boolean
 }) {
   // Estado local: IDs marcados como pagados. Se inicializa desde el estado actual de cada gasto.
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
@@ -91,7 +95,7 @@ export function PaidReconciliationModal({
                 </span>
               </div>
               <span className="text-sm font-semibold text-red-600 shrink-0">
-                {formatCurrency(expense.amount)}
+                {isAmountHidden(expense) ? HIDDEN_AMOUNT : formatCurrency(expense.amount)}
               </span>
             </label>
           ))}
