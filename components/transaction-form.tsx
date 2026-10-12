@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Slider } from "@/components/ui/slider" // Componente de deslizador (slider) de Shadcn UI.
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
+import { DatePicker } from "@/components/ui/date-picker" // Calendario propio de la app.
 import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
 
 /** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
@@ -346,14 +347,11 @@ export function TransactionForm({
 
           <div>
             <Label htmlFor="date">Fecha</Label>
-            <Input
+            <DatePicker
               id="date"
-              type="date"
               value={formData.date}
               min={effectiveMinDate}
-              onChange={(e) => setFormData((prev) => ({ ...prev, date: e.target.value }))}
-              aria-invalid={isDateTooEarly}
-              required
+              onChange={(date) => setFormData((prev) => ({ ...prev, date }))}
             />
             {isDateTooEarly && (
               <p className="mt-1 text-xs text-destructive">
