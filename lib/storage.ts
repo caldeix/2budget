@@ -7,6 +7,7 @@
  */
 
 import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
+import { DEFAULT_CATEGORIES } from "@/lib/categories" // Categorías iniciales.
 import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
 import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
 
@@ -35,6 +36,7 @@ export const defaultConfig: AppConfig = {
   person1Name: "Persona 1",
   person2Name: "Persona 2",
   singleMode: false,
+  categories: DEFAULT_CATEGORIES,
 }
 
 /**

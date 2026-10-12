@@ -13,7 +13,9 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import type { AppConfig, AppData } from "@/types"
-import { Modal } from "@/components/ui/modal" // Componente base del modal.
+import { Modal } from "@/components/ui/modal"
+import { CategoriesEditor } from "@/components/categories-editor"
+import { categoriesOf, type Category } from "@/lib/categories" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
@@ -71,6 +73,8 @@ export function SettingsModal({
   const [person2Name, setPerson2Name] = useState(config.person2Name)
   // Estado local del modo individual; se guarda junto con los nombres.
   const [singleMode, setSingleMode] = useState(Boolean(config.singleMode))
+  // Copia editable de las categorías; se guarda con el resto de la configuración.
+  const [categories, setCategories] = useState<Category[]>(categoriesOf(config))
   // Archivo leído y pendiente de confirmar antes de importarlo.
   const [pendingImport, setPendingImport] = useState<{ name: string; content: string } | null>(null)
   // Estado para controlar la visibilidad del modal de confirmación de eliminación de datos.
@@ -85,6 +89,7 @@ export function SettingsModal({
     setPerson1Name(config.person1Name)
     setPerson2Name(config.person2Name)
     setSingleMode(Boolean(config.singleMode))
+    setCategories(categoriesOf(config))
   }, [isOpen, config])
 
   /**
@@ -94,10 +99,14 @@ export function SettingsModal({
    * @returns {void}
    */
   const handleSaveConfig = () => {
+    // Sobre la configuración actual: así no se pierden campos que aquí no se editan (p. ej. la
+    // privacidad en pareja, que cada miembro cambia desde Cuenta).
     onUpdateConfig({
+      ...config,
       person1Name,
       person2Name,
       singleMode,
+      categories,
     })
     onClose()
   }
@@ -231,6 +240,12 @@ export function SettingsModal({
                 </div>
               )}
             </div>
+            {/* Categorías de las transacciones */}
+            <div className="space-y-3 rounded-2xl border p-4">
+              <h4 className="font-medium text-foreground">Categorías</h4>
+              <CategoriesEditor categories={categories} onChange={setCategories} />
+            </div>
+
             <Button onClick={handleSaveConfig} className="w-full">
               Guardar configuración
             </Button>

@@ -18,6 +18,7 @@ import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
 import { aggregateTransactions, isClosingAdjustment, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
 import { HIDDEN_AMOUNT } from "@/lib/privacy" // Importe oculto por la pareja.
+import { UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
@@ -57,6 +58,7 @@ const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
  * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
  * @property {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja (ver `lib/privacy.ts`).
+ * @property {Category[]} categories - Categorías del hogar, para mostrarlas y filtrar.
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -75,6 +77,7 @@ interface TransactionsTableProps {
   singleMode?: boolean
   locked?: boolean
   isAmountHidden?: (t: Transaction) => boolean
+  categories: Category[]
 }
 
 /** Sin privacidad activada, nada se oculta. */
@@ -125,7 +128,11 @@ export function TransactionsTable({
   singleMode = false,
   locked = false,
   isAmountHidden = neverHidden,
+  categories,
 }: TransactionsTableProps) {
+  // Nombre de la categoría de una transacción ("Sin categoría" si no tiene o se borró).
+  const categoryName = (t: Transaction) =>
+    (t.categoryId && categories.find((c) => c.id === t.categoryId)?.name) || UNCATEGORIZED_LABEL
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
   const desktopGridCols = singleMode
@@ -139,9 +146,10 @@ export function TransactionsTable({
   // Estado para la dirección de ordenación.
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   // Estado para el filtro por tipo de transacción ('all', 'income', 'expense').
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all")
-  // Estado para el filtro por categoría de gasto ('all', 'fixed', 'variable').
-  const [filterCategory, setFilterCategory] = useState<"all" | "fixed" | "variable">("all")
+  // Tipo: ingresos, gastos fijos o gastos variables (como el selector "Tipo" del formulario).
+  const [filterType, setFilterType] = useState<"all" | "income" | "fixed" | "variable">("all")
+  // Categoría (Supermercado, Casa…): un id, "none" (sin categoría) o todas.
+  const [filterCategory, setFilterCategory] = useState<string>("all")
   // Estado para el filtro por pago: solo gastos pagados o solo pendientes (los ingresos no se marcan).
   const [filterPaid, setFilterPaid] = useState<"all" | "paid" | "pending">("all")
   // Estado para el ID de la transacción con el menú de swipe abierto (en móvil).
@@ -293,8 +301,14 @@ export function TransactionsTable({
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesType = filterType === "all" || transaction.type === filterType
-      const matchesCategory = filterCategory === "all" || transaction.category === filterCategory
+      const matchesType =
+        filterType === "all" ||
+        (filterType === "income" ? transaction.type === "income" : transaction.category === filterType)
+      const matchesCategory =
+        filterCategory === "all" ||
+        (filterCategory === "none"
+          ? categoryName(transaction) === UNCATEGORIZED_LABEL
+          : transaction.categoryId === filterCategory)
       // "Pagados" incluye los ajustes de cierre, que nunca quedan pendientes (ver `isSettled`).
       const matchesPaid =
         filterPaid === "all" ||
@@ -408,7 +422,17 @@ export function TransactionsTable({
    * @param {Transaction} transaction - La transacción.
    * @returns {JSX.Element} El elemento `<span>` del badge.
    */
-  const getCategoryBadge = (transaction: Transaction) => {
+  const getCategoryBadge = (transaction: Transaction) => (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {getTypeBadge(transaction)}
+      {!isClosingAdjustment(transaction) && (
+        <span className="text-xs text-muted-foreground">{categoryName(transaction)}</span>
+      )}
+    </span>
+  )
+
+  /** Etiqueta del tipo: ingreso, fijo, variable o no computable. */
+  const getTypeBadge = (transaction: Transaction) => {
     if (transaction.nonComputable) {
       return (
         <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
@@ -506,7 +530,8 @@ export function TransactionsTable({
               >
                 <option value="all">Todos los tipos</option>
                 <option value="income">Ingresos</option>
-                <option value="expense">Gastos</option>
+                <option value="fixed">Gastos fijos</option>
+                <option value="variable">Gastos variables</option>
               </select>
 
               {/* Selector de filtro por categoría */}
@@ -516,8 +541,12 @@ export function TransactionsTable({
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
               >
                 <option value="all">Todas las categorías</option>
-                <option value="fixed">fijo</option>
-                <option value="variable">variable</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="none">{UNCATEGORIZED_LABEL}</option>
               </select>
 
               {/* Selector de filtro por pago (solo gastos) */}

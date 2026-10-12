@@ -19,6 +19,7 @@ import {
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
+import { categoriesOf } from "@/lib/categories"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -211,13 +212,13 @@ export default function HomePage() {
   // sugerirlos al escribir el nombre de una transacción.
   const nameSuggestions = useMemo(() => {
     const seen = new Set<string>()
-    const out: { name: string; type: Transaction["type"] }[] = []
+    const out: { name: string; type: Transaction["type"]; categoryId?: string }[] = []
     for (const t of [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))) {
       const name = t.name.trim()
       const key = `${t.type}:${name.toLowerCase()}`
       if (!name || isClosingAdjustment(t) || seen.has(key)) continue
       seen.add(key)
-      out.push({ name, type: t.type })
+      out.push({ name, type: t.type, categoryId: t.categoryId })
     }
     return out
   }, [data.transactions])
@@ -646,6 +647,7 @@ export default function HomePage() {
               singleMode={data.config.singleMode}
               locked={isSelectedMonthLocked}
               isAmountHidden={isAmountHidden}
+              categories={categoriesOf(data.config)}
             />
           </div>
         </div>
@@ -765,6 +767,7 @@ export default function HomePage() {
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
         nameSuggestions={nameSuggestions}
+        categories={categoriesOf(data.config)}
         minDate={minTransactionDate}
       />
 
@@ -801,6 +804,7 @@ export default function HomePage() {
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
           singleMode={data.config.singleMode}
+          config={data.config}
           onDelete={
             selectedReport.id === latestReportId
               ? () => {
