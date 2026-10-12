@@ -273,9 +273,9 @@ export function TransactionForm({
             </div>
           )}
 
-          {/* Checkbox para gastos no computables */}
+          {/* Checkbox para gastos no computables (a todo el ancho, debajo de Tipo y Categoría) */}
           {formData.type === "expense" && (
-            <div className="flex items-center space-x-2 mt-4">
+            <div className="col-span-2 flex items-center space-x-2 mt-2">
               <input
                 type="checkbox"
                 id="nonComputable"
