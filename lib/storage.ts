@@ -70,9 +70,11 @@ export function ownerForShare(owner: Transaction["owner"], person1Percentage: nu
 export function normalizeTransaction(t: Transaction): Transaction {
   // El porcentaje de la Persona 2 se deriva del de la Persona 1 para que un dato
   // incoherente (p. ej. 30/60) no rompa el cuadre de los repartos.
-  const person1Percentage = normalizePercentage(t.person1Percentage ?? 50)
-  // "Ambos" con el 100% para uno es, en realidad, individual de esa persona (ver `ownerForShare`).
-  const owner = ownerForShare(t.owner, person1Percentage)
+  const rawPercentage = normalizePercentage(t.person1Percentage ?? 50)
+  // "Ambos" con el 100% para uno es, en realidad, individual de esa persona (ver `ownerForShare`),
+  // y un individual lleva siempre el 100% (o el 0%): el reparto se guardaba a 50/50 en versiones antiguas.
+  const owner = ownerForShare(t.owner, rawPercentage)
+  const person1Percentage = owner === "person1" ? 100 : owner === "person2" ? 0 : rawPercentage
   return {
     ...t,
     owner,
