@@ -31,11 +31,14 @@ interface ChartData {
  * @property {ChartData[]} data - Un array de objetos `ChartData` que representan los segmentos del pastel.
  * @property {number} [size=200] - Tamaño (ancho y alto) del SVG del gráfico en píxeles. Por defecto es 200.
  * @property {string} [className] - Clases CSS adicionales para el contenedor del gráfico.
+ * @property {"list" | "grid"} [legend="list"] - Leyenda en lista (una línea por elemento) o en varias
+ *           columnas, para muchos elementos (p. ej. las categorías).
  */
 interface PieChartProps {
   data: ChartData[]
   size?: number
   className?: string
+  legend?: "list" | "grid"
 }
 
 /**
@@ -47,7 +50,7 @@ interface PieChartProps {
  * @returns {JSX.Element} Un elemento SVG que representa el gráfico de pastel,
  *                        o un mensaje de "Sin datos" si no hay datos.
  */
-export function PieChart({ data, size = 200, className }: PieChartProps) {
+export function PieChart({ data, size = 200, className, legend = "list" }: PieChartProps) {
   // `useTheme` permite acceder al tema actual ('light' o 'dark') y a la función para cambiarlo.
   const { theme } = useTheme()
 
@@ -149,9 +152,15 @@ export function PieChart({ data, size = 200, className }: PieChartProps) {
         ))}
       </svg>
       {/* Leyenda del gráfico */}
-      <div className="mt-4 space-y-2 max-w-xs mx-auto">
+      <div
+        className={
+          legend === "grid"
+            ? "mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2"
+            : "mt-4 space-y-2 max-w-xs mx-auto"
+        }
+      >
         {paths.map((item, index) => (
-          <div key={index} className="flex items-center justify-between text-sm">
+          <div key={index} className="flex items-center justify-between gap-3 text-sm">
             <div className="flex items-center gap-2">
               {/* Pequeño círculo de color para la leyenda */}
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />

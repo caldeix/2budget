@@ -21,12 +21,17 @@ import { Slider } from "@/components/ui/slider" // Componente de deslizador (sli
 import { AmountInput } from "@/components/ui/amount-input" // Input de importe que impide un tercer decimal.
 import { DatePicker } from "@/components/ui/date-picker" // Calendario propio de la app.
 import { ownerForShare } from "@/lib/storage" // El propietario sale del reparto.
+import { normalizeName, UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
 
-/** Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo). */
+/**
+ * Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo) y la
+ * categoría de la última vez (se rellena sola al elegirlo).
+ */
 export interface NameSuggestion {
   name: string
   type: "income" | "expense"
+  categoryId?: string
 }
 
 /** Máximo de sugerencias visibles a la vez. */
@@ -51,6 +56,7 @@ const normalize = (text: string) =>
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta el propietario y el reparto.
  * @property {NameSuggestion[]} [nameSuggestions] - Nombres ya usados, para sugerirlos al escribir.
+ * @property {Category[]} categories - Categorías disponibles (ver `lib/categories.ts`).
  * @property {string} [minDate] - Primera fecha admitida (YYYY-MM-DD): no se añaden transacciones a meses
  *           ya pasados (ver `app/page.tsx`). Al editar, la fecha original de la transacción siempre vale.
  */
@@ -63,6 +69,7 @@ interface TransactionFormProps {
   person2Name: string
   singleMode?: boolean
   nameSuggestions?: NameSuggestion[]
+  categories: Category[]
   minDate?: string
 }
 
@@ -82,6 +89,7 @@ export function TransactionForm({
   person2Name,
   singleMode = false,
   nameSuggestions = [],
+  categories,
   minDate,
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
@@ -108,7 +116,10 @@ export function TransactionForm({
     person2Percentage: transaction ? 100 - sharePercentageOf(transaction) : 100 - defaultPerson1Percentage,
     date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
+    categoryId: transaction?.categoryId,
   })
+  // Si el usuario ha elegido la categoría a mano, no se le pisa al autocompletar el nombre.
+  const [categoryTouched, setCategoryTouched] = useState(false)
 
   // Fecha mínima efectiva: al editar, la fecha que ya tenía la transacción no se rechaza.
   const effectiveMinDate = minDate && transaction && transaction.date < minDate ? transaction.date : minDate
@@ -131,7 +142,9 @@ export function TransactionForm({
         person2Percentage: 100 - sharePercentageOf(transaction),
         date: transaction.date,
         nonComputable: transaction.nonComputable || false,
+        categoryId: transaction.categoryId,
       })
+      setCategoryTouched(true)
     } else {
       // Si no hay transacción (es una nueva), reinicia el formulario a sus valores por defecto.
       setFormData({
@@ -144,7 +157,9 @@ export function TransactionForm({
         person2Percentage: 100 - defaultPerson1Percentage,
         date: getTodayDate(),
         nonComputable: false,
+        categoryId: undefined,
       })
+      setCategoryTouched(false)
     }
   }, [transaction, isOpen, defaultOwner, defaultPerson1Percentage]) // Se ejecuta al abrir, al cambiar la transacción o el modo.
 
@@ -156,17 +171,30 @@ export function TransactionForm({
     if (!query) return []
     return nameSuggestions
       .filter((s) => s.type === formData.type)
-      .map((s) => s.name)
-      .filter((name) => normalize(name).includes(query) && normalize(name) !== query)
+      .filter((s) => normalize(s.name).includes(query) && normalize(s.name) !== query)
       .slice(0, MAX_SUGGESTIONS)
   }, [nameSuggestions, formData.name, formData.type])
   const isSuggesting = showSuggestions && suggestions.length > 0
 
-  const pickSuggestion = (name: string) => {
-    setFormData((prev) => ({ ...prev, name }))
+  const pickSuggestion = (s: NameSuggestion) => {
+    // Con el nombre viene la categoría de la última vez (si no se ha elegido otra a mano).
+    setFormData((prev) => ({ ...prev, name: s.name, categoryId: categoryTouched ? prev.categoryId : s.categoryId }))
     setShowSuggestions(false)
     setHighlighted(-1)
   }
+
+  /** Al escribir un nombre que ya existe tal cual, también se rellena su categoría. */
+  const applyNameTyped = (name: string) => {
+    setFormData((prev) => {
+      if (categoryTouched) return { ...prev, name }
+      const match = nameSuggestions.find((s) => s.type === prev.type && normalizeName(s.name) === normalizeName(name))
+      return { ...prev, name, categoryId: match?.categoryId ?? prev.categoryId }
+    })
+  }
+
+  // Categorías del tipo actual; si la elegida ya no vale (cambio de tipo o borrada), "Sin categoría".
+  const typeCategories = categories.filter((c) => c.kind === formData.type)
+  const categoryValue = typeCategories.some((c) => c.id === formData.categoryId) ? formData.categoryId : ""
 
   /** Flechas para moverse por las sugerencias, Enter para elegir y Escape para cerrarlas. */
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -204,6 +232,7 @@ export function TransactionForm({
     const owner = ownerForShare("both", formData.person1Percentage)
     onSubmit({
       ...formData,
+      categoryId: categoryValue || undefined,
       owner,
       person1Percentage: owner === "person1" ? 100 : owner === "person2" ? 0 : formData.person1Percentage,
       person2Percentage: owner === "person1" ? 0 : owner === "person2" ? 100 : formData.person2Percentage,
@@ -230,48 +259,48 @@ export function TransactionForm({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={transaction ? "Editar Transacción" : "Nueva Transacción"} size="md">
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
-        {/* Campos de Tipo y Categoría */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Tipo (ingreso, gasto fijo o variable: `type` + `category` en un solo selector) y Categoría */}
+        <div data-tour="form-type" className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="type">Tipo</Label>
             <select
               id="type"
-              value={formData.type}
-              onChange={(e) =>
+              value={formData.type === "income" ? "income" : formData.category}
+              onChange={(e) => {
+                const value = e.target.value as "income" | "fixed" | "variable"
                 setFormData((prev) => ({
                   ...prev,
-                  type: e.target.value as "income" | "expense",
-                  // Si el tipo es ingreso, la categoría es 'income'; de lo contrario, 'variable'.
-                  category: e.target.value === "income" ? "income" : "variable",
+                  type: value === "income" ? "income" : "expense",
+                  category: value,
                 }))
-              }
+              }}
               className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
             >
-              <option value="expense">Gasto</option>
+              <option value="variable">Gasto variable</option>
+              <option value="fixed">Gasto fijo</option>
               <option value="income">Ingreso</option>
             </select>
           </div>
 
-          {/* El selector de Categoría solo se muestra si el tipo es "expense" */}
-          {formData.type === "expense" && (
-            <div>
-              <Label htmlFor="category">Categoría</Label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    category: e.target.value as "fixed" | "variable",
-                  }))
-                }
-                className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-              >
-                <option value="variable">variable</option>
-                <option value="fixed">fijo</option>
-              </select>
-            </div>
-          )}
+          <div>
+            <Label htmlFor="categoryId">Categoría</Label>
+            <select
+              id="categoryId"
+              value={categoryValue ?? ""}
+              onChange={(e) => {
+                setCategoryTouched(true)
+                setFormData((prev) => ({ ...prev, categoryId: e.target.value || undefined }))
+              }}
+              className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+            >
+              <option value="">{UNCATEGORIZED_LABEL}</option>
+              {typeCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Checkbox para gastos no computables (a todo el ancho, debajo de Tipo y Categoría) */}
           {formData.type === "expense" && (
@@ -296,14 +325,14 @@ export function TransactionForm({
         </div>
 
         {/* Campo de Nombre */}
-        <div className="relative">
+        <div data-tour="form-name" className="relative">
           <Label htmlFor="name">Nombre</Label>
           <Input
             id="name"
             type="text"
             value={formData.name}
             onChange={(e) => {
-              setFormData((prev) => ({ ...prev, name: e.target.value }))
+              applyNameTyped(e.target.value)
               setShowSuggestions(true)
               setHighlighted(-1)
             }}
@@ -324,22 +353,27 @@ export function TransactionForm({
               role="listbox"
               className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto rounded-md border border-border bg-card shadow-lg py-1"
             >
-              {suggestions.map((name, i) => (
+              {suggestions.map((s, i) => (
                 <li
-                  key={name}
+                  key={s.name}
                   role="option"
                   aria-selected={i === highlighted}
                   // `mousedown` (no `click`): se elige antes de que el input pierda el foco.
                   onMouseDown={(e) => {
                     e.preventDefault()
-                    pickSuggestion(name)
+                    pickSuggestion(s)
                   }}
                   className={cn(
-                    "px-3 py-2 text-sm cursor-pointer text-foreground hover:bg-muted",
+                    "flex items-center justify-between gap-2 px-3 py-2 text-sm cursor-pointer text-foreground hover:bg-muted",
                     i === highlighted && "bg-muted",
                   )}
                 >
-                  {name}
+                  <span>{s.name}</span>
+                  {s.categoryId && (
+                    <span className="text-xs text-muted-foreground">
+                      {categories.find((c) => c.id === s.categoryId)?.name}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -347,7 +381,7 @@ export function TransactionForm({
         </div>
 
         {/* Campos de Importe y Fecha */}
-        <div className="grid grid-cols-2 gap-4">
+        <div data-tour="form-amount-date" className="grid grid-cols-2 gap-4">
           <div>
             <Label htmlFor="amount">Importe (€)</Label>
             <AmountInput
@@ -378,7 +412,7 @@ export function TransactionForm({
         {/* Reparto entre los dos (oculto en modo individual). Sustituye al antiguo selector de
             propietario: 100% para uno equivale a "solo suyo". */}
         {showShareSlider && (
-          <div className="space-y-4">
+          <div data-tour="form-share" className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Reparto</Label>
               <span className="text-xs text-muted-foreground">

@@ -18,6 +18,7 @@ import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
 import { aggregateTransactions, isClosingAdjustment, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
 import { HIDDEN_AMOUNT } from "@/lib/privacy" // Importe oculto por la pareja.
+import { UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import {
@@ -56,7 +57,12 @@ const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes
  * @property {boolean} hasMore - Indica si hay más transacciones disponibles para cargar.
  * @property {boolean} [singleMode] - Modo individual: oculta la columna de propietario.
  * @property {boolean} [locked] - Mes pasado ya cerrado con informe: solo lectura (sin acciones).
+ * @property {Transaction[]} [allTransactions] - Todas las transacciones: con texto en el buscador se
+ *           busca en todos los meses, no solo en el seleccionado.
+ * @property {(t: Transaction) => boolean} [isTransactionLocked] - Si la transacción es de un mes cerrado
+ *           (solo lectura), para las filas de otros meses al buscar.
  * @property {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja (ver `lib/privacy.ts`).
+ * @property {Category[]} categories - Categorías del hogar, para mostrarlas y filtrar.
  */
 interface TransactionsTableProps {
   transactions: Transaction[]
@@ -74,7 +80,10 @@ interface TransactionsTableProps {
   hasMore: boolean
   singleMode?: boolean
   locked?: boolean
+  allTransactions?: Transaction[]
+  isTransactionLocked?: (t: Transaction) => boolean
   isAmountHidden?: (t: Transaction) => boolean
+  categories: Category[]
 }
 
 /** Sin privacidad activada, nada se oculta. */
@@ -124,8 +133,14 @@ export function TransactionsTable({
   hasMore, // Si hay más transacciones para cargar.
   singleMode = false,
   locked = false,
+  allTransactions,
+  isTransactionLocked,
   isAmountHidden = neverHidden,
+  categories,
 }: TransactionsTableProps) {
+  // Nombre de la categoría de una transacción ("Sin categoría" si no tiene o se borró).
+  const categoryName = (t: Transaction) =>
+    (t.categoryId && categories.find((c) => c.id === t.categoryId)?.name) || UNCATEGORIZED_LABEL
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
   const desktopGridCols = singleMode
@@ -139,9 +154,10 @@ export function TransactionsTable({
   // Estado para la dirección de ordenación.
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   // Estado para el filtro por tipo de transacción ('all', 'income', 'expense').
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all")
-  // Estado para el filtro por categoría de gasto ('all', 'fixed', 'variable').
-  const [filterCategory, setFilterCategory] = useState<"all" | "fixed" | "variable">("all")
+  // Tipo: ingresos, gastos fijos o gastos variables (como el selector "Tipo" del formulario).
+  const [filterType, setFilterType] = useState<"all" | "income" | "fixed" | "variable">("all")
+  // Categoría (Supermercado, Casa…): un id, "none" (sin categoría) o todas.
+  const [filterCategory, setFilterCategory] = useState<string>("all")
   // Estado para el filtro por pago: solo gastos pagados o solo pendientes (los ingresos no se marcan).
   const [filterPaid, setFilterPaid] = useState<"all" | "paid" | "pending">("all")
   // Estado para el ID de la transacción con el menú de swipe abierto (en móvil).
@@ -173,7 +189,8 @@ export function TransactionsTable({
    * @returns {void}
    */
   const handleTouchEndRow = (e: React.TouchEvent, transactionId: string) => {
-    if (locked) return // Mes cerrado: no hay acciones que mostrar.
+    const row = filteredAndSortedTransactions.find((t) => t.id === transactionId)
+    if (row && isRowLocked(row)) return // Mes cerrado: no hay acciones que mostrar.
     const touchEndX = e.changedTouches[0].clientX
     const deltaX = touchEndX - touchStartXRow // Distancia horizontal del swipe.
 
@@ -290,11 +307,25 @@ export function TransactionsTable({
    * `useMemo` que filtra las transacciones por búsqueda, tipo y categoría (SIN paginar).
    * Es la base tanto de la lista como de las tarjetas de resumen "Filtradas".
    */
+  // Con texto en el buscador se busca en TODOS los meses (si se han pasado); si no, en el mes.
+  const isSearchingAll = searchTerm.trim() !== "" && allTransactions !== undefined
+  const searchBase = isSearchingAll ? allTransactions : transactions
+  const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`
+  const isOtherMonth = (t: Transaction) => isSearchingAll && t.date.slice(0, 7) !== selectedMonthKey
+  // Solo lectura por fila: el mes seleccionado si está cerrado, o el mes de la fila al buscar.
+  const isRowLocked = (t: Transaction) => (isOtherMonth(t) ? Boolean(isTransactionLocked?.(t)) : locked)
+
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((transaction) => {
+    return searchBase.filter((transaction) => {
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
-      const matchesType = filterType === "all" || transaction.type === filterType
-      const matchesCategory = filterCategory === "all" || transaction.category === filterCategory
+      const matchesType =
+        filterType === "all" ||
+        (filterType === "income" ? transaction.type === "income" : transaction.category === filterType)
+      const matchesCategory =
+        filterCategory === "all" ||
+        (filterCategory === "none"
+          ? categoryName(transaction) === UNCATEGORIZED_LABEL
+          : transaction.categoryId === filterCategory)
       // "Pagados" incluye los ajustes de cierre, que nunca quedan pendientes (ver `isSettled`).
       const matchesPaid =
         filterPaid === "all" ||
@@ -302,7 +333,8 @@ export function TransactionsTable({
 
       return matchesSearch && matchesType && matchesCategory && matchesPaid
     })
-  }, [transactions, searchTerm, filterType, filterCategory, filterPaid])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid])
 
   /**
    * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
@@ -408,37 +440,48 @@ export function TransactionsTable({
    * @param {Transaction} transaction - La transacción.
    * @returns {JSX.Element} El elemento `<span>` del badge.
    */
-  const getCategoryBadge = (transaction: Transaction) => {
-    if (transaction.nonComputable) {
-      return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-          No computable
+  /**
+   * Tipo y categoría de una fila: un icono redondo para el tipo (ingreso, gasto fijo o variable;
+   * se explica al pasar el ratón) y, al lado, el nombre de la categoría. En PC, los no computables
+   * llevan además la marca "NC" (en el móvil ya va junto al importe).
+   */
+  const getCategoryBadge = (transaction: Transaction, showNonComputable = false) => (
+    <span className="inline-flex items-center gap-1.5">
+      {getTypeIcon(transaction)}
+      {!isClosingAdjustment(transaction) && (
+        <span className="text-xs text-muted-foreground">{categoryName(transaction)}</span>
+      )}
+      {showNonComputable && transaction.nonComputable && (
+        <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full" title="No computable">
+          NC
         </span>
-      )
-    }
+      )}
+    </span>
+  )
 
+  /** Icono del tipo: ingreso (verde), gasto fijo (rojo, calendario) o gasto variable (naranja). */
+  const getTypeIcon = (transaction: Transaction) => {
+    const base = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
     if (transaction.type === "income") {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-600">
-          <TrendingUp className="h-3 w-3" />
-          Ingreso
+        <span className={`${base} bg-green-100 text-green-600`} title="Ingreso">
+          <TrendingUp className="h-3.5 w-3.5" />
+          <span className="sr-only">Ingreso</span>
         </span>
       )
     }
-
     if (transaction.category === "fixed") {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">
-          <Calendar className="h-3 w-3" />
-          fijo
+        <span className={`${base} bg-red-100 text-red-600`} title="Gasto fijo">
+          <Calendar className="h-3.5 w-3.5" />
+          <span className="sr-only">Gasto fijo</span>
         </span>
       )
     }
-
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-600">
-        <TrendingDown className="h-3 w-3" />
-        variable
+      <span className={`${base} bg-orange-100 text-orange-600`} title="Gasto variable">
+        <TrendingDown className="h-3.5 w-3.5" />
+        <span className="sr-only">Gasto variable</span>
       </span>
     )
   }
@@ -480,7 +523,8 @@ export function TransactionsTable({
           <h2 className="text-xl font-semibold text-foreground">
             Transacciones{" "}
             <span className="text-sm font-normal text-muted-foreground">
-              {filteredAndSortedTransactions.length}/{transactions.length}
+              {filteredAndSortedTransactions.length}/{searchBase.length}
+              {isSearchingAll && " · todos los meses"}
             </span>
           </h2>
 
@@ -506,7 +550,8 @@ export function TransactionsTable({
               >
                 <option value="all">Todos los tipos</option>
                 <option value="income">Ingresos</option>
-                <option value="expense">Gastos</option>
+                <option value="fixed">Gastos fijos</option>
+                <option value="variable">Gastos variables</option>
               </select>
 
               {/* Selector de filtro por categoría */}
@@ -516,8 +561,12 @@ export function TransactionsTable({
                 className="w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
               >
                 <option value="all">Todas las categorías</option>
-                <option value="fixed">fijo</option>
-                <option value="variable">variable</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+                <option value="none">{UNCATEGORIZED_LABEL}</option>
               </select>
 
               {/* Selector de filtro por pago (solo gastos) */}
@@ -660,7 +709,14 @@ export function TransactionsTable({
                         }`}
                       />
                       <div>
-                        <div className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                        <div
+                          className={cn(
+                            "text-sm font-medium",
+                            transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
+                            isOtherMonth(transaction) && "text-primary",
+                          )}
+                          title={isOtherMonth(transaction) ? "De otro mes" : undefined}
+                        >
                           {formatDate(transaction.date)}
                         </div>
                       </div>
@@ -676,7 +732,7 @@ export function TransactionsTable({
                         </span>
                       )}
                     </div>
-                    <div>{getCategoryBadge(transaction)}</div>
+                    <div>{getCategoryBadge(transaction, true)}</div>
                     {!singleMode && (
                       <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
                         {getOwnerDisplay(transaction)}
@@ -698,7 +754,7 @@ export function TransactionsTable({
                     </div>
                     {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
-                      {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                      {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -716,7 +772,7 @@ export function TransactionsTable({
                           <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
                         </Button>
                       )}
-                      {!locked && (
+                      {!isRowLocked(transaction) && (
                         <>
                           <Button
                             size="sm"
@@ -773,7 +829,13 @@ export function TransactionsTable({
                               }`}
                             />
                             <div>
-                              <span className={cn("text-sm font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
+                              <span
+                                className={cn(
+                                  "text-sm font-medium",
+                                  transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
+                                  isOtherMonth(transaction) && "text-primary",
+                                )}
+                              >
                                 {formatDate(transaction.date)}
                               </span>
                             </div>
@@ -798,7 +860,7 @@ export function TransactionsTable({
                                 NC
                               </span>
                             )}
-                            {!locked && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                            {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
                               <button
                                 type="button"
                                 data-tour="paid"

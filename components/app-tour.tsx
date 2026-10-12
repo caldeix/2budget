@@ -8,6 +8,10 @@
  *              Cada paso apunta a un elemento con `data-tour="…"`. Si hay varios (p. ej. la fila
  *              de escritorio y la de móvil), se usa el primero visible; los pasos sin ningún
  *              elemento visible (p. ej. botones que en móvil van dentro del menú) se omiten.
+ *
+ *              Algunos pasos enseñan el interior de una ventana (el formulario de transacción, el
+ *              cierre de mes): llevan `open` y el tour avisa a la página (`onOpenChange`) para que
+ *              la abra o la cierre; sus elementos se buscan cuando la ventana ya está abierta.
  */
 
 "use client"
@@ -16,18 +20,25 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 
+/** Ventana que debe estar abierta durante un paso. */
+export type TourWindow = "transaction-form" | "close-month"
+
 /** Un paso del tour. */
 export interface TourStep {
   /** Valor del atributo `data-tour` del elemento a resaltar. */
   target: string
   title: string
   text: string
+  /** Ventana que el tour abre para este paso (y cierra al pasar a uno que no la lleve). */
+  open?: TourWindow
 }
 
 /** Margen del resaltado alrededor del elemento y separación del tooltip. */
 const HIGHLIGHT_PADDING = 6
 const TOOLTIP_GAP = 12
 const VIEWPORT_MARGIN = 16
+/** Cuánto se espera a que aparezca el elemento de un paso (p. ej. dentro de una ventana recién abierta). */
+const FIND_TIMEOUT_MS = 2000
 
 /** Primer elemento visible con ese `data-tour`. */
 function findTarget(target: string): HTMLElement | null {
@@ -48,25 +59,31 @@ function isFixed(el: HTMLElement): boolean {
 }
 
 /**
- * Lleva el elemento a la vista dejando sitio debajo para el tooltip: centra en la pantalla el
- * bloque "elemento + tooltip" (o, si no cabe, pone el elemento arriba). En horizontal solo mueve
- * su contenedor con scroll (el carrusel del móvil), nunca la página.
+ * Lleva el elemento a la vista dejando sitio debajo para el tooltip: centra el bloque "elemento +
+ * tooltip" (o, si no cabe, pone el elemento arriba). Desplaza el contenedor con scroll que lo
+ * contenga (el cuerpo de una ventana, el carrusel del móvil) y, si no está en una ventana fija,
+ * la página.
  */
 function scrollIntoViewForTooltip(el: HTMLElement, tooltipHeight: number) {
+  const vh = window.innerHeight
+  const r = el.getBoundingClientRect()
+  const total = r.height + TOOLTIP_GAP + tooltipHeight
+  const desiredTop = total <= vh - 2 * VIEWPORT_MARGIN ? (vh - total) / 2 : VIEWPORT_MARGIN
+
   for (let node = el.parentElement; node; node = node.parentElement) {
-    const { overflowX } = getComputedStyle(node)
+    const { overflowX, overflowY } = getComputedStyle(node)
     if ((overflowX === "auto" || overflowX === "scroll") && node.scrollWidth > node.clientWidth) {
       const box = node.getBoundingClientRect()
-      const r = el.getBoundingClientRect()
       node.scrollTo({ left: node.scrollLeft + r.left - box.left - (box.width - r.width) / 2, behavior: "smooth" })
-      break
+    }
+    if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight) {
+      const box = node.getBoundingClientRect()
+      // Dentro de la caja: el elemento a la altura deseada respecto a la pantalla (o arriba del todo).
+      node.scrollTo({ top: node.scrollTop + r.top - Math.max(box.top + VIEWPORT_MARGIN, desiredTop), behavior: "smooth" })
+      return
     }
   }
   if (isFixed(el)) return
-  const r = el.getBoundingClientRect()
-  const vh = window.innerHeight
-  const total = r.height + TOOLTIP_GAP + tooltipHeight
-  const desiredTop = total <= vh - 2 * VIEWPORT_MARGIN ? (vh - total) / 2 : VIEWPORT_MARGIN
   window.scrollTo({ top: window.scrollY + r.top - desiredTop, behavior: "smooth" })
 }
 
@@ -75,12 +92,20 @@ type Rect = { top: number; left: number; width: number; height: number }
 const sameRect = (a: Rect | null, b: Rect) =>
   a !== null && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height
 
+interface AppTourProps {
+  steps: TourStep[]
+  onFinish: () => void
+  /** Se llama al cambiar de paso con la ventana que debe estar abierta (o `null`). */
+  onOpenChange?: (open: TourWindow | null) => void
+}
+
 /**
  * @function AppTour
  * @description Muestra el tour con los pasos dados. Llama a `onFinish` al pulsar "Finalizar".
  */
-export function AppTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () => void }) {
-  // Los pasos se fijan al empezar, según lo que se ve en esta pantalla (móvil o PC).
+export function AppTour({ steps, onFinish, onOpenChange }: AppTourProps) {
+  // Los pasos se fijan al empezar, según lo que se ve en esta pantalla (móvil o PC). Los que van
+  // dentro de una ventana no se pueden comprobar aún: se dan por buenos.
   const [activeSteps, setActiveSteps] = useState<TourStep[] | null>(null)
   const [index, setIndex] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
@@ -91,21 +116,26 @@ export function AppTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () =
   tooltipHeightRef.current = tooltipSize.height
 
   useEffect(() => {
-    setActiveSteps(steps.filter((step) => findTarget(step.target) !== null))
+    setActiveSteps(steps.filter((step) => step.open !== undefined || findTarget(step.target) !== null))
   }, [steps])
 
   const step = activeSteps?.[index] ?? null
   const isLast = activeSteps !== null && index === activeSteps.length - 1
 
-  // Lleva el elemento a la vista y sigue su posición (desplazamientos, carrusel, cambios de tamaño).
+  // Abre o cierra la ventana que pide el paso.
   useEffect(() => {
     if (!step) return
-    const el = findTarget(step.target)
-    if (!el) return
-    scrollIntoViewForTooltip(el, tooltipHeightRef.current)
+    onOpenChange?.(step.open ?? null)
+  }, [step, onOpenChange])
 
-    // Sigue su posición al desplazar (también dentro del carrusel), al cambiar el tamaño y, por
-    // si algo se mueve sin evento (transiciones), cada poco tiempo.
+  // Espera al elemento (si está en una ventana que se acaba de abrir), lo lleva a la vista y sigue
+  // su posición (desplazamientos, carrusel, cambios de tamaño).
+  useEffect(() => {
+    if (!step) return
+    setRect(null)
+    let cancelled = false
+    let interval = 0
+
     const track = () => {
       const current = findTarget(step.target)
       if (!current) return
@@ -113,14 +143,34 @@ export function AppTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () =
       const next = { top: r.top, left: r.left, width: r.width, height: r.height }
       setRect((prev) => (sameRect(prev, next) ? prev : next))
     }
-    track()
-    window.addEventListener("scroll", track, { capture: true, passive: true })
-    window.addEventListener("resize", track)
-    const interval = setInterval(track, 150)
+
+    const start = () => {
+      track()
+      window.addEventListener("scroll", track, { capture: true, passive: true })
+      window.addEventListener("resize", track)
+      // Por si algo se mueve sin evento (transiciones), cada poco tiempo.
+      interval = window.setInterval(track, 150)
+    }
+
+    const waitFor = (since: number) => {
+      if (cancelled) return
+      const el = findTarget(step.target)
+      if (el) {
+        scrollIntoViewForTooltip(el, tooltipHeightRef.current)
+        start()
+      } else if (Date.now() - since < FIND_TIMEOUT_MS) {
+        window.setTimeout(() => waitFor(since), 100)
+      } else {
+        start() // Sin elemento: el tooltip se muestra abajo, sin resaltado.
+      }
+    }
+    waitFor(Date.now())
+
     return () => {
+      cancelled = true
       window.removeEventListener("scroll", track, { capture: true })
       window.removeEventListener("resize", track)
-      clearInterval(interval)
+      window.clearInterval(interval)
     }
   }, [step])
 
@@ -140,8 +190,11 @@ export function AppTour({ steps, onFinish }: { steps: TourStep[]; onFinish: () =
   const handleNext = useCallback(() => {
     if (!activeSteps) return
     if (index < activeSteps.length - 1) setIndex(index + 1)
-    else onFinish()
-  }, [activeSteps, index, onFinish])
+    else {
+      onOpenChange?.(null)
+      onFinish()
+    }
+  }, [activeSteps, index, onFinish, onOpenChange])
 
   // Si no hay nada que enseñar (no debería pasar), el tour termina solo.
   useEffect(() => {

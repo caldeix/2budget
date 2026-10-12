@@ -10,7 +10,8 @@
 "use client"
 
 import { useState } from "react"
-import type { MonthlyReport } from "@/types"
+import type { AppConfig, MonthlyReport } from "@/types"
+import { expensesByCategory } from "@/lib/categories" // Gastos por categoría.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Trash2 } from "lucide-react" // Icono de borrar.
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
@@ -29,6 +30,7 @@ import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Perso
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: oculta la Persona 2 si el informe no tiene cifras suyas.
  * @property {() => void} [onDelete] - Borra el informe y sus ajustes. Solo se pasa para el último informe.
+ * @property {AppConfig} config - Configuración actual (nombres de las categorías).
  */
 interface ReportDetailModalProps {
   isOpen: boolean
@@ -38,7 +40,24 @@ interface ReportDetailModalProps {
   person2Name: string
   singleMode?: boolean
   onDelete?: () => void
+  config: AppConfig
 }
+
+/** Colores del quesito por categoría (se repiten si hay más de doce). */
+const CATEGORY_COLORS = [
+  "hsl(43 64% 52%)",
+  "hsl(271 76% 53%)",
+  "hsl(200 70% 50%)",
+  "hsl(150 55% 42%)",
+  "hsl(15 80% 55%)",
+  "hsl(330 65% 55%)",
+  "hsl(60 70% 45%)",
+  "hsl(240 55% 60%)",
+  "hsl(180 50% 40%)",
+  "hsl(100 45% 45%)",
+  "hsl(0 65% 55%)",
+  "hsl(30 60% 45%)",
+]
 
 /**
  * @function ReportDetailModal
@@ -55,7 +74,13 @@ export function ReportDetailModal({
   person2Name,
   singleMode,
   onDelete,
+  config,
 }: ReportDetailModalProps) {
+  // Gastos del mes por categoría (sin los ajustes de cierre).
+  const categoryChartData = expensesByCategory(report.transactions, config).map((item, i) => ({
+    ...item,
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+  }))
   // Borrar pide una segunda confirmación dentro del propio modal.
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false)
 
@@ -139,13 +164,8 @@ export function ReportDetailModal({
           </div>
         </div>
 
-        {/* Sección de Gráficos */}
+        {/* Sección de Gráficos: ingresos por persona y gastos por tipo en una fila; por categoría, a todo el ancho */}
         <div className={`grid grid-cols-1 gap-8 ${showPerson2 ? "lg:grid-cols-2" : ""}`}>
-          {/* Gráfico de Distribución de Gastos */}
-          <div>
-            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Gastos</h3>
-            <PieChart data={expenseChartData} size={250} />
-          </div>
           {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2 no aporta nada) */}
           {showPerson2 && (
             <div>
@@ -153,6 +173,16 @@ export function ReportDetailModal({
               <PieChart data={incomeChartData} size={250} />
             </div>
           )}
+          {/* Gráfico de Distribución de Gastos (fijos y variables) */}
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Gastos</h3>
+            <PieChart data={expenseChartData} size={250} />
+          </div>
+          {/* Gastos por categoría: ocupa la fila entera y la leyenda va en columnas */}
+          <div className={showPerson2 ? "lg:col-span-2" : ""}>
+            <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Gastos por categoría</h3>
+            <PieChart data={categoryChartData} size={250} legend="grid" />
+          </div>
         </div>
 
         {/* Sección de Detalles por Persona */}

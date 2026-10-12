@@ -19,6 +19,11 @@ import {
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
+import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
+import { CategorySpreadModal } from "@/components/category-spread-modal"
+import { lastMonths, monthlyEvolution } from "@/lib/evolution"
+import { EvolutionCard } from "@/components/evolution-card"
+import { EvolutionModal } from "@/components/evolution-modal"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -40,7 +45,7 @@ import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 import { MasterCheckDialog } from "@/components/master-check-dialog"
 import { isMasterCheckDue } from "@/lib/cloud/master-check"
 import { recordMasterCheck, recordTourCompleted } from "@/lib/cloud/repository"
-import { AppTour, type TourStep } from "@/components/app-tour"
+import { AppTour, type TourStep, type TourWindow } from "@/components/app-tour"
 import { getTourSteps } from "@/components/tour-steps"
 import { createTourData } from "@/lib/tour-data"
 
@@ -84,6 +89,7 @@ export default function HomePage() {
     isLoading: isDataLoading,
     addTransaction,
     updateTransaction,
+    applyCategoryToName,
     setTransactionsPaid,
     deleteTransaction,
     updateConfig,
@@ -107,6 +113,7 @@ export default function HomePage() {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
+  const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
   // Móvil: los botones flotantes secundarios se despliegan con el botón de menú (en PC se ven siempre).
   const [isFabMenuOpen, setIsFabMenuOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
@@ -188,9 +195,23 @@ export default function HomePage() {
   // Un mes pasado con informe está cerrado: sus transacciones son de solo lectura. Para cambiar
   // algo se borra su informe (si es el último), y el mes vuelve a quedar abierto.
   const isSelectedMonthLocked = !!existingReportForSelectedMonth && !isSelectedMonthCurrent && !isSelectedMonthFuture
+  // Una transacción es de solo lectura si su mes es pasado y tiene informe (para los resultados
+  // de otros meses al buscar).
+  const isTransactionLocked = useCallback(
+    (t: Transaction) => {
+      const month = Number(t.date.slice(5, 7))
+      const year = Number(t.date.slice(0, 4))
+      const isPast = year < actualCurrentYear || (year === actualCurrentYear && month < actualCurrentMonth)
+      return isPast && !!getExistingReport(month, year)
+    },
+    [actualCurrentMonth, actualCurrentYear, getExistingReport],
+  )
   // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = calculateCumulativeBalances(data.transactions)
+  // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
+  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
+  const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
   // Privacidad en pareja: mi rol en el hogar y si mi pareja me oculta sus transacciones individuales.
@@ -211,24 +232,46 @@ export default function HomePage() {
   // sugerirlos al escribir el nombre de una transacción.
   const nameSuggestions = useMemo(() => {
     const seen = new Set<string>()
-    const out: { name: string; type: Transaction["type"] }[] = []
+    const out: { name: string; type: Transaction["type"]; categoryId?: string }[] = []
     for (const t of [...data.transactions].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))) {
       const name = t.name.trim()
       const key = `${t.type}:${name.toLowerCase()}`
       if (!name || isClosingAdjustment(t) || seen.has(key)) continue
       seen.add(key)
-      out.push({ name, type: t.type })
+      out.push({ name, type: t.type, categoryId: t.categoryId })
     }
     return out
   }, [data.transactions])
 
+  // Al poner categoría a un nombre que ya se usó antes sin ella, se ofrece aplicarla a las anteriores.
+  const [categorySpread, setCategorySpread] = useState<{
+    name: string
+    type: Transaction["type"]
+    categoryId: string
+    count: number
+  } | null>(null)
+
   const handleAddOrUpdateTransaction = (transactionData: TransactionFormData) => {
+    const editedId = editingTransaction?.id
     if (editingTransaction) {
       updateTransaction(editingTransaction.id, transactionData)
       setEditingTransaction(null)
     } else {
       addTransaction(transactionData)
     }
+
+    const { name, type, categoryId } = transactionData
+    if (!categoryId || isTourActive) return
+    const target = normalizeName(name)
+    const count = data.transactions.filter(
+      (t) =>
+        t.id !== editedId &&
+        t.type === type &&
+        !t.categoryId &&
+        !isClosingAdjustment(t) &&
+        normalizeName(t.name) === target,
+    ).length
+    if (count > 0) setCategorySpread({ name: name.trim(), type, categoryId, count })
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -429,6 +472,7 @@ export default function HomePage() {
     isReportModalOpen ||
     selectedReport !== null ||
     isReportsListOpen ||
+    isEvolutionOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     isConfirmCopyModalOpen
@@ -453,9 +497,22 @@ export default function HomePage() {
     )
   }, [data.config, session.enabled])
 
+  // El tour abre el formulario de transacción y el cierre de mes para enseñarlos por dentro.
+  const handleTourOpenChange = useCallback((open: TourWindow | null) => {
+    setEditingTransaction(null)
+    setIsTransactionFormOpen(open === "transaction-form")
+    if (open === "close-month") {
+      setMonthToCloseReport(getCurrentMonth())
+      setYearToCloseReport(getCurrentYear())
+    }
+    setIsReportModalOpen(open === "close-month")
+  }, [])
+
   const finishTour = useCallback(() => {
     setTourData(null)
     setTourSteps(null)
+    setIsTransactionFormOpen(false)
+    setIsReportModalOpen(false)
     markTourSeenOnDevice(uid)
     if (session.services && uid) recordTourCompleted(session.services.db, uid)
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -492,7 +549,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-center items-center h-12 sm:h-16">
             <h1 className="text-xl sm:text-2xl font-bold text-foreground relative">
               2Budge
@@ -514,7 +571,7 @@ export default function HomePage() {
       </header>
 
       {syncError && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
             <p className="text-sm text-amber-600">{syncError}</p>
@@ -523,7 +580,7 @@ export default function HomePage() {
       )}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
         <SummaryCards
           totalIncome={calculations.totalIncome}
           totalExpenses={calculations.totalExpenses}
@@ -545,8 +602,10 @@ export default function HomePage() {
           showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
         />
 
-        <div className="flex flex-col lg:flex-row gap-8 mt-8">
-          <aside className="w-full lg:w-80 space-y-8">
+        {/* Desde 1280 px, el lateral mide lo mismo que una tarjeta del resumen (4 columnas con
+            separación de 24 px): así la lista de transacciones empieza donde empieza la tarjeta de Ingresos. */}
+        <div className="flex flex-col lg:flex-row gap-8 xl:gap-6 mt-8">
+          <aside className="w-full lg:w-80 xl:w-[calc((100%-72px)/4)] xl:shrink-0 space-y-8">
             <CumulativeBalanceCard
               totalBalance={cumulativeBalances.totalBalance}
               person1TotalBalance={cumulativeBalances.person1TotalBalance}
@@ -555,6 +614,8 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
             />
+
+            <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
 
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
@@ -645,7 +706,10 @@ export default function HomePage() {
               hasMore={hasMoreTransactions}
               singleMode={data.config.singleMode}
               locked={isSelectedMonthLocked}
+              allTransactions={data.transactions}
+              isTransactionLocked={isTransactionLocked}
               isAmountHidden={isAmountHidden}
+              categories={categoriesOf(data.config)}
             />
           </div>
         </div>
@@ -746,6 +810,18 @@ export default function HomePage() {
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
       />
 
+      <CategorySpreadModal
+        isOpen={categorySpread !== null}
+        onClose={() => setCategorySpread(null)}
+        onConfirm={() => {
+          if (categorySpread) applyCategoryToName(categorySpread.name, categorySpread.type, categorySpread.categoryId)
+          setCategorySpread(null)
+        }}
+        name={categorySpread?.name ?? ""}
+        categoryName={categorySpread ? categoryNameOf(data.config, { categoryId: categorySpread.categoryId }) : ""}
+        count={categorySpread?.count ?? 0}
+      />
+
       <PaidReconciliationModal
         isOpen={isPaidReconcileOpen}
         monthName={reconcileLabel.monthName}
@@ -765,6 +841,7 @@ export default function HomePage() {
         person2Name={data.config.person2Name}
         singleMode={data.config.singleMode}
         nameSuggestions={nameSuggestions}
+        categories={categoriesOf(data.config)}
         minDate={minTransactionDate}
       />
 
@@ -782,6 +859,13 @@ export default function HomePage() {
           singleMode={data.config.singleMode}
         />
       )}
+
+      <EvolutionModal
+        isOpen={isEvolutionOpen}
+        onClose={() => setIsEvolutionOpen(false)}
+        points={evolutionPoints}
+        currentYear={actualCurrentYear}
+      />
 
       <ReportsListModal
         isOpen={isReportsListOpen}
@@ -801,6 +885,7 @@ export default function HomePage() {
           person1Name={data.config.person1Name}
           person2Name={data.config.person2Name}
           singleMode={data.config.singleMode}
+          config={data.config}
           onDelete={
             selectedReport.id === latestReportId
               ? () => {
@@ -864,7 +949,7 @@ export default function HomePage() {
         }}
       />
 
-      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} />}
+      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} onOpenChange={handleTourOpenChange} />}
     </div>
   )
 }

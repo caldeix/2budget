@@ -20,6 +20,7 @@ import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en espa�
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
+import { normalizeName } from "@/lib/categories" // Nombres comparables (sin tildes ni mayúsculas).
 
 /** Indica si la transacción es del mes y año dados. */
 function isInMonth(t: Transaction, month: number, year: number): boolean {
@@ -468,6 +469,33 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
 
   // Devuelve el estado y las funciones para que los componentes puedan utilizarlos.
   /**
+   * @function applyCategoryToName
+   * @description Pone la categoría a todas las transacciones del mismo tipo y nombre que aún no
+   *              tengan ninguna (también a sus copias dentro de los informes cerrados, para que su
+   *              gráfico por categoría quede completo). No toca nada más.
+   */
+  const applyCategoryToName = useCallback(
+    (name: string, type: Transaction["type"], categoryId: string) => {
+      commit((prevData) => {
+        const target = normalizeName(name)
+        const matches = (t: Transaction) =>
+          t.type === type && !t.categoryId && !isClosingAdjustment(t) && normalizeName(t.name) === target
+        const ids = new Set(prevData.transactions.filter(matches).map((t) => t.id))
+        if (ids.size === 0) return prevData
+        const fix = (t: Transaction) => (ids.has(t.id) ? { ...t, categoryId } : t)
+        return {
+          ...prevData,
+          transactions: prevData.transactions.map(fix),
+          reports: prevData.reports.map((r) =>
+            r.transactions.some((t) => ids.has(t.id)) ? { ...r, transactions: r.transactions.map(fix) } : r,
+          ),
+        }
+      })
+    },
+    [commit],
+  )
+
+  /**
    * @function deleteReport
    * @description Borra un informe y las transacciones de ajuste de su cierre: el mes vuelve a
    *              quedar abierto, como antes de cerrarlo.
@@ -495,6 +523,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     isLoading,
     addTransaction,
     updateTransaction,
+    applyCategoryToName,
     setTransactionsPaid,
     deleteTransaction,
     updateConfig,
