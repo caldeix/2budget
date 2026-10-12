@@ -286,7 +286,7 @@ export function MonthlyReportModal({
         </div>
 
         {/* Sección para introducir el dinero real disponible */}
-        <div className="space-y-4">
+        <div data-tour="close-real-money" className="space-y-4">
           <h3 className="font-semibold text-foreground">Dinero real disponible al final del mes</h3>
           <div className={`grid gap-4 ${showPerson2 ? "grid-cols-2" : "grid-cols-1"}`}>
             <div>
@@ -319,7 +319,8 @@ export function MonthlyReportModal({
         {(!isZeroMoney(person1Adjustment) || !isZeroMoney(person2Adjustment)) && (
           <div className="bg-secondary/10 rounded-2xl p-4">
             <h3 className="font-semibold text-foreground mb-4">Ajustes calculados</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            {/* El tour resalta solo las cifras: la caja entera no cabe en el móvil con el tooltip. */}
+            <div data-tour="close-adjustments" className="grid grid-cols-2 gap-4 text-sm mb-4">
               <div>
                 <p className="text-muted-foreground">Ajuste {person1Name}:</p>
                 <p className={`font-medium ${person1Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>

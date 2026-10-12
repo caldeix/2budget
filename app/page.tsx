@@ -44,7 +44,7 @@ import { RecoveryCodeDialog } from "@/components/recovery-code-dialog"
 import { MasterCheckDialog } from "@/components/master-check-dialog"
 import { isMasterCheckDue } from "@/lib/cloud/master-check"
 import { recordMasterCheck, recordTourCompleted } from "@/lib/cloud/repository"
-import { AppTour, type TourStep } from "@/components/app-tour"
+import { AppTour, type TourStep, type TourWindow } from "@/components/app-tour"
 import { getTourSteps } from "@/components/tour-steps"
 import { createTourData } from "@/lib/tour-data"
 
@@ -473,9 +473,22 @@ export default function HomePage() {
     )
   }, [data.config, session.enabled])
 
+  // El tour abre el formulario de transacción y el cierre de mes para enseñarlos por dentro.
+  const handleTourOpenChange = useCallback((open: TourWindow | null) => {
+    setEditingTransaction(null)
+    setIsTransactionFormOpen(open === "transaction-form")
+    if (open === "close-month") {
+      setMonthToCloseReport(getCurrentMonth())
+      setYearToCloseReport(getCurrentYear())
+    }
+    setIsReportModalOpen(open === "close-month")
+  }, [])
+
   const finishTour = useCallback(() => {
     setTourData(null)
     setTourSteps(null)
+    setIsTransactionFormOpen(false)
+    setIsReportModalOpen(false)
     markTourSeenOnDevice(uid)
     if (session.services && uid) recordTourCompleted(session.services.db, uid)
     window.scrollTo({ top: 0, behavior: "smooth" })
@@ -898,7 +911,7 @@ export default function HomePage() {
         }}
       />
 
-      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} />}
+      {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} onOpenChange={handleTourOpenChange} />}
     </div>
   )
 }
