@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.6.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.7.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.7.0 — Instalable como app
+
+- **Manifiesto web** — Nombre, iconos (también la versión "maskable" que Android recorta en círculo), colores y pantalla completa: Android ofrece "Instalar app" en vez de un simple acceso directo, y la app se abre en su propia ventana, con su icono en el cajón de aplicaciones. En iPhone, "Añadir a pantalla de inicio" desde Safari la abre a pantalla completa
+- **Abre sin conexión** — Un service worker guarda la portada y sus ficheros desde la primera visita. La página siempre se pide primero a la red (para tener la última versión publicada) y los ficheros con hash salen de la caché; cada versión tiene su propia caché y borra la anterior. No toca Firebase ni otros dominios
+- SemVer: 2.6.1 → 2.7.0 (MINOR)
 
 ### v2.6.1 — Ordenar por pagados y filtros más ordenados
 
