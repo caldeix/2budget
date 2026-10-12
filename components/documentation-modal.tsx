@@ -238,7 +238,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               <ul className="list-disc list-inside space-y-1">
                 <li>
                   En la tarjeta <strong>Informes</strong>, «Cerrar mes actual» abre el cierre. Si estás viendo un mes
-                  pasado sin informe, aparece también el botón para generar el suyo.
+                  pasado sin informe, aparece también el botón para generar el suyo. Solo se puede actualizar el
+                  informe del mes actual y del anterior; los más antiguos ya no se tocan.
                 </li>
                 <li>
                   Escribe el <strong>dinero real</strong> que tiene cada uno al final del mes. La app lo compara con el

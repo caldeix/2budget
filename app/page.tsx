@@ -169,6 +169,8 @@ export default function HomePage() {
   const isSelectedMonthFuture =
     selectedYear > actualCurrentYear ||
     (selectedYear === actualCurrentYear && selectedMonth > actualCurrentMonth)
+  const { month: previousMonth, year: previousYear } = getPreviousMonthYear(actualCurrentMonth, actualCurrentYear)
+  const isSelectedMonthPrevious = selectedMonth === previousMonth && selectedYear === previousYear
 
   const calculations = useCalculations(allTransactionsForSelectedMonth)
   const existingReportForActualMonth = getExistingReport(actualCurrentMonth, actualCurrentYear)
@@ -581,7 +583,11 @@ export default function HomePage() {
                   </Button>
                 </div>
 
-                {!isSelectedMonthCurrent && !isSelectedMonthFuture && (
+                {/* Un mes pasado sin informe se puede cerrar (generar) siempre; actualizarlo, solo si es
+                    el mes anterior al actual: los más antiguos ya son de solo lectura. */}
+                {!isSelectedMonthCurrent &&
+                  !isSelectedMonthFuture &&
+                  (!existingReportForSelectedMonth || isSelectedMonthPrevious) && (
                   <div className="mb-4">
                     <Button
                       onClick={handleOpenReportModalForSelectedMonth}
