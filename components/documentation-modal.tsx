@@ -186,11 +186,12 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   admiten transacciones nuevas.
                 </li>
                 <li>
-                  <strong>Propietario:</strong> {person1Name}, {person2Name} o Ambos. Con «Ambos», el deslizador reparte
-                  el importe: si {person1Name} paga el 70%, a {person2Name} le toca el 30%.
+                  <strong>Reparto:</strong> el deslizador dice qué parte es de cada uno. Si {person1Name} paga el 70%, a{" "}
+                  {person2Name} le toca el 30%. Con el 100% para uno, la transacción es solo suya (y así se muestra
+                  en la lista); cualquier otro reparto es compartido.
                 </li>
               </ul>
-              <p>En modo individual no se pide propietario ni reparto: todo es tuyo.</p>
+              <p>En modo individual no se pide reparto: todo es tuyo.</p>
             </AccordionContent>
           </AccordionItem>
 
