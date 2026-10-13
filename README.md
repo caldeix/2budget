@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-2.10.2-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.11.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -38,8 +38,8 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
-- **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
-- **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, tarjetas con solo los totales y un único dinero real en el cierre de mes
+- **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
+- **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, Ingresos y Gastos juntos en una sola tarjeta y un único dinero real en el cierre de mes
 - **Cuenta y hogar en la nube** — Cuenta obligatoria con email verificado. Los datos se guardan en un hogar compartido por la pareja (o "tu espacio" en modo individual), sincronizado al momento entre dispositivos y también sin conexión. Invitación a la pareja con un código de un solo uso
 - **Cifrado de extremo a extremo** — Cada transacción, informe y la configuración se cifran en el navegador (AES-256-GCM) con una clave del hogar protegida por la **contraseña maestra** de cada miembro (PBKDF2). La contraseña maestra no se guarda en ningún sitio
 - **Código de recuperación** — Permite elegir una contraseña maestra nueva si se olvida; se muestra una sola vez. Una vez al mes, la app pide la contraseña maestra para que no se olvide
@@ -50,6 +50,13 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.11.0 — Ingresos y gastos juntos en modo individual
+
+- **Una tarjeta para Ingresos y Gastos en modo individual** — Sin desglose por persona, las dos tarjetas se quedaban casi vacías. Ahora van juntas en una sola, partida en horizontal: los ingresos arriba en verde y los gastos abajo en rojo (con la cifra de «Hoy» si hay gastos pendientes). En PC y tablet queda al lado del Balance; en el móvil, el carrusel pasa a dos tarjetas. En pareja no cambia nada
+- **La copia conserva la categoría** — Al copiar los gastos fijos y los ingresos del mes anterior, cada copia mantiene su categoría. Antes quedaban todas en «Sin categoría»
+- **Sin tests en el proyecto** — Fuera Vitest y el script `test` de `package.json`
+- SemVer: 2.10.2 → 2.11.0 (MINOR)
 
 ### v2.10.2 — Hoy y Previsto en modo individual
 
