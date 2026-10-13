@@ -891,6 +891,7 @@ export default function HomePage() {
           person2Name={data.config.person2Name}
           existingReport={getExistingReport(monthToCloseReport, yearToCloseReport)}
           singleMode={data.config.singleMode}
+          allTransactions={data.transactions}
         />
       )}
 
