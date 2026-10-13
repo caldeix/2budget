@@ -3,14 +3,15 @@
  * @description Privacidad en pareja: cada persona puede ocultar a su pareja el importe de sus
  *              transacciones individuales (las que son 100% suyas). Solo se oculta en la interfaz
  *              (la lista, el aviso de gastos pagados y la copia de fijos): los totales, balances e
- *              informes no cambian, y los ajustes de cierre siempre se ven.
+ *              informes no cambian, y los ajustes de cierre y las aportaciones a la cuenta compartida
+ *              (dinero que entra en la cuenta de los dos) siempre se ven.
  *
  *              No es cifrado: los dos miembros comparten la clave del hogar, así que los datos
  *              siguen estando en el dispositivo de la pareja (por ejemplo, en una exportación).
  */
 
 import type { AppConfig, Transaction } from "@/types"
-import { isClosingAdjustment } from "@/lib/aggregations"
+import { isClosingAdjustment, isContribution } from "@/lib/aggregations"
 import { normalizePercentage } from "@/lib/money"
 
 export type Person = "person1" | "person2"
@@ -42,6 +43,6 @@ export function isHiddenFromViewer(t: Transaction, viewer: Person | null, config
   if (!viewer) return false
   const partner = partnerOf(viewer)
   if (!config.hideIndividualFromPartner?.[partner]) return false
-  if (isClosingAdjustment(t)) return false
+  if (isClosingAdjustment(t) || isContribution(t)) return false
   return belongsOnlyTo(t, partner)
 }

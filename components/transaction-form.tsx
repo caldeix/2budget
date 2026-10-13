@@ -4,6 +4,8 @@
  *              que permite al usuario añadir nuevas transacciones o editar las existentes.
  *              Incluye campos para el tipo, categoría, nombre, importe, propietario y
  *              un deslizador para la distribución de porcentajes si la transacción es compartida.
+ *              Las aportaciones a la cuenta compartida (v3.0.0) no llevan categoría ni reparto: se
+ *              elige quién aporta.
  *              Es un Client Component (`"use client"`) debido al uso de estados y eventos.
  */
 
@@ -30,7 +32,7 @@ import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en lo
  */
 export interface NameSuggestion {
   name: string
-  type: "income" | "expense"
+  type: Transaction["type"]
   categoryId?: string
 }
 
@@ -59,6 +61,8 @@ const normalize = (text: string) =>
  * @property {Category[]} categories - Categorías disponibles (ver `lib/categories.ts`).
  * @property {string} [minDate] - Primera fecha admitida (YYYY-MM-DD): no se añaden transacciones a meses
  *           ya pasados (ver `app/page.tsx`). Al editar, la fecha original de la transacción siempre vale.
+ * @property {"person1" | "person2" | null} [viewerRole] - Quién usa la app (en la nube): es quien aporta
+ *           por defecto en una aportación nueva.
  */
 interface TransactionFormProps {
   isOpen: boolean
@@ -71,6 +75,7 @@ interface TransactionFormProps {
   nameSuggestions?: NameSuggestion[]
   categories: Category[]
   minDate?: string
+  viewerRole?: "person1" | "person2" | null
 }
 
 /**
@@ -91,6 +96,7 @@ export function TransactionForm({
   nameSuggestions = [],
   categories,
   minDate,
+  viewerRole,
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
   const defaultOwner = singleMode ? "person1" : "both"
@@ -120,6 +126,24 @@ export function TransactionForm({
   })
   // Si el usuario ha elegido la categoría a mano, no se le pisa al autocompletar el nombre.
   const [categoryTouched, setCategoryTouched] = useState(false)
+
+  // Aportación a la cuenta compartida: un traspaso de una sola persona, sin categoría ni reparto.
+  const isContributionForm = formData.type === "contribution"
+  const nameOf = (person: "person1" | "person2") => (person === "person1" ? person1Name : person2Name)
+  const contributionName = (person: "person1" | "person2") => `Aportación ${nameOf(person)}`
+  // En modo individual no hay compartida: el tipo solo aparece al editar una aportación antigua.
+  const offersContribution = !singleMode || isContributionForm
+
+  /** Cambia quién aporta; si el nombre era el propuesto para el otro, se cambia con él. */
+  const setContributor = (person: "person1" | "person2") => {
+    setFormData((prev) => ({
+      ...prev,
+      owner: person,
+      person1Percentage: person === "person1" ? 100 : 0,
+      person2Percentage: person === "person1" ? 0 : 100,
+      name: prev.name === "" || prev.name === contributionName(prev.owner === "person2" ? "person2" : "person1") ? contributionName(person) : prev.name,
+    }))
+  }
 
   // Fecha mínima efectiva: al editar, la fecha que ya tenía la transacción no se rechaza.
   const effectiveMinDate = minDate && transaction && transaction.date < minDate ? transaction.date : minDate
@@ -228,6 +252,22 @@ export function TransactionForm({
     // Se admite 0 € para mantener un gasto habitual que un mes no se cobra.
     if (!formData.name || formData.amount < 0 || isDateTooEarly) return
 
+    // Aportación: es de quien la envía, sin categoría ni reparto.
+    if (isContributionForm) {
+      const contributor = formData.owner === "person2" ? "person2" : "person1"
+      onSubmit({
+        ...formData,
+        category: "contribution",
+        categoryId: undefined,
+        nonComputable: false,
+        owner: contributor,
+        person1Percentage: contributor === "person1" ? 100 : 0,
+        person2Percentage: contributor === "person1" ? 0 : 100,
+      })
+      onClose()
+      return
+    }
+
     // El propietario sale del deslizador: 100% para una persona es individual de esa persona.
     const owner = ownerForShare("both", formData.person1Percentage)
     onSubmit({
@@ -261,17 +301,40 @@ export function TransactionForm({
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         {/* Tipo (ingreso, gasto fijo o variable: `type` + `category` en un solo selector) y Categoría */}
         <div data-tour="form-type" className="grid grid-cols-2 gap-4">
-          <div>
+          <div className={isContributionForm ? "col-span-2" : undefined}>
             <Label htmlFor="type">Tipo</Label>
             <select
               id="type"
-              value={formData.type === "income" ? "income" : formData.category}
+              value={formData.type === "expense" ? formData.category : formData.type}
               onChange={(e) => {
-                const value = e.target.value as "income" | "fixed" | "variable"
+                const value = e.target.value as "income" | "fixed" | "variable" | "contribution"
+                if (value === "contribution") {
+                  // Por defecto aporta quien usa la app; el nombre se propone si está vacío.
+                  const person = viewerRole ?? "person1"
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: "contribution",
+                    category: "contribution",
+                    owner: person,
+                    person1Percentage: person === "person1" ? 100 : 0,
+                    person2Percentage: person === "person1" ? 0 : 100,
+                    nonComputable: false,
+                    categoryId: undefined,
+                    name: prev.name || contributionName(person),
+                  }))
+                  return
+                }
                 setFormData((prev) => ({
                   ...prev,
                   type: value === "income" ? "income" : "expense",
                   category: value,
+                  // Al dejar de ser aportación, el reparto vuelve al de una transacción nueva.
+                  ...(prev.type === "contribution" && {
+                    owner: defaultOwner,
+                    person1Percentage: defaultPerson1Percentage,
+                    person2Percentage: 100 - defaultPerson1Percentage,
+                    name: prev.name.startsWith("Aportación ") ? "" : prev.name,
+                  }),
                 }))
               }}
               className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
@@ -279,28 +342,32 @@ export function TransactionForm({
               <option value="variable">Gasto variable</option>
               <option value="fixed">Gasto fijo</option>
               <option value="income">Ingreso</option>
+              {offersContribution && <option value="contribution">Aportación a la compartida</option>}
             </select>
           </div>
 
-          <div>
-            <Label htmlFor="categoryId">Categoría</Label>
-            <select
-              id="categoryId"
-              value={categoryValue ?? ""}
-              onChange={(e) => {
-                setCategoryTouched(true)
-                setFormData((prev) => ({ ...prev, categoryId: e.target.value || undefined }))
-              }}
-              className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
-            >
-              <option value="">{UNCATEGORIZED_LABEL}</option>
-              {typeCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Una aportación no tiene categoría: no es ingreso ni gasto. */}
+          {!isContributionForm && (
+            <div>
+              <Label htmlFor="categoryId">Categoría</Label>
+              <select
+                id="categoryId"
+                value={categoryValue ?? ""}
+                onChange={(e) => {
+                  setCategoryTouched(true)
+                  setFormData((prev) => ({ ...prev, categoryId: e.target.value || undefined }))
+                }}
+                className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
+              >
+                <option value="">{UNCATEGORIZED_LABEL}</option>
+                {typeCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Checkbox para gastos no computables (a todo el ancho, debajo de Tipo y Categoría) */}
           {formData.type === "expense" && (
@@ -409,9 +476,34 @@ export function TransactionForm({
           </div>
         </div>
 
+        {/* Aportación: quién la envía a la compartida (sin reparto: es de una sola persona). */}
+        {isContributionForm && (
+          <div data-tour="form-share" className="space-y-2">
+            <Label>¿Quién aporta?</Label>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Quién aporta">
+              {(["person1", "person2"] as const).map((person) => (
+                <Button
+                  key={person}
+                  type="button"
+                  role="radio"
+                  aria-checked={formData.owner === person}
+                  variant={formData.owner === person ? "default" : "outline"}
+                  onClick={() => setContributor(person)}
+                  className="truncate"
+                >
+                  {nameOf(person)}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Pasa dinero de su cuenta a la compartida: no es un gasto, sigue siendo suyo.
+            </p>
+          </div>
+        )}
+
         {/* Reparto entre los dos (oculto en modo individual). Sustituye al antiguo selector de
             propietario: 100% para uno equivale a "solo suyo". */}
-        {showShareSlider && (
+        {showShareSlider && !isContributionForm && (
           <div data-tour="form-share" className="space-y-4">
             <div className="flex items-center justify-between">
               <Label>Reparto</Label>
