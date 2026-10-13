@@ -1,4 +1,13 @@
+<div align="center">
+
 # 2Budget
+
+**Las finanzas de casa, en pareja o por tu cuenta, cifradas de extremo a extremo.**
+
+[![Abrir 2Budget](https://img.shields.io/badge/Abrir_2Budget-caldeix.github.io%2F2budget-8A2BE2?style=for-the-badge&logo=googlechrome&logoColor=white)](https://caldeix.github.io/2budget)
+
+[![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
+[![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
 ![Version](https://img.shields.io/badge/Version-2.10.2-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
@@ -7,11 +16,9 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_%2B_Firestore-FFCA28?logo=firebase&logoColor=black)
 ![Deployed on GitHub Pages](https://img.shields.io/badge/Deploy-GitHub_Pages-222?logo=github&logoColor=white)
-![License](https://img.shields.io/badge/License-Propietaria-red.svg)
+[![License](https://img.shields.io/badge/License-Propietaria-red.svg)](LICENSE)
 
-## Live
-
-[https://caldeix.github.io/2budget](https://caldeix.github.io/2budget)
+</div>
 
 ---
 
@@ -47,6 +54,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ### v2.10.2 — Hoy y Previsto en modo individual
 
 - **Hoy y Previsto en modo individual** — Con gastos pendientes, las tarjetas de Balance y Gastos muestran la tabla «Hoy | Previsto» (con una sola fila) en lugar de la línea «Hoy», igual que en pareja. Antes la palabra «Previsto» no aparecía y no se veía qué era cada cifra
+- **README** — Enlace a la web, autor y copyright como insignias al principio; licencia al día (2026)
 - SemVer: 2.10.1 → 2.10.2 (PATCH)
 
 ### v2.10.1 — Categorías en orden alfabético
@@ -243,13 +251,3 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 
 - **Copia de gastos fijos e ingresos** — duplica los gastos fijos y los ingresos del mes anterior al mes actual con un clic
 - Validación mejorada para evitar copias duplicadas en el mismo mes
-
----
-
-## Autor
-
-Desarrollado por [Caldeix](https://caldeix.github.io/links/) · Creado parcialmente con IA
-
----
-
-© 2025 Caldeix. Todos los derechos reservados.
