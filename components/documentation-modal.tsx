@@ -99,6 +99,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   menos su parte de los gastos).
                 </li>
               </ul>
+              <p>
+                En <strong>modo individual</strong> no hay desglose por persona: Ingresos y Gastos van juntos en una
+                sola tarjeta, los ingresos arriba y los gastos abajo, al lado del Balance.
+              </p>
               <Subtitle>Hoy y Previsto</Subtitle>
               <p>
                 Mientras quedan gastos por pagar, las tarjetas muestran dos cifras: <strong>Hoy</strong>, solo con los
@@ -232,8 +236,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 El botón de copiar trae al mes que estás viendo los gastos fijos y los ingresos del mes anterior (los
-                ajustes de cierre no se copian). Si el mes ya tiene gastos fijos o ingresos, ese tipo no se vuelve a
-                copiar.
+                ajustes de cierre no se copian), cada uno con su categoría. Si el mes ya tiene gastos fijos o ingresos,
+                ese tipo no se vuelve a copiar.
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
