@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-2.11.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.0.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -38,7 +38,8 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Gastos no computables** — Marca gastos puntuales (regalos, vacaciones) para que no afecten el balance global
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
-- **Copia de gastos fijos e ingresos** — Duplica automáticamente los gastos fijos y los ingresos del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
+- **Cuenta compartida** — Las aportaciones que cada uno envía a la cuenta de los dos son un tipo propio (un traspaso, no un gasto). Lo compartido sale de la compartida y lo individual de la cuenta de cada uno: el resumen, el total acumulado y el cierre de mes separan la cuenta de cada persona y la compartida, y el cierre pide su saldo en el banco
+- **Copia de gastos fijos, ingresos y aportaciones** — Duplica automáticamente los gastos fijos, los ingresos y las aportaciones a la compartida del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
 - **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, Ingresos y Gastos juntos en una sola tarjeta y un único dinero real en el cierre de mes
 - **Cuenta y hogar en la nube** — Cuenta obligatoria con email verificado. Los datos se guardan en un hogar compartido por la pareja (o "tu espacio" en modo individual), sincronizado al momento entre dispositivos y también sin conexión. Invitación a la pareja con un código de un solo uso
 - **Cifrado de extremo a extremo** — Cada transacción, informe y la configuración se cifran en el navegador (AES-256-GCM) con una clave del hogar protegida por la **contraseña maestra** de cada miembro (PBKDF2). La contraseña maestra no se guarda en ningún sitio
@@ -50,6 +51,17 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.0.0 — Cuenta compartida
+
+- **Aportaciones a la cuenta compartida** — Tipo nuevo en el formulario: lo que cada uno envía a la cuenta de los dos. No es un gasto: el dinero sigue siendo tuyo, solo cambia de cuenta. Se elige quién aporta, se marca como enviada y se copia al mes siguiente con los fijos y los ingresos
+- **Lo compartido va por la compartida** — Todo gasto o ingreso con reparto sale o entra de la cuenta compartida; lo que es solo de uno, de su cuenta. Sin selectores nuevos: lo decide el reparto
+- **Tres cuentas en el resumen** — En el balance individual, la cuenta de cada uno (lo que verás en el banco), su total debajo y una fila nueva «Compartida» con lo que hay y de quién es, en Hoy y en Previsto. También en el total acumulado: lo que sobra en la compartida se queda ahí
+- **Cierre de mes con la compartida** — Pide lo que queda en la cuenta de cada uno y el saldo de la compartida en el banco; si no cuadra con lo calculado, el ajuste se reparte a medias. El informe muestra lo aportado, lo gastado y el saldo de la compartida
+- **Lista** — Las aportaciones llevan su icono, una flecha en el importe y «Aportación de …» en lugar de categoría; filtro nuevo «Aportaciones». Se ven siempre, aunque la pareja tenga activada la privacidad
+- Los meses sin aportaciones se ven exactamente igual que antes. En modo individual no cambia nada
+- **Actualizad la app en los dos dispositivos**: una versión anterior a la 3.0.0 contaría las aportaciones como gastos
+- SemVer: 2.11.0 → 3.0.0 (MAJOR)
 
 ### v2.11.0 — Ingresos y gastos juntos en modo individual
 
