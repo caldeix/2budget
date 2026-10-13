@@ -320,6 +320,8 @@ export default function HomePage() {
         person2Percentage: transaction.person2Percentage ?? 50,
         date: formattedDate,
         nonComputable: transaction.nonComputable,
+        // La copia conserva la categoría de la original (antes quedaba en "Sin categoría").
+        categoryId: transaction.categoryId,
       }
       addTransaction(newTransaction)
     })
