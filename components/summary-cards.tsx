@@ -162,6 +162,9 @@ export function SummaryCards({
   // En modo individual, el desglose por persona sobra salvo que la Persona 2 tenga cifras este mes.
   const showPerson2 = shouldShowPerson2(singleMode, person2Income, person2Expenses)
   const cardCount = showPerson2 ? 4 : 3
+  // Sin desglose por persona (modo individual), Balance y Gastos llevan la misma tabla
+  // "Hoy | Previsto" con una sola fila, en lugar de la línea "Hoy": así se ve qué es cada cifra.
+  const singleToday = showToday && !showPerson2
 
   // En móvil las tarjetas van en un carrusel horizontal: los puntos marcan la tarjeta visible.
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -211,10 +214,13 @@ export function SummaryCards({
               <p className="text-sm font-medium text-muted-foreground">Balance</p>
               {/* Muestra el balance formateado, en verde si es positivo, rojo si es negativo. */}
               <p className={`text-2xl font-bold ${balanceColor(balance)}`}>{formatCurrency(balance)}</p>
-              {showToday && <TodayLine value={today.balance} className={balanceColor(today.balance)} />}
+              {showToday && !singleToday && <TodayLine value={today.balance} className={balanceColor(today.balance)} />}
             </div>
           </div>
-          <div className={`${rowsMargin(showToday)} space-y-1`}>
+          {singleToday && (
+            <PersonFigures showToday colored rows={[{ name: person1Name, today: today.balance, expected: balance }]} />
+          )}
+          <div className={`${singleToday ? "mt-2" : rowsMargin(showToday)} space-y-1`}>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Ingresos:</span>
               <span className="text-green-600 font-medium">{formatCurrency(totalIncome)}</span>
@@ -242,7 +248,7 @@ export function SummaryCards({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Ingresos</p>
               <p className="text-2xl font-bold text-green-600">{formatCurrency(totalIncome)}</p>
-              {showToday && <TodaySpacer />}
+              {showToday && !singleToday && <TodaySpacer />}
             </div>
           </div>
           {showPerson2 && (
@@ -269,7 +275,7 @@ export function SummaryCards({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Gastos</p>
               <p className="text-2xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
-              {showToday && <TodayLine value={today.totalExpenses} />}
+              {showToday && !singleToday && <TodayLine value={today.totalExpenses} />}
             </div>
           </div>
           {showPerson2 && (
@@ -280,6 +286,9 @@ export function SummaryCards({
                 { name: person2Name, today: today.person2Expenses, expected: person2Expenses },
               ]}
             />
+          )}
+          {singleToday && (
+            <PersonFigures showToday rows={[{ name: person1Name, today: today.totalExpenses, expected: totalExpenses }]} />
           )}
         </div>
 

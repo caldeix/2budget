@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.10.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.10.2-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,11 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.10.2 — Hoy y Previsto en modo individual
+
+- **Hoy y Previsto en modo individual** — Con gastos pendientes, las tarjetas de Balance y Gastos muestran la tabla «Hoy | Previsto» (con una sola fila) en lugar de la línea «Hoy», igual que en pareja. Antes la palabra «Previsto» no aparecía y no se veía qué era cada cifra
+- SemVer: 2.10.1 → 2.10.2 (PATCH)
 
 ### v2.10.1 — Categorías en orden alfabético
 
