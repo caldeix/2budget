@@ -1,6 +1,6 @@
 # 2Budget
 
-![Version](https://img.shields.io/badge/Version-2.10.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-2.10.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -43,6 +43,11 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v2.10.1 — Categorías en orden alfabético
+
+- **Categorías ordenadas** — Salen en orden alfabético en el formulario de transacción, en el filtro de la lista y en Configuración (una nueva entra ya en su sitio). «Sin categoría» sigue en su sitio de siempre
+- SemVer: 2.10.0 → 2.10.1 (PATCH)
 
 ### v2.10.0 — Gastos por categoría según de quién son
 

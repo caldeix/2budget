@@ -308,9 +308,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   dinero real). No borra nada y se puede desactivar cuando quieras.
                 </li>
                 <li>
-                  <strong>Categorías:</strong> la lista que sale al añadir una transacción. Renombra en la propia fila,
-                  quita con la papelera o añade una nueva (de gasto o de ingreso). Al quitar una, sus transacciones
-                  pasan a «Sin categoría». Los cambios se aplican al pulsar «Guardar configuración».
+                  <strong>Categorías:</strong> la lista que sale al añadir una transacción, en orden alfabético. Renombra
+                  en la propia fila, quita con la papelera o añade una nueva (de gasto o de ingreso). Al quitar una, sus
+                  transacciones pasan a «Sin categoría». Los cambios se aplican al pulsar «Guardar configuración».
                 </li>
                 <li>
                   <strong>Exportar datos:</strong> descarga una copia en JSON, sin cifrar, con todas las transacciones,
