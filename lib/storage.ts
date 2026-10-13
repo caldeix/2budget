@@ -70,6 +70,29 @@ export function ownerForShare(owner: Transaction["owner"], person1Percentage: nu
  * @returns {Transaction} La transacción con los campos garantizados.
  */
 export function normalizeTransaction(t: Transaction): Transaction {
+  // Una aportación es siempre de una sola persona (quien la envía), sin categoría y computable.
+  // Un "both" solo puede llegar de un JSON importado: se queda con quien tenga el % mayor.
+  if (t.type === "contribution") {
+    // Sin la clave `categoryId` (no un `undefined`): una aportación no tiene categoría.
+    const { categoryId: _categoryId, ...rest } = t
+    const owner =
+      t.owner === "person1" || t.owner === "person2"
+        ? t.owner
+        : normalizePercentage(t.person1Percentage ?? 50) >= 50
+          ? "person1"
+          : "person2"
+    return {
+      ...rest,
+      category: "contribution",
+      owner,
+      amount: roundMoney(t.amount),
+      person1Percentage: owner === "person1" ? 100 : 0,
+      person2Percentage: owner === "person1" ? 0 : 100,
+      nonComputable: false,
+      paid: Boolean(t.paid),
+    }
+  }
+
   // El porcentaje de la Persona 2 se deriva del de la Persona 1 para que un dato
   // incoherente (p. ej. 30/60) no rompa el cuadre de los repartos.
   const rawPercentage = normalizePercentage(t.person1Percentage ?? 50)
@@ -111,6 +134,9 @@ export function normalizeReport(r: MonthlyReport): MonthlyReport {
     person2Income: roundMoney(r.person2Income),
     person1Expenses: roundMoney(r.person1Expenses),
     person2Expenses: roundMoney(r.person2Expenses),
+    // Los campos de la compartida solo existen en meses que la usan: no se inventan ceros.
+    ...(r.sharedRealMoney !== undefined && { sharedRealMoney: roundMoney(r.sharedRealMoney) }),
+    ...(r.sharedAdjustment !== undefined && { sharedAdjustment: roundMoney(r.sharedAdjustment) }),
     transactions: Array.isArray(r.transactions) ? r.transactions.map(normalizeTransaction) : [],
   }
 }
