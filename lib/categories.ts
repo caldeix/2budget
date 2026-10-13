@@ -39,9 +39,14 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "otros-ingresos", name: "Otros ingresos", kind: "income" },
 ]
 
-/** Las categorías de la configuración (o las iniciales si aún no tiene). */
+/** Ordena las categorías alfabéticamente por nombre (sin distinguir mayúsculas ni tildes). */
+export function sortCategories(categories: Category[]): Category[] {
+  return [...categories].sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+}
+
+/** Las categorías de la configuración (o las iniciales si aún no tiene), en orden alfabético. */
 export function categoriesOf(config: AppConfig): Category[] {
-  return config.categories ?? DEFAULT_CATEGORIES
+  return sortCategories(config.categories ?? DEFAULT_CATEGORIES)
 }
 
 /** Las categorías que valen para un tipo de transacción. */

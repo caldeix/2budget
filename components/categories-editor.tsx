@@ -2,6 +2,7 @@
  * @file components/categories-editor.tsx
  * @description Lista editable de categorías para Configuración: renombrar en la propia fila,
  *              quitar y añadir (de gasto o de ingreso). Trabaja sobre una copia: el padre guarda.
+ *              Salen en orden alfabético; al renombrar no se reordena mientras se escribe.
  */
 
 "use client"
@@ -10,7 +11,7 @@ import { useState } from "react"
 import { Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { newCategoryId, type Category } from "@/lib/categories"
+import { newCategoryId, sortCategories, type Category } from "@/lib/categories"
 
 interface CategoriesEditorProps {
   categories: Category[]
@@ -26,7 +27,7 @@ export function CategoriesEditor({ categories, onChange }: CategoriesEditorProps
   const add = () => {
     const name = newName.trim()
     if (!name) return
-    onChange([...categories, { id: newCategoryId(name, categories), name, kind: newKind }])
+    onChange(sortCategories([...categories, { id: newCategoryId(name, categories), name, kind: newKind }]))
     setNewName("")
   }
 
