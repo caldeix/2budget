@@ -623,6 +623,7 @@ export default function HomePage() {
           selectedYear={selectedYear}
           nonComputableExpenses={calculations.nonComputableExpenses}
           singleMode={data.config.singleMode}
+          accounts={calculations.accounts}
           today={calculations.today}
           // "Hoy" solo tiene sentido si queda algo por pagar y el mes ya ha empezado.
           showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
@@ -639,6 +640,7 @@ export default function HomePage() {
               person1Name={data.config.person1Name}
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
+              accounts={cumulativeBalances.accounts}
             />
 
             <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
