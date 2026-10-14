@@ -20,9 +20,11 @@ export interface Person {
  * @interface Transaction
  * @description Define la estructura de una transacción financiera.
  * @property {string} id - Identificador único de la transacción.
- * @property {'income' | 'expense'} type - Tipo de transacción: 'income' (ingreso) o 'expense' (gasto).
- * @property {'fixed' | 'variable' | 'income'} category - Categoría de la transacción.
- *           Para gastos: 'fixed' (fijo) o 'variable'. Para ingresos: 'income'.
+ * @property {'income' | 'expense' | 'contribution'} type - Tipo de transacción: 'income' (ingreso),
+ *           'expense' (gasto) o 'contribution' (aportación a la cuenta compartida, un traspaso que no es
+ *           ni ingreso ni gasto: ver `lib/shared-account.ts`).
+ * @property {'fixed' | 'variable' | 'income' | 'contribution'} category - Categoría de la transacción.
+ *           Para gastos: 'fixed' (fijo) o 'variable'. Para ingresos: 'income'. Para aportaciones: 'contribution'.
  * @property {string} name - Nombre o descripción de la transacción (ej. "Alquiler", "Salario").
  * @property {number} amount - Cantidad de dinero de la transacción.
  * @property {'person1' | 'person2' | 'both'} owner - Propietario de la transacción.
@@ -34,8 +36,8 @@ export interface Person {
  */
 export interface Transaction {
   id: string
-  type: "income" | "expense"
-  category: "fixed" | "variable" | "income"
+  type: "income" | "expense" | "contribution"
+  category: "fixed" | "variable" | "income" | "contribution"
   name: string
   amount: number
   owner: "person1" | "person2" | "both"
@@ -88,6 +90,14 @@ export interface MonthlyReport {
   person2Income: number
   person1Expenses: number
   person2Expenses: number
+  /**
+   * Saldo real de la cuenta compartida al cerrar (lo que había en el banco), solo en los meses que
+   * la usan (con alguna aportación). Es un SALDO, no lo que queda del mes: se compara con lo
+   * acumulado en la compartida hasta ese mes (ver `sharedBalanceUntil`).
+   */
+  sharedRealMoney?: number
+  /** Ajuste de la compartida al cerrar (saldo real − saldo calculado). */
+  sharedAdjustment?: number
   transactions: Transaction[]
   createdAt: string
 }
@@ -142,8 +152,8 @@ export interface AppData {
  * @interface TransactionFormData
  * @description Define la estructura de los datos del formulario de transacción.
  *              Es similar a `Transaction` pero sin `id` ni `createdAt`, ya que se generan al guardar.
- * @property {'income' | 'expense'} type - Tipo de transacción.
- * @property {'fixed' | 'variable' | 'income'} category - Categoría de la transacción.
+ * @property {'income' | 'expense' | 'contribution'} type - Tipo de transacción.
+ * @property {'fixed' | 'variable' | 'income' | 'contribution'} category - Categoría de la transacción.
  * @property {string} name - Nombre de la transacción.
  * @property {number} amount - Cantidad de dinero.
  * @property {'person1' | 'person2' | 'both'} owner - Propietario de la transacción.
@@ -153,8 +163,8 @@ export interface AppData {
  * @property {boolean} [nonComputable] - Indica si el gasto no debe afectar al balance global.
  */
 export interface TransactionFormData {
-  type: "income" | "expense"
-  category: "fixed" | "variable" | "income"
+  type: "income" | "expense" | "contribution"
+  category: "fixed" | "variable" | "income" | "contribution"
   name: string
   amount: number
   owner: "person1" | "person2" | "both"

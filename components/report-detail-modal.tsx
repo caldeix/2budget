@@ -3,7 +3,8 @@
  * @description Este archivo define el componente `ReportDetailModal`, un modal
  *              que muestra un resumen detallado de un informe mensual específico.
  *              Incluye gráficos de pastel para la distribución de gastos e ingresos,
- *              y un desglose de las finanzas por persona.
+ *              y un desglose de las finanzas por persona. En los meses con cuenta compartida
+ *              (v3.0.0), cada persona muestra su cuenta y un bloque más muestra la compartida.
  *              Es un Client Component (`"use client"`) debido al uso de `PieChart`.
  */
 
@@ -19,6 +20,8 @@ import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { PieChart } from "@/components/ui/chart" // Componente de gráfico de pastel.
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
+import { aggregateTransactions, isClosingAdjustment, isContribution } from "@/lib/aggregations" // Agregación.
+import { monthAccountSplit, usesSharedAccount } from "@/lib/shared-account" // Cuenta compartida.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 
 /**
@@ -98,6 +101,28 @@ export function ReportDetailModal({
     ...item,
     color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
   }))
+
+  // Cuenta compartida: lo calculado antes de los ajustes del cierre (con ellos, lo calculado ya
+  // coincidiría con el dinero real). Solo en meses con aportaciones.
+  const shared = (() => {
+    if (!usesSharedAccount(report.transactions)) return null
+    const before = report.transactions.filter((t) => !isClosingAdjustment(t))
+    const totals = aggregateTransactions(before)
+    const split = monthAccountSplit(
+      before,
+      subtractMoney(totals.person1Income, totals.person1Expenses),
+      subtractMoney(totals.person2Income, totals.person2Expenses),
+      true,
+    )
+    const sharedExpenses = aggregateTransactions(before.filter((t) => t.owner === "both")).totalExpenses
+    const realMoney = report.sharedRealMoney ?? 0
+    const adjustment = report.sharedAdjustment ?? 0
+    return { split, sharedExpenses, realMoney, adjustment, expected: subtractMoney(realMoney, adjustment) }
+  })()
+  const accountOf = (person: "person1" | "person2") =>
+    shared ? (person === "person1" ? shared.split.person1Account : shared.split.person2Account) : 0
+  const sharedPartOf = (person: "person1" | "person2") =>
+    shared ? (person === "person1" ? shared.split.sharedPerson1 : shared.split.sharedPerson2) : 0
 
   /**
    * Datos para el gráfico de pastel de gastos.
@@ -232,7 +257,7 @@ export function ReportDetailModal({
         </div>
 
         {/* Sección de Detalles por Persona */}
-        <div className={`grid grid-cols-1 gap-6 ${showPerson2 ? "md:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-6 ${shared ? "md:grid-cols-3" : showPerson2 ? "md:grid-cols-2" : ""}`}>
           {/* Detalles de Persona 1 */}
           <div className="bg-muted rounded-2xl p-4">
             <h3 className="font-semibold text-foreground mb-4">{person1Name}</h3>
@@ -245,14 +270,29 @@ export function ReportDetailModal({
                 <span className="text-muted-foreground">Gastos:</span>
                 <span className="font-medium text-red-600">{formatCurrency(report.person1Expenses)}</span>
               </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-muted-foreground">Balance calculado:</span>
-                <span
-                  className={`font-medium ${subtractMoney(report.person1Income, report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
-                >
-                  {formatCurrency(subtractMoney(report.person1Income, report.person1Expenses))}
-                </span>
-              </div>
+              {shared ? (
+                <>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-muted-foreground">Parte en la compartida:</span>
+                    <span className="font-medium text-foreground">{formatCurrency(sharedPartOf("person1"))}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Cuenta calculada:</span>
+                    <span className={`font-medium ${accountOf("person1") >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {formatCurrency(accountOf("person1"))}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-muted-foreground">Balance calculado:</span>
+                  <span
+                    className={`font-medium ${subtractMoney(report.person1Income, report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                  >
+                    {formatCurrency(subtractMoney(report.person1Income, report.person1Expenses))}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Dinero real:</span>
                 <span className="font-medium text-foreground">{formatCurrency(report.person1RealMoney)}</span>
@@ -279,14 +319,29 @@ export function ReportDetailModal({
                   <span className="text-muted-foreground">Gastos:</span>
                   <span className="font-medium text-red-600">{formatCurrency(report.person2Expenses)}</span>
                 </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-muted-foreground">Balance calculado:</span>
-                  <span
-                    className={`font-medium ${subtractMoney(report.person2Income, report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
-                  >
-                    {formatCurrency(subtractMoney(report.person2Income, report.person2Expenses))}
-                  </span>
-                </div>
+                {shared ? (
+                  <>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-muted-foreground">Parte en la compartida:</span>
+                      <span className="font-medium text-foreground">{formatCurrency(sharedPartOf("person2"))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cuenta calculada:</span>
+                      <span className={`font-medium ${accountOf("person2") >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {formatCurrency(accountOf("person2"))}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-muted-foreground">Balance calculado:</span>
+                    <span
+                      className={`font-medium ${subtractMoney(report.person2Income, report.person2Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {formatCurrency(subtractMoney(report.person2Income, report.person2Expenses))}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Dinero real:</span>
                   <span className="font-medium text-foreground">{formatCurrency(report.person2RealMoney)}</span>
@@ -295,6 +350,47 @@ export function ReportDetailModal({
                   <span className="text-muted-foreground">Ajuste:</span>
                   <span className={`font-medium ${report.person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
                     {formatCurrency(report.person2Adjustment)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cuenta compartida: lo aportado, lo gastado de ella y el saldo del cierre. */}
+          {shared && (
+            <div className="bg-muted rounded-2xl p-4">
+              <h3 className="font-semibold text-foreground mb-4">Compartida</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Aportado {person1Name}:</span>
+                  <span className="font-medium text-primary">{formatCurrency(shared.split.contributed1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Aportado {person2Name}:</span>
+                  <span className="font-medium text-primary">{formatCurrency(shared.split.contributed2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Gastos compartidos:</span>
+                  <span className="font-medium text-red-600">{formatCurrency(shared.sharedExpenses)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Resultado del mes:</span>
+                  <span className={`font-medium ${shared.split.shared >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(shared.split.shared)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-muted-foreground">Saldo calculado:</span>
+                  <span className="font-medium text-foreground">{formatCurrency(shared.expected)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Saldo real:</span>
+                  <span className="font-medium text-foreground">{formatCurrency(shared.realMoney)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ajuste (a medias):</span>
+                  <span className={`font-medium ${shared.adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(shared.adjustment)}
                   </span>
                 </div>
               </div>
@@ -328,6 +424,12 @@ export function ReportDetailModal({
                 {report.transactions.filter((t) => t.type === "income").length}
               </p>
             </div>
+            {shared && (
+              <div>
+                <p className="text-muted-foreground">Aportaciones:</p>
+                <p className="font-medium text-foreground">{report.transactions.filter(isContribution).length}</p>
+              </div>
+            )}
           </div>
         </div>
 

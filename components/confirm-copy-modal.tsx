@@ -13,9 +13,9 @@ export type CopyAmounts = Record<string, number>
 
 /**
  * @function ConfirmCopyModal
- * @description Confirma la copia de los gastos fijos e ingresos del mes anterior. Con "Revisar
- *              importes" se puede cambiar el importe de cada uno antes de copiarlos (p. ej. una
- *              factura que este mes sube).
+ * @description Confirma la copia de los gastos fijos, los ingresos y las aportaciones a la cuenta
+ *              compartida del mes anterior. Con "Revisar importes" se puede cambiar el importe de
+ *              cada uno antes de copiarlos (p. ej. una factura que este mes sube).
  */
 export function ConfirmCopyModal({
   isOpen,
@@ -26,6 +26,7 @@ export function ConfirmCopyModal({
   transactions,
   expenseCount,
   incomeCount,
+  contributionCount = 0,
   isAmountHidden = () => false,
 }: {
   isOpen: boolean
@@ -37,6 +38,8 @@ export function ConfirmCopyModal({
   transactions: Transaction[]
   expenseCount: number
   incomeCount: number
+  /** Aportaciones a la cuenta compartida que se copian. */
+  contributionCount?: number
   /** Si el importe está oculto por la pareja: se copia tal cual, sin verlo ni cambiarlo. */
   isAmountHidden?: (t: Transaction) => boolean
 }) {
@@ -50,16 +53,31 @@ export function ConfirmCopyModal({
     setAmounts(Object.fromEntries(transactions.map((t) => [t.id, t.amount])))
   }, [isOpen, transactions])
 
-  // Primero los ingresos y después los gastos, cada grupo por nombre.
+  // Primero los ingresos, después las aportaciones y al final los gastos, cada grupo por nombre.
+  const typeOrder: Record<Transaction["type"], number> = { income: 0, contribution: 1, expense: 2 }
   const sorted = [...transactions].sort((a, b) =>
-    a.type !== b.type ? (a.type === "income" ? -1 : 1) : a.name.localeCompare(b.name, "es"),
+    a.type !== b.type ? typeOrder[a.type] - typeOrder[b.type] : a.name.localeCompare(b.name, "es"),
   )
+  const typeLabel = (t: Transaction) =>
+    t.type === "income" ? "Ingreso" : t.type === "contribution" ? "Aportación" : "Gasto fijo"
+  const typeColor = (t: Transaction) =>
+    t.type === "income" ? "text-green-600" : t.type === "contribution" ? "text-primary" : "text-red-600"
+  const what =
+    contributionCount > 0
+      ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
+      : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Revisar importes" : "Confirmar copia de gastos fijos e ingresos"}
+      title={
+        isEditing
+          ? "Revisar importes"
+          : contributionCount > 0
+            ? "Confirmar copia de fijos, ingresos y aportaciones"
+            : "Confirmar copia de gastos fijos e ingresos"
+      }
       size={isEditing ? "lg" : "md"}
     >
       <div className="p-6 space-y-4">
@@ -73,8 +91,8 @@ export function ConfirmCopyModal({
                 <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{t.name}</p>
-                    <p className={`text-xs ${t.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                      {t.type === "income" ? "Ingreso" : "Gasto fijo"} · antes{" "}
+                    <p className={`text-xs ${typeColor(t)}`}>
+                      {typeLabel(t)} · antes{" "}
                       {isAmountHidden(t) ? HIDDEN_AMOUNT : formatCurrency(t.amount)}
                     </p>
                   </div>
@@ -103,8 +121,7 @@ export function ConfirmCopyModal({
         ) : (
           <>
             <p>
-              ¿Estás seguro de que deseas copiar {expenseCount} gastos fijos y {incomeCount} ingresos del mes anterior a{" "}
-              {monthName} {year}?
+              ¿Estás seguro de que deseas copiar {what} del mes anterior a {monthName} {year}?
             </p>
             <p className="text-sm text-muted-foreground">Esta acción no se puede deshacer.</p>
             <div className="flex flex-wrap justify-end gap-2 pt-4">

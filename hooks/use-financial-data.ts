@@ -289,8 +289,8 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         ...prevData,
         transactions: prevData.transactions.map((t) => {
           if (!idSet.has(t.id)) return t
-          // `paid` solo tiene sentido en gastos; un ingreso jamás se refecha.
-          if (t.type !== "expense") return t
+          // `paid` solo tiene sentido en gastos y aportaciones ("enviada"); un ingreso jamás se refecha.
+          if (t.type !== "expense" && t.type !== "contribution") return t
           // Desmarcar: la fecha se queda como está.
           if (!paid) return t.paid ? { ...t, paid: false } : t
           // Ya estaba pagado: no se refecha (ver nota de arriba).

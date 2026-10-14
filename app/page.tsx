@@ -17,7 +17,7 @@ import {
   setLastSeenMonth,
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
-import { isClosingAdjustment } from "@/lib/aggregations"
+import { isClosingAdjustment, isContribution, isPayable } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
@@ -66,6 +66,8 @@ const RECENT_REPORTS = 3
 
 // Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
 const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
+// Las aportaciones a la cuenta compartida se copian como los fijos y los ingresos.
+const isCopyableContribution = (t: Transaction) => isContribution(t)
 
 export default function HomePage() {
   // Sesión en la nube: con hogar (y desbloqueado con la contraseña maestra), los datos se leen
@@ -166,8 +168,17 @@ export default function HomePage() {
 
   const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(isFixedExpense)
   const hasIncomesInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableIncome)
+  const hasContributionsInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableContribution)
+  // Las aportaciones solo faltan si el mes anterior las tenía (sin cuenta compartida no hay nada que copiar).
+  const previousMonthHasContributions = useMemo(() => {
+    const { month, year } = getPreviousMonthYear(selectedMonth, selectedYear)
+    return getTransactionsForMonth(month, year).some(isCopyableContribution)
+  }, [selectedMonth, selectedYear, getTransactionsForMonth])
   // Cada tipo se copia solo si el mes seleccionado aún no lo tiene, para no duplicar.
-  const hasNothingToCopy = hasFixedExpensesInCurrentMonth && hasIncomesInCurrentMonth
+  const hasNothingToCopy =
+    hasFixedExpensesInCurrentMonth &&
+    hasIncomesInCurrentMonth &&
+    (hasContributionsInCurrentMonth || !previousMonthHasContributions)
 
   const actualCurrentMonth = getCurrentMonth()
   const actualCurrentYear = getCurrentYear()
@@ -291,17 +302,26 @@ export default function HomePage() {
     const sourceTransactions = getTransactionsForMonth(sourceMonth, sourceYear)
     const toCopy = sourceTransactions.filter(
       (t) =>
-        (!hasFixedExpensesInCurrentMonth && isFixedExpense(t)) || (!hasIncomesInCurrentMonth && isCopyableIncome(t))
+        (!hasFixedExpensesInCurrentMonth && isFixedExpense(t)) ||
+        (!hasIncomesInCurrentMonth && isCopyableIncome(t)) ||
+        (!hasContributionsInCurrentMonth && isCopyableContribution(t))
     )
 
     if (toCopy.length === 0) {
-      alert(`No hay gastos fijos ni ingresos en ${sourceMonthName} ${sourceYear} para copiar.`)
+      alert(`No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`)
       return
     }
 
     setTransactionsToCopy(toCopy)
     setIsConfirmCopyModalOpen(true)
-  }, [selectedMonth, selectedYear, getTransactionsForMonth, hasFixedExpensesInCurrentMonth, hasIncomesInCurrentMonth])
+  }, [
+    selectedMonth,
+    selectedYear,
+    getTransactionsForMonth,
+    hasFixedExpensesInCurrentMonth,
+    hasIncomesInCurrentMonth,
+    hasContributionsInCurrentMonth,
+  ])
 
   const confirmCopyTransactions = useCallback((amounts: CopyAmounts) => {
     // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
@@ -327,12 +347,15 @@ export default function HomePage() {
     })
 
     const expenseCount = transactionsToCopy.filter(isFixedExpense).length
-    const incomeCount = transactionsToCopy.length - expenseCount
+    const incomeCount = transactionsToCopy.filter(isCopyableIncome).length
+    const contributionCount = transactionsToCopy.filter(isCopyableContribution).length
     setIsConfirmCopyModalOpen(false)
     setTransactionsToCopy([])
-    alert(
-      `${expenseCount} gastos fijos y ${incomeCount} ingresos copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`,
-    )
+    const copied =
+      contributionCount > 0
+        ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
+        : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
+    alert(`${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`)
   }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
@@ -441,7 +464,8 @@ export default function HomePage() {
 
     if (lastSeen !== currentKey) {
       const { month: prevMonth, year: prevYear } = getPreviousMonthYear(getCurrentMonth(), getCurrentYear())
-      const prevExpenses = getTransactionsForMonth(prevMonth, prevYear).filter((t) => t.type === "expense")
+      // Gastos y aportaciones (las aportaciones se marcan como enviadas igual que un gasto pagado).
+      const prevExpenses = getTransactionsForMonth(prevMonth, prevYear).filter(isPayable)
       const hasUnpaid = prevExpenses.some((t) => !t.paid)
 
       if (prevExpenses.length > 0 && hasUnpaid) {
@@ -599,6 +623,7 @@ export default function HomePage() {
           selectedYear={selectedYear}
           nonComputableExpenses={calculations.nonComputableExpenses}
           singleMode={data.config.singleMode}
+          accounts={calculations.accounts}
           today={calculations.today}
           // "Hoy" solo tiene sentido si queda algo por pagar y el mes ya ha empezado.
           showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
@@ -615,6 +640,7 @@ export default function HomePage() {
               person1Name={data.config.person1Name}
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
+              accounts={cumulativeBalances.accounts}
             />
 
             <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
@@ -744,10 +770,14 @@ export default function HomePage() {
             data-tour="fab-copy"
             title={
               hasNothingToCopy
-                ? "Ya hay gastos fijos e ingresos este mes"
+                ? previousMonthHasContributions
+                  ? "Ya hay gastos fijos, ingresos y aportaciones este mes"
+                  : "Ya hay gastos fijos e ingresos este mes"
                 : isCopyBlockedByFuture
                   ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
-                  : "Copiar gastos fijos e ingresos del mes anterior"
+                  : previousMonthHasContributions
+                    ? "Copiar gastos fijos, ingresos y aportaciones del mes anterior"
+                    : "Copiar gastos fijos e ingresos del mes anterior"
             }
           >
             <Copy className="h-5 w-5" />
@@ -810,6 +840,7 @@ export default function HomePage() {
         isAmountHidden={isAmountHidden}
         expenseCount={transactionsToCopy.filter(isFixedExpense).length}
         incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
+        contributionCount={transactionsToCopy.filter(isCopyableContribution).length}
       />
 
       <CategorySpreadModal
@@ -845,6 +876,7 @@ export default function HomePage() {
         nameSuggestions={nameSuggestions}
         categories={categoriesOf(data.config)}
         minDate={minTransactionDate}
+        viewerRole={viewerRole}
       />
 
       {isReportModalOpen && (
@@ -859,6 +891,7 @@ export default function HomePage() {
           person2Name={data.config.person2Name}
           existingReport={getExistingReport(monthToCloseReport, yearToCloseReport)}
           singleMode={data.config.singleMode}
+          allTransactions={data.transactions}
         />
       )}
 

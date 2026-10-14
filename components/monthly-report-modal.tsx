@@ -4,6 +4,9 @@
  *              para "cerrar" un mes financiero. Permite al usuario introducir el dinero real
  *              disponible para cada persona y calcula los ajustes necesarios, generando
  *              transacciones de ajuste si hay diferencias.
+ *              En los meses con cuenta compartida (v3.0.0) pide el dinero de la cuenta de cada uno y
+ *              el SALDO de la compartida, que se compara con lo acumulado en ella hasta ese mes; su
+ *              ajuste es compartido, a medias.
  *              Es un Client Component (`"use client"`) debido al uso de estados y efectos.
  */
 
@@ -21,6 +24,7 @@ import { AmountInput } from "@/components/ui/amount-input" // Input de importe q
 import { useCalculations } from "@/hooks/use-calculations" // Hook para cálculos financieros.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de un cierre anterior.
+import { sharedBalanceUntil } from "@/lib/shared-account" // Saldo calculado de la compartida.
 import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos.
 
 /**
@@ -36,6 +40,8 @@ import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {MonthlyReport} [existingReport] - Objeto de informe mensual existente si se está actualizando uno.
  * @property {boolean} [singleMode] - Modo individual: solo se pide el dinero real de la Persona 1.
+ * @property {Transaction[]} [allTransactions] - Todas las transacciones: con ellas se calcula lo acumulado
+ *           en la cuenta compartida hasta el mes que se cierra.
  */
 interface MonthlyReportModalProps {
   isOpen: boolean
@@ -51,6 +57,7 @@ interface MonthlyReportModalProps {
   person2Name: string
   existingReport?: MonthlyReport
   singleMode?: boolean
+  allTransactions?: Transaction[]
 }
 
 /**
@@ -71,11 +78,14 @@ export function MonthlyReportModal({
   person2Name,
   existingReport,
   singleMode,
+  allTransactions,
 }: MonthlyReportModalProps) {
   // Estado para el dinero real disponible de la Persona 1.
   const [person1RealMoney, setPerson1RealMoney] = useState(0)
   // Estado para el dinero real disponible de la Persona 2.
   const [person2RealMoney, setPerson2RealMoney] = useState(0)
+  // Saldo real de la cuenta compartida (solo en meses con aportaciones).
+  const [sharedRealMoney, setSharedRealMoney] = useState(0)
   // Estado para controlar si el formulario está en proceso de envío.
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -97,18 +107,30 @@ export function MonthlyReportModal({
         // Si hay un informe existente, precarga los valores de dinero real.
         setPerson1RealMoney(existingReport.person1RealMoney)
         setPerson2RealMoney(existingReport.person2RealMoney)
+        setSharedRealMoney(existingReport.sharedRealMoney ?? 0)
       } else {
         // Si es un nuevo informe, reinicia los valores a cero.
         setPerson1RealMoney(0)
         setPerson2RealMoney(0)
+        setSharedRealMoney(0)
       }
       setIsSubmitting(false) // Asegura que el estado de envío esté en falso al abrir.
     }
   }, [isOpen, existingReport]) // Dependencias: se ejecuta cuando `isOpen` o `existingReport` cambian.
 
-  // Balances calculados para cada persona a partir de las transacciones del mes.
-  const person1CalculatedBalance = calculations.person1Balance
-  const person2CalculatedBalance = calculations.person2Balance
+  // Cuenta compartida: el mes la usa si tiene alguna aportación. Entonces lo que se compara con el
+  // dinero real de cada persona es su CUENTA (su balance menos su parte en la compartida), y la
+  // compartida se compara por SALDO con lo acumulado en ella hasta este mes (sin los ajustes de
+  // este cierre, que se sustituyen).
+  const usesShared = calculations.accounts.usesShared
+  const sharedExpected = useMemo(
+    () => (usesShared ? sharedBalanceUntil(allTransactions ?? transactions, month, year) : null),
+    [usesShared, allTransactions, transactions, month, year],
+  )
+
+  // Lo calculado para cada persona: su balance del mes o, con compartida, su cuenta.
+  const person1CalculatedBalance = usesShared ? calculations.accounts.person1Account : calculations.person1Balance
+  const person2CalculatedBalance = usesShared ? calculations.accounts.person2Account : calculations.person2Balance
 
   // En modo individual la Persona 2 solo aparece si tiene movimientos este mes (datos de la etapa
   // en pareja). Si no aparece, su dinero real es su balance calculado (0): ajuste nulo, sin
@@ -121,6 +143,9 @@ export function MonthlyReportModal({
   // persistido como `amount` de la transaccion de ajuste.
   const person1Adjustment = subtractMoney(person1RealMoney, person1CalculatedBalance)
   const person2Adjustment = subtractMoney(effectivePerson2RealMoney, person2CalculatedBalance)
+  const sharedAdjustment = sharedExpected ? subtractMoney(sharedRealMoney, sharedExpected.shared) : 0
+  const hasAnyAdjustment =
+    !isZeroMoney(person1Adjustment) || !isZeroMoney(person2Adjustment) || !isZeroMoney(sharedAdjustment)
 
   /**
    * @function createAdjustmentTransactions
@@ -166,6 +191,23 @@ export function MonthlyReportModal({
         date: adjustmentDate,
       })
     }
+
+    // Ajuste de la compartida: compartido a medias, así que cae en la cuenta compartida.
+    if (!isZeroMoney(sharedAdjustment)) {
+      adjustmentTransactionsArray.push({
+        type: sharedAdjustment > 0 ? "income" : "expense",
+        category: sharedAdjustment > 0 ? "income" : "variable",
+        name: `Ajuste Compartida - Cierre ${formatMonthYear(month, year)}`,
+        amount: Math.abs(sharedAdjustment),
+        owner: "both",
+        person1Percentage: 50,
+        person2Percentage: 50,
+        nonComputable: false, // Un ajuste de cierre siempre computa.
+        paid: true, // Apunte contable: nunca queda pendiente de pagar.
+        closingAdjustment: true,
+        date: adjustmentDate,
+      })
+    }
     return adjustmentTransactionsArray
   }
 
@@ -195,6 +237,8 @@ export function MonthlyReportModal({
       person2Income: calculations.person2Income,
       person1Expenses: calculations.person1Expenses,
       person2Expenses: calculations.person2Expenses,
+      // Solo en meses con cuenta compartida (los demás informes quedan como siempre).
+      ...(usesShared && { sharedRealMoney, sharedAdjustment }),
     }
 
     // Genera las transacciones de ajuste.
@@ -221,6 +265,7 @@ export function MonthlyReportModal({
     effectivePerson2RealMoney,
     person1CalculatedBalance,
     person2CalculatedBalance,
+    sharedAdjustment,
     month,
     year,
     person1Name,
@@ -269,16 +314,33 @@ export function MonthlyReportModal({
               <p className="font-medium text-red-600">{formatCurrency(calculations.totalExpenses)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Balance {person1Name}:</p>
+              <p className="text-muted-foreground">
+                {usesShared ? "Cuenta" : "Balance"} {person1Name}:
+              </p>
               <p className={`font-medium ${person1CalculatedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {formatCurrency(person1CalculatedBalance)}
               </p>
             </div>
             {showPerson2 && (
               <div>
-                <p className="text-muted-foreground">Balance {person2Name}:</p>
+                <p className="text-muted-foreground">
+                  {usesShared ? "Cuenta" : "Balance"} {person2Name}:
+                </p>
                 <p className={`font-medium ${person2CalculatedBalance >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(person2CalculatedBalance)}
+                </p>
+              </div>
+            )}
+            {sharedExpected && (
+              <div className="col-span-2">
+                <p className="text-muted-foreground">Compartida (saldo calculado):</p>
+                <p className={`font-medium ${sharedExpected.shared >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {formatCurrency(sharedExpected.shared)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {person1Name} {formatCurrency(sharedExpected.sharedPerson1)} · {person2Name}{" "}
+                  {formatCurrency(sharedExpected.sharedPerson2)} · este mes{" "}
+                  {formatCurrency(calculations.accounts.shared)}
                 </p>
               </div>
             )}
@@ -288,7 +350,17 @@ export function MonthlyReportModal({
         {/* Sección para introducir el dinero real disponible */}
         <div data-tour="close-real-money" className="space-y-4">
           <h3 className="font-semibold text-foreground">Dinero real disponible al final del mes</h3>
-          <div className={`grid gap-4 ${showPerson2 ? "grid-cols-2" : "grid-cols-1"}`}>
+          {usesShared && (
+            <p className="text-sm text-muted-foreground">
+              En la cuenta de cada uno, lo que le queda de este mes. En la compartida, el saldo que hay ahora
+              en el banco: lo que sobró otros meses sigue ahí.
+            </p>
+          )}
+          <div
+            className={`grid gap-4 ${
+              usesShared ? "grid-cols-1 sm:grid-cols-3" : showPerson2 ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
             <div>
               <Label htmlFor="person1Money">{person1Name} (€)</Label>
               <AmountInput
@@ -311,12 +383,24 @@ export function MonthlyReportModal({
                 />
               </div>
             )}
+            {usesShared && (
+              <div>
+                <Label htmlFor="sharedMoney">Compartida: saldo en el banco (€)</Label>
+                <AmountInput
+                  id="sharedMoney"
+                  value={sharedRealMoney}
+                  onValueChange={setSharedRealMoney}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+            )}
           </div>
         </div>
 
         {/* Sección de ajustes calculados y previsualización de transacciones de ajuste */}
         {/* Solo se muestra si hay ajustes significativos para alguna de las personas. */}
-        {(!isZeroMoney(person1Adjustment) || !isZeroMoney(person2Adjustment)) && (
+        {hasAnyAdjustment && (
           <div className="bg-secondary/10 rounded-2xl p-4">
             <h3 className="font-semibold text-foreground mb-4">Ajustes calculados</h3>
             {/* El tour resalta solo las cifras: la caja entera no cabe en el móvil con el tooltip. */}
@@ -332,6 +416,14 @@ export function MonthlyReportModal({
                   <p className="text-muted-foreground">Ajuste {person2Name}:</p>
                   <p className={`font-medium ${person2Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
                     {formatCurrency(person2Adjustment)}
+                  </p>
+                </div>
+              )}
+              {usesShared && (
+                <div>
+                  <p className="text-muted-foreground">Ajuste Compartida (a medias):</p>
+                  <p className={`font-medium ${sharedAdjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(sharedAdjustment)}
                   </p>
                 </div>
               )}
@@ -360,7 +452,11 @@ export function MonthlyReportModal({
                           <p className="font-medium text-foreground">{transaction.name}</p>
                           <p className="text-xs text-muted-foreground">
                             {transaction.type === "income" ? "Ingreso" : "Gasto"} -{" "}
-                            {transaction.owner === "person1" ? person1Name : person2Name}
+                            {transaction.owner === "both"
+                              ? "Compartida"
+                              : transaction.owner === "person1"
+                                ? person1Name
+                                : person2Name}
                           </p>
                         </div>
                       </div>

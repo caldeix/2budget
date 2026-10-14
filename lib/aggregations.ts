@@ -63,9 +63,27 @@ export function isClosingAdjustment(t: Transaction): boolean {
 }
 
 /**
+ * @function isContribution
+ * @description Aportación a la cuenta compartida: un TRASPASO de la cuenta de una persona a la de
+ *              los dos. No es ingreso ni gasto: no cuenta en ningún total (ver `lib/shared-account.ts`).
+ */
+export function isContribution(t: Transaction): boolean {
+  return t.type === "contribution"
+}
+
+/**
+ * @function isPayable
+ * @description Transacción que se marca como pagada (o, en una aportación, como enviada): los
+ *              gastos y las aportaciones, salvo los ajustes de cierre, que ya nacen pagados.
+ */
+export function isPayable(t: Transaction): boolean {
+  return (t.type === "expense" || t.type === "contribution") && !isClosingAdjustment(t)
+}
+
+/**
  * @function isSettled
  * @description Indica si una transacción ya cuenta "a día de hoy": los ingresos (se dan por
- *              cobrados), los gastos marcados como pagados y los ajustes de cierre.
+ *              cobrados), los gastos y aportaciones marcados como pagados y los ajustes de cierre.
  */
 export function isSettled(t: Transaction): boolean {
   return t.type === "income" || Boolean(t.paid) || isClosingAdjustment(t)
@@ -127,6 +145,10 @@ export function aggregateTransactions(
   let exactExpenses1 = 0
 
   for (const t of transactions) {
+    // Una aportación solo mueve dinero de cuenta: ni ingreso ni gasto (sin esta línea contaría
+    // como gasto, porque abajo todo lo que no es ingreso se suma como gasto).
+    if (isContribution(t)) continue
+
     const cents = toCents(t.amount)
 
     if (t.type === "income") {

@@ -2,7 +2,8 @@
  * @file components/paid-reconciliation-modal.tsx
  * @description Modal de "cierre de mes". Al detectar que ha empezado un mes de calendario nuevo,
  *              obliga al usuario a reconciliar los gastos del mes anterior: marcar cuáles pagó o
- *              usar "Marcar todas como pagadas". Es un modal forzado (no se cierra con Escape ni
+ *              usar "Marcar todas como pagadas". Las aportaciones a la cuenta compartida van aquí
+ *              también (marcada = enviada). Es un modal forzado (no se cierra con Escape ni
  *              clic en el fondo); solo se resuelve con uno de sus dos botones.
  */
 
@@ -20,7 +21,7 @@ import { HIDDEN_AMOUNT } from "@/lib/privacy"
  * @param {boolean} isOpen - Si el modal está abierto.
  * @param {string} monthName - Nombre del mes que se cierra (ej. "Julio").
  * @param {number} year - Año del mes que se cierra.
- * @param {Transaction[]} expenses - Gastos del mes que se cierra (todos, computables y no computables).
+ * @param {Transaction[]} expenses - Gastos del mes que se cierra (todos, computables y no computables) y aportaciones.
  * @param {() => void} onMarkAll - Marca todos los gastos como pagados.
  * @param {(paidIds: string[]) => void} onSave - Aplica el marcado individual (los IDs indicados quedan pagados).
  * @param {(t: Transaction) => boolean} [isAmountHidden] - Si el importe está oculto por la pareja.
@@ -92,9 +93,14 @@ export function PaidReconciliationModal({
                   {expense.nonComputable && (
                     <span className="ml-2 text-xs text-muted-foreground">(no computable)</span>
                   )}
+                  {expense.type === "contribution" && (
+                    <span className="ml-2 text-xs text-muted-foreground">(aportación)</span>
+                  )}
                 </span>
               </div>
-              <span className="text-sm font-semibold text-red-600 shrink-0">
+              <span
+                className={`text-sm font-semibold shrink-0 ${expense.type === "contribution" ? "text-primary" : "text-red-600"}`}
+              >
                 {isAmountHidden(expense) ? HIDDEN_AMOUNT : formatCurrency(expense.amount)}
               </span>
             </label>

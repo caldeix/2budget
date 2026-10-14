@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
 import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
-import { aggregateTransactions, isClosingAdjustment, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
+import { aggregateTransactions, isClosingAdjustment, isContribution, isPayable, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
 import { HIDDEN_AMOUNT } from "@/lib/privacy" // Importe oculto por la pareja.
 import { UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
@@ -34,6 +34,7 @@ import {
   DollarSign,
   CheckCircle2,
   Circle,
+  ArrowRightLeft,
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 
@@ -99,10 +100,26 @@ const HIDDEN_EDIT_HINT = "Tu pareja ha ocultado el importe de sus transacciones 
 type SortField = "date" | "name" | "amount" | "type" | "paid"
 
 /**
- * Orden por pago. El primer clic ordena de mayor a menor: primero los gastos pendientes, luego
- * los pagados y al final los ingresos (que no se marcan). El segundo clic, al revés.
+ * Orden por pago. El primer clic ordena de mayor a menor: primero los gastos (y aportaciones)
+ * pendientes, luego los pagados y al final los ingresos (que no se marcan). El segundo clic, al revés.
  */
 const paidRank = (t: Transaction) => (t.type === "income" ? 0 : isSettled(t) ? 1 : 2)
+
+/** Color del punto y del importe: ingreso verde, aportación violeta, no computable gris, gasto rojo. */
+const amountTone = (t: Transaction, tones: { income: string; contribution: string; nonComputable: string; expense: string }) =>
+  t.type === "income"
+    ? tones.income
+    : isContribution(t)
+      ? tones.contribution
+      : t.nonComputable
+        ? tones.nonComputable
+        : tones.expense
+const dotColor = (t: Transaction) =>
+  amountTone(t, { income: "bg-green-600", contribution: "bg-primary", nonComputable: "bg-gray-500", expense: "bg-red-600" })
+const amountColor = (t: Transaction) =>
+  amountTone(t, { income: "text-green-600", contribution: "text-primary", nonComputable: "text-gray-500", expense: "text-red-600" })
+/** Signo del importe: una aportación no suma ni resta (es un traspaso), lleva una flecha. */
+const amountSign = (t: Transaction) => (t.type === "income" ? "+" : isContribution(t) ? "→ " : "-")
 /**
  * @typedef {'asc' | 'desc'} SortDirection
  * @description Tipo para la dirección de ordenación (ascendente o descendente).
@@ -141,6 +158,9 @@ export function TransactionsTable({
   // Nombre de la categoría de una transacción ("Sin categoría" si no tiene o se borró).
   const categoryName = (t: Transaction) =>
     (t.categoryId && categories.find((c) => c.id === t.categoryId)?.name) || UNCATEGORIZED_LABEL
+  // Una aportación no tiene categoría: en su lugar se dice de quién es.
+  const categoryText = (t: Transaction) =>
+    isContribution(t) ? `Aportación de ${t.owner === "person2" ? person2Name : person1Name}` : categoryName(t)
   // Columnas de la vista de escritorio: en modo individual desaparece la de propietario.
   // Las dos clases van completas para que Tailwind las genere.
   const desktopGridCols = singleMode
@@ -155,7 +175,7 @@ export function TransactionsTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc")
   // Estado para el filtro por tipo de transacción ('all', 'income', 'expense').
   // Tipo: ingresos, gastos fijos o gastos variables (como el selector "Tipo" del formulario).
-  const [filterType, setFilterType] = useState<"all" | "income" | "fixed" | "variable">("all")
+  const [filterType, setFilterType] = useState<"all" | "income" | "fixed" | "variable" | "contribution">("all")
   // Categoría (Supermercado, Casa…): un id, "none" (sin categoría) o todas.
   const [filterCategory, setFilterCategory] = useState<string>("all")
   // Estado para el filtro por pago: solo gastos pagados o solo pendientes (los ingresos no se marcan).
@@ -320,16 +340,20 @@ export function TransactionsTable({
       const matchesSearch = transaction.name.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesType =
         filterType === "all" ||
-        (filterType === "income" ? transaction.type === "income" : transaction.category === filterType)
+        (filterType === "income" || filterType === "contribution"
+          ? transaction.type === filterType
+          : transaction.type === "expense" && transaction.category === filterType)
+      // "Sin categoría" no incluye las aportaciones (no llevan categoría porque no aplica).
       const matchesCategory =
         filterCategory === "all" ||
         (filterCategory === "none"
-          ? categoryName(transaction) === UNCATEGORIZED_LABEL
+          ? !isContribution(transaction) && categoryName(transaction) === UNCATEGORIZED_LABEL
           : transaction.categoryId === filterCategory)
-      // "Pagados" incluye los ajustes de cierre, que nunca quedan pendientes (ver `isSettled`).
+      // "Pagados" incluye los ajustes de cierre, que nunca quedan pendientes (ver `isSettled`), y las
+      // aportaciones enviadas.
       const matchesPaid =
         filterPaid === "all" ||
-        (transaction.type === "expense" && (filterPaid === "paid") === isSettled(transaction))
+        (transaction.type !== "income" && (filterPaid === "paid") === isSettled(transaction))
 
       return matchesSearch && matchesType && matchesCategory && matchesPaid
     })
@@ -449,7 +473,7 @@ export function TransactionsTable({
     <span className="inline-flex items-center gap-1.5">
       {getTypeIcon(transaction)}
       {!isClosingAdjustment(transaction) && (
-        <span className="text-xs text-muted-foreground">{categoryName(transaction)}</span>
+        <span className="text-xs text-muted-foreground">{categoryText(transaction)}</span>
       )}
       {showNonComputable && transaction.nonComputable && (
         <span className="text-[10px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full" title="No computable">
@@ -459,9 +483,29 @@ export function TransactionsTable({
     </span>
   )
 
-  /** Icono del tipo: ingreso (verde), gasto fijo (rojo, calendario) o gasto variable (naranja). */
+  /** Textos del botón de pagado: una aportación se marca como "enviada". */
+  const paidTitle = (t: Transaction) =>
+    isContribution(t)
+      ? t.paid
+        ? "Enviada — clic para marcar pendiente"
+        : "Marcar como enviada"
+      : t.paid
+        ? "Pagado — clic para marcar pendiente"
+        : "Marcar como pagado"
+  const paidLabel = (t: Transaction) =>
+    isContribution(t) ? (t.paid ? "Enviada" : "Pendiente de enviar") : t.paid ? "Pagado" : "Pendiente"
+
+  /** Icono del tipo: ingreso (verde), aportación (violeta, flechas), gasto fijo (rojo, calendario) o gasto variable (naranja). */
   const getTypeIcon = (transaction: Transaction) => {
     const base = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+    if (isContribution(transaction)) {
+      return (
+        <span className={`${base} bg-primary/10 text-primary`} title="Aportación a la compartida">
+          <ArrowRightLeft className="h-3.5 w-3.5" />
+          <span className="sr-only">Aportación a la compartida</span>
+        </span>
+      )
+    }
     if (transaction.type === "income") {
       return (
         <span className={`${base} bg-green-100 text-green-600`} title="Ingreso">
@@ -552,6 +596,7 @@ export function TransactionsTable({
                 <option value="income">Ingresos</option>
                 <option value="fixed">Gastos fijos</option>
                 <option value="variable">Gastos variables</option>
+                {!singleMode && <option value="contribution">Aportaciones</option>}
               </select>
 
               {/* Selector de filtro por categoría */}
@@ -699,15 +744,7 @@ export function TransactionsTable({
                     transaction.nonComputable && "opacity-70"
                   )}>
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          transaction.type === "income" 
-                            ? "bg-green-600" 
-                            : transaction.nonComputable 
-                              ? "bg-gray-500" 
-                              : "bg-red-600"
-                        }`}
-                      />
+                      <div className={`w-2 h-2 rounded-full ${dotColor(transaction)}`} />
                       <div>
                         <div
                           className={cn(
@@ -741,20 +778,16 @@ export function TransactionsTable({
                     <div
                       className={cn(
                         "text-lg font-semibold text-right",
-                        transaction.type === "income" 
-                          ? "text-green-600" 
-                          : transaction.nonComputable 
-                            ? "text-gray-500" 
-                            : "text-red-600",
+                        amountColor(transaction),
                         transaction.nonComputable && "italic"
                       )}
                     >
-                      {transaction.type === "income" ? "+" : "-"}
+                      {amountSign(transaction)}
                       {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
                     </div>
                     {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
                     <div className="flex items-center justify-end gap-1">
-                      {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                      {!isRowLocked(transaction) && isPayable(transaction) && (
                         <Button
                           size="sm"
                           variant="ghost"
@@ -766,10 +799,10 @@ export function TransactionsTable({
                               ? "text-green-600 hover:text-green-700 hover:bg-green-600/10"
                               : "text-muted-foreground hover:text-foreground",
                           )}
-                          title={transaction.paid ? "Pagado — clic para marcar pendiente" : "Marcar como pagado"}
+                          title={paidTitle(transaction)}
                         >
                           {transaction.paid ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                          <span className="sr-only">{transaction.paid ? "Pagado" : "Pendiente"}</span>
+                          <span className="sr-only">{paidLabel(transaction)}</span>
                         </Button>
                       )}
                       {!isRowLocked(transaction) && (
@@ -819,15 +852,7 @@ export function TransactionsTable({
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                transaction.type === "income" 
-                                  ? "bg-green-600" 
-                                  : transaction.nonComputable 
-                                    ? "bg-gray-500" 
-                                    : "bg-red-600"
-                              }`}
-                            />
+                            <div className={`w-2 h-2 rounded-full ${dotColor(transaction)}`} />
                             <div>
                               <span
                                 className={cn(
@@ -844,15 +869,11 @@ export function TransactionsTable({
                             <span
                               className={cn(
                                 "text-lg font-semibold",
-                                transaction.type === "income" 
-                                  ? "text-green-600" 
-                                  : transaction.nonComputable 
-                                    ? "text-gray-500" 
-                                    : "text-red-600",
+                                amountColor(transaction),
                                 transaction.nonComputable && "italic"
                               )}
                             >
-                              {transaction.type === "income" ? "+" : "-"}
+                              {amountSign(transaction)}
                               {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
                             </span>
                             {transaction.nonComputable && (
@@ -860,7 +881,7 @@ export function TransactionsTable({
                                 NC
                               </span>
                             )}
-                            {!isRowLocked(transaction) && transaction.type === "expense" && !isClosingAdjustment(transaction) && (
+                            {!isRowLocked(transaction) && isPayable(transaction) && (
                               <button
                                 type="button"
                                 data-tour="paid"
@@ -869,7 +890,7 @@ export function TransactionsTable({
                                   "ml-1 p-0.5",
                                   transaction.paid ? "text-green-600" : "text-muted-foreground",
                                 )}
-                                aria-label={transaction.paid ? "Pagado" : "Marcar como pagado"}
+                                aria-label={paidLabel(transaction)}
                               >
                                 {transaction.paid ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                               </button>

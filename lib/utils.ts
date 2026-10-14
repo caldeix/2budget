@@ -8,8 +8,9 @@
 import { type ClassValue, clsx } from "clsx" // Utilidad para combinar clases condicionalmente.
 import { twMerge } from "tailwind-merge" // Utilidad para fusionar clases de Tailwind sin conflictos.
 import type { AppData, Transaction } from "@/types" // Tipos de datos de la app.
-import { aggregateTransactions } from "@/lib/aggregations" // Núcleo único de agregación.
+import { aggregateTransactions, isContribution } from "@/lib/aggregations" // Núcleo único de agregación.
 import { fromCents, subtractMoney, toCents } from "@/lib/money" // Aritmética monetaria exacta.
+import { cumulativeAccountSplit, type AccountSplit } from "@/lib/shared-account" // Cuenta compartida.
 
 /**
  * `formatCurrency` vive ahora en `@/lib/money`, junto al resto de la aritmética monetaria.
@@ -256,18 +257,23 @@ function groupByMonth(transactions: Transaction[]): Map<string, Transaction[]> {
  *              Se calcula MES A MES y se suman los resultados: el reparto de los importes
  *              compartidos redondea por mes, así que agregarlo todo de golpe podría diferir en
  *              algún céntimo de la suma de los balances mensuales que se ven (y se cierran).
+ *
+ *              Con la cuenta compartida (v3.0.0), `accounts` reparte esos balances entre la cuenta de
+ *              cada uno y la compartida (ver `lib/shared-account.ts`). Los balances totales no cambian.
  * @param {Transaction[]} transactions - Un array de objetos de transacción.
- * @returns {{ totalBalance: number; person1TotalBalance: number; person2TotalBalance: number; }} Un objeto con los balances acumulados.
+ * @returns Los balances acumulados y su reparto entre cuentas.
  */
 export function calculateCumulativeBalances(transactions: Transaction[]): {
   totalBalance: number
   person1TotalBalance: number
   person2TotalBalance: number
+  accounts: AccountSplit
 } {
   let p1 = 0
   let p2 = 0
+  const byMonth = groupByMonth(transactions)
 
-  for (const monthTransactions of groupByMonth(transactions).values()) {
+  for (const monthTransactions of byMonth.values()) {
     // Balance del mes tal y como lo muestran las tarjetas mensuales (con los no computables)...
     const month = aggregateTransactions(monthTransactions)
     // ...y, como el acumulado EXCLUYE los gastos no computables, se devuelve su parte a cada uno.
@@ -281,6 +287,7 @@ export function calculateCumulativeBalances(transactions: Transaction[]): {
     totalBalance: fromCents(p1 + p2),
     person1TotalBalance: fromCents(p1),
     person2TotalBalance: fromCents(p2),
+    accounts: cumulativeAccountSplit(byMonth.values(), fromCents(p1), fromCents(p2)),
   }
 }
 
@@ -304,6 +311,9 @@ export function createRoundingAdjustmentsForClosedReports(data: AppData): Transa
 
   for (const report of data.reports) {
     const monthTransactions = byMonth.get(`${report.year}-${String(report.month).padStart(2, "0")}`) ?? []
+    // Con cuenta compartida el dinero real de cada uno es su cuenta, no su balance total: esta
+    // comparación no vale (y esos meses son de la v3.0.0, muy posteriores a la v1.4.5).
+    if (monthTransactions.some(isContribution)) continue
     const totals = aggregateTransactions(monthTransactions)
     const d1 = toCents(report.person1RealMoney) - (toCents(totals.person1Income) - toCents(totals.person1Expenses))
     const d2 = toCents(report.person2RealMoney) - (toCents(totals.person2Income) - toCents(totals.person2Expenses))
