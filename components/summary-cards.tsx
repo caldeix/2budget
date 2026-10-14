@@ -13,6 +13,7 @@ import { cn, formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades 
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Iconos.
 import type { TodayFigures } from "@/hooks/use-calculations" // Cifras "a día de hoy".
+import type { AccountSplit } from "@/lib/shared-account" // Reparto entre la cuenta de cada uno y la compartida.
 
 /**
  * @interface SummaryCardsProps
@@ -31,6 +32,8 @@ import type { TodayFigures } from "@/hooks/use-calculations" // Cifras "a día d
  * @property {number} selectedMonth - El mes actualmente seleccionado para el resumen.
  * @property {number} selectedYear - El año actualmente seleccionado para el resumen.
  * @property {boolean} [singleMode] - Modo individual: oculta el desglose por persona si la Persona 2 no tiene cifras.
+ * @property {AccountSplit} [accounts] - Reparto entre cuentas del mes (Previsto). Si el mes usa la cuenta
+ *           compartida, el balance individual muestra la cuenta de cada uno y una fila "Compartida".
  * @property {TodayFigures} today - Gastos y balances solo con lo ya pagado ("Hoy").
  * @property {boolean} showToday - Si se muestran las dos cifras ("Hoy" y "Previsto"); si no, solo la prevista.
  */
@@ -50,6 +53,7 @@ interface SummaryCardsProps {
   selectedYear: number
   nonComputableExpenses: number
   singleMode?: boolean
+  accounts?: AccountSplit
   today: TodayFigures
   showToday: boolean
 }
@@ -91,14 +95,15 @@ const rowsMargin = (showToday: boolean) => (showToday ? "mt-4 md:mt-9" : "mt-4")
 /**
  * @function PersonFigures
  * @description Cifras por persona. Con `showToday`, dos columnas ("Hoy" y "Previsto");
- *              si no, una sola, como siempre.
+ *              si no, una sola, como siempre. Cada fila puede llevar debajo una línea pequeña
+ *              (`detail`), p. ej. el total de la persona o el reparto de la compartida.
  */
 function PersonFigures({
   rows,
   showToday,
   colored = false,
 }: {
-  rows: { name: string; today: number; expected: number }[]
+  rows: { name: string; today: number; expected: number; detail?: string }[]
   showToday: boolean
   colored?: boolean
 }) {
@@ -108,9 +113,12 @@ function PersonFigures({
     return (
       <div className="mt-4 space-y-1">
         {rows.map((row, i) => (
-          <div key={i} className="flex justify-between text-sm">
-            <span className="text-muted-foreground">{row.name}:</span>
-            <span className={`font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
+          <div key={i}>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">{row.name}:</span>
+              <span className={`font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
+            </div>
+            {row.detail && <p className="text-xs text-muted-foreground truncate">{row.detail}</p>}
           </div>
         ))}
       </div>
@@ -127,6 +135,7 @@ function PersonFigures({
           <span className="text-muted-foreground truncate">{row.name}</span>
           <span className={`text-right font-medium ${color(row.today)}`}>{formatCurrency(row.today)}</span>
           <span className={`text-right font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
+          {row.detail && <span className="col-span-3 -mt-1 text-xs text-muted-foreground truncate">{row.detail}</span>}
         </div>
       ))}
     </div>
@@ -156,6 +165,7 @@ export function SummaryCards({
   selectedYear,
   nonComputableExpenses,
   singleMode,
+  accounts,
   today,
   showToday,
 }: SummaryCardsProps) {
@@ -166,6 +176,35 @@ export function SummaryCards({
   // Sin desglose por persona (modo individual), Balance lleva la tabla "Hoy | Previsto" con una
   // sola fila, en lugar de la línea "Hoy": así se ve qué es cada cifra.
   const singleToday = showToday && !showPerson2
+  // Cuenta compartida (v3.0.0): cada persona muestra su cuenta (lo que tiene en su banco) con su
+  // total debajo, y una tercera fila muestra la compartida y de quién es lo que hay en ella.
+  const usesShared = Boolean(accounts?.usesShared)
+  const individualRows =
+    usesShared && accounts
+      ? [
+          {
+            name: person1Name,
+            today: today.accounts.person1Account,
+            expected: accounts.person1Account,
+            detail: `Total: ${formatCurrency(person1Balance)}`,
+          },
+          {
+            name: person2Name,
+            today: today.accounts.person2Account,
+            expected: accounts.person2Account,
+            detail: `Total: ${formatCurrency(person2Balance)}`,
+          },
+          {
+            name: "Compartida",
+            today: today.accounts.shared,
+            expected: accounts.shared,
+            detail: `${person1Name} ${formatCurrency(accounts.sharedPerson1)} · ${person2Name} ${formatCurrency(accounts.sharedPerson2)}`,
+          },
+        ]
+      : [
+          { name: person1Name, today: today.person1Balance, expected: person1Balance },
+          { name: person2Name, today: today.person2Balance, expected: person2Balance },
+        ]
 
   // En móvil las tarjetas van en un carrusel horizontal: los puntos marcan la tarjeta visible.
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -329,18 +368,11 @@ export function SummaryCards({
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Balance Individual</p>
                 {/* Mismo alto de línea que las cifras grandes de las otras tarjetas. */}
-                <p className="text-lg leading-8 font-bold text-foreground">Por persona</p>
+                <p className="text-lg leading-8 font-bold text-foreground">{usesShared ? "Por cuenta" : "Por persona"}</p>
                 {showToday && <TodaySpacer />}
               </div>
             </div>
-            <PersonFigures
-              showToday={showToday}
-              colored
-              rows={[
-                { name: person1Name, today: today.person1Balance, expected: person1Balance },
-                { name: person2Name, today: today.person2Balance, expected: person2Balance },
-              ]}
-            />
+            <PersonFigures showToday={showToday} colored rows={individualRows} />
           </div>
         )}
       </div>

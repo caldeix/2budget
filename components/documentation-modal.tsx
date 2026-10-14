@@ -96,7 +96,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 </li>
                 <li>
                   <strong>Balance individual:</strong> lo que le queda a {person1Name} y a {person2Name} (sus ingresos
-                  menos su parte de los gastos).
+                  menos su parte de los gastos). Si el mes tiene aportaciones a la cuenta compartida, muestra la cuenta
+                  de cada uno, su total debajo y una fila «Compartida» (ver la sección 6).
                 </li>
               </ul>
               <p>
@@ -140,8 +141,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   cerrado, no se pueden editar. Al borrar el texto vuelve el mes.
                 </li>
                 <li>
-                  <strong>Filtrar:</strong> por tipo (ingresos, gastos fijos o gastos variables), por categoría
-                  (Supermercado, Casa… o «Sin categoría») y por pago (solo los gastos pagados o solo los pendientes).
+                  <strong>Filtrar:</strong> por tipo (ingresos, gastos fijos, gastos variables o aportaciones), por
+                  categoría (Supermercado, Casa… o «Sin categoría») y por pago (solo los pagados o solo los pendientes).
                 </li>
                 <li>
                   El contador (por ejemplo <strong>10/29</strong>) indica cuántas transacciones se ven de las que hay en
@@ -155,8 +156,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
               <Subtitle>Marcar como pagado</Subtitle>
               <p>
-                Pulsa el círculo de un gasto cuando lo pagues (se pone verde). Cuenta para la cifra de «Hoy». Al abrir la
-                app en un mes nuevo, si del mes anterior quedaron gastos sin marcar, la app te pregunta cuáles se pagaron.
+                Pulsa el círculo de un gasto cuando lo pagues (se pone verde). Cuenta para la cifra de «Hoy». Las
+                aportaciones a la compartida se marcan igual, cuando se envían. Al abrir la app en un mes nuevo, si del
+                mes anterior quedaron gastos o aportaciones sin marcar, la app te pregunta cuáles se pagaron.
               </p>
               <Subtitle>Editar y borrar</Subtitle>
               <ul className="list-disc list-inside space-y-1">
@@ -183,7 +185,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               <ul className="list-disc list-inside space-y-1">
                 <li>
                   <strong>Tipo:</strong> <em>gasto variable</em> (supermercado, ocio…), <em>gasto fijo</em> (alquiler,
-                  suscripciones…; son los que se copian de un mes a otro) o <em>ingreso</em>.
+                  suscripciones…; son los que se copian de un mes a otro), <em>ingreso</em> o, en pareja,{" "}
+                  <em>aportación a la compartida</em> (sin categoría ni reparto: se elige quién aporta; ver la sección 6).
                 </li>
                 <li>
                   <strong>Categoría:</strong> en qué se va el dinero (Supermercado, Casa, Transporte…). Hay una lista
@@ -232,12 +235,12 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
 
           {/* 5. Copiar */}
           <AccordionItem value="copiar">
-            <SectionTrigger>5. Copiar gastos fijos e ingresos</SectionTrigger>
+            <SectionTrigger>5. Copiar gastos fijos, ingresos y aportaciones</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
-                El botón de copiar trae al mes que estás viendo los gastos fijos y los ingresos del mes anterior (los
-                ajustes de cierre no se copian), cada uno con su categoría. Si el mes ya tiene gastos fijos o ingresos,
-                ese tipo no se vuelve a copiar.
+                El botón de copiar trae al mes que estás viendo los gastos fijos, los ingresos y las aportaciones a la
+                compartida del mes anterior (los ajustes de cierre no se copian), cada uno con su categoría. Si el mes
+                ya tiene alguno de esos tipos, ese tipo no se vuelve a copiar.
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
@@ -252,9 +255,43 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             </AccordionContent>
           </AccordionItem>
 
-          {/* 6. Informes */}
+          {/* 6. Cuenta compartida */}
+          <AccordionItem value="cuenta-compartida">
+            <SectionTrigger>6. Cuenta compartida</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Si cada mes enviáis dinero a una <strong>cuenta de los dos</strong> y de ahí pagáis lo compartido, apunta
+                lo que envía cada uno como <strong>aportación a la compartida</strong>. No es un gasto: el dinero sigue
+                siendo de quien lo envía, solo cambia de cuenta. Se marca como enviada y se copia al mes siguiente con
+                los fijos y los ingresos.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Lo compartido va por la compartida:</strong> todo gasto o ingreso con reparto sale o entra de
+                  ella; lo que es solo de uno, de su cuenta. No hay que elegir nada más: lo decide el reparto.
+                </li>
+                <li>
+                  En <strong>Balance individual</strong> se ve la <strong>cuenta</strong> de cada uno (lo que tiene en su
+                  banco), su <strong>total</strong> debajo (su cuenta más su parte en la compartida) y una fila{" "}
+                  <strong>Compartida</strong> con lo que hay y de quién es. Todo en «Hoy» y «Previsto».
+                </li>
+                <li>
+                  Lo que sobra en la compartida <strong>se queda ahí</strong> y se acumula: el Total acumulado también
+                  separa las tres cuentas. Los gastos no computables compartidos se quedan en la compartida (son una
+                  hucha).
+                </li>
+                <li>
+                  Ejemplo: cobráis 1000 € cada uno y enviáis 500 € cada uno; los gastos compartidos son 600 € a medias.
+                  Cada cuenta tiene 500 €, la compartida 400 € (200 € de cada uno) y el total de cada uno es 700 €.
+                </li>
+                <li>Un mes sin aportaciones se calcula como siempre. En modo individual no hay cuenta compartida.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* 7. Informes */}
           <AccordionItem value="informes">
-            <SectionTrigger>6. Informes y cierre de mes</SectionTrigger>
+            <SectionTrigger>7. Informes y cierre de mes</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <Subtitle>Cerrar el mes</Subtitle>
               <ul className="list-disc list-inside space-y-1">
@@ -267,6 +304,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   Escribe el <strong>dinero real</strong> que tiene cada uno al final del mes. La app lo compara con el
                   balance calculado y crea una <strong>transacción de ajuste</strong> por persona con la diferencia, para
                   que las cuentas cuadren.
+                </li>
+                <li>
+                  Si el mes tiene <strong>cuenta compartida</strong>, se pide lo que queda en la cuenta de cada uno y el{" "}
+                  <strong>saldo de la compartida</strong> en el banco (con lo acumulado de otros meses). La app lo compara
+                  con su saldo calculado y, si no cuadra, crea un ajuste <strong>a medias</strong>.
                 </li>
                 <li>
                   Si ya está cerrado, el botón pasa a «Actualizar mes actual»: los ajustes se recalculan y{" "}
@@ -299,9 +341,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             </AccordionContent>
           </AccordionItem>
 
-          {/* 7. Configuración */}
+          {/* 8. Configuración */}
           <AccordionItem value="configuracion">
-            <SectionTrigger>7. Configuración</SectionTrigger>
+            <SectionTrigger>8. Configuración</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <ul className="list-disc list-inside space-y-1">
                 <li>
@@ -334,7 +376,7 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
 
           {/* 8. Cuenta */}
           <AccordionItem value="cuenta">
-            <SectionTrigger>8. Cuenta, nube y privacidad</SectionTrigger>
+            <SectionTrigger>9. Cuenta, nube y privacidad</SectionTrigger>
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 Para usar 2Budget hace falta una <strong>cuenta con el email verificado</strong>. El botón de la nube,
@@ -359,7 +401,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               <p>
                 En Cuenta &gt; Tu hogar, cada uno puede activar <strong>«Ocultar mis transacciones individuales a mi
                 pareja»</strong>. Tu pareja verá *** en lugar del importe de las transacciones que son 100% tuyas, y no
-                podrá editarlas. Los totales, los balances y los informes no cambian. Solo se oculta en la app: los datos
+                podrá editarlas. Las aportaciones a la cuenta compartida se ven siempre, porque es dinero de los dos.
+                Los totales, los balances y los informes no cambian. Solo se oculta en la app: los datos
                 siguen compartidos y cifrados con la misma clave del hogar.
               </p>
               <Subtitle>Cifrado y contraseña maestra</Subtitle>
