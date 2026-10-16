@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Footer } from "@/components/footer"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
+import { ErrorRecorder } from "@/components/error-screen"
 import { APP_VERSION } from "@/lib/app-version"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
@@ -81,6 +82,7 @@ export default function RootLayout({
           {children}
           <Footer />
           <ServiceWorkerRegister />
+          <ErrorRecorder />
         </ThemeProvider>
       </body>
     </html>

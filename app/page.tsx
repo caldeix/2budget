@@ -37,6 +37,7 @@ import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
+import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
@@ -158,6 +159,9 @@ export default function HomePage() {
   const [isPaidReconcileOpen, setIsPaidReconcileOpen] = useState(false)
   const [reconcileExpenses, setReconcileExpenses] = useState<Transaction[]>([])
   const [reconcileLabel, setReconcileLabel] = useState<{ monthName: string; year: number }>({ monthName: "", year: 0 })
+  // Avisos breves (copiar fijos, importar), en lugar de `alert()`.
+  const [flash, setFlash] = useState<Flash | null>(null)
+  const closeFlash = useCallback(() => setFlash(null), [])
 
   const [transactionsToShow, setTransactionsToShow] = useState(5)
 
@@ -312,7 +316,10 @@ export default function HomePage() {
     )
 
     if (toCopy.length === 0) {
-      alert(`No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`)
+      setFlash({
+        text: `No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`,
+        tone: "error",
+      })
       return
     }
 
@@ -359,7 +366,7 @@ export default function HomePage() {
       contributionCount > 0
         ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
         : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
-    alert(`${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`)
+    setFlash({ text: `${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`, tone: "success" })
   }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
@@ -402,7 +409,7 @@ export default function HomePage() {
   const handleImportData = (content: string): boolean => {
     const imported = parseImportedData(content)
     if (!imported) {
-      alert("Error al importar los datos. Verifica que el archivo sea válido.")
+      setFlash({ text: "Error al importar los datos. Verifica que el archivo sea válido.", tone: "error" })
       return false
     }
     replaceAllData(imported)
@@ -1030,6 +1037,7 @@ export default function HomePage() {
 
       {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} onOpenChange={handleTourOpenChange} />}
       <UpdateNotice />
+      <FlashMessage flash={flash} onClose={closeFlash} />
     </div>
   )
 }

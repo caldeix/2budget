@@ -23,6 +23,7 @@ import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
 import { adjustmentIdFor, reportIdFor } from "@/lib/dedupe" // Ids fijos por mes del informe y sus ajustes.
 import { normalizeName } from "@/lib/categories" // Nombres comparables (sin tildes ni mayúsculas).
+import { setDataSnapshot } from "@/lib/error-log" // Copia de los datos para la pantalla de error.
 
 /** Indica si la transacción es del mes y año dados. */
 function isInMonth(t: Transaction, month: number, year: number): boolean {
@@ -561,6 +562,12 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     },
     [commit],
   )
+
+  // Copia para la pantalla de error (ver `lib/error-log.ts`): los datos reales, nunca los del tour
+  // ni los de otro sitio mientras el hogar no se ha podido abrir.
+  useEffect(() => {
+    setDataSnapshot(loadError ? null : data)
+  }, [data, loadError])
 
   return {
     data: visibleData,
