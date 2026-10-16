@@ -105,6 +105,7 @@ export default function HomePage() {
     replaceAllData,
     householdInfo,
     syncError,
+    loadError,
   } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
   const needsAuth = session.enabled && (!session.user || !session.emailVerified)
@@ -564,6 +565,23 @@ export default function HomePage() {
     return <VaultUnlock session={session} vault={vault} onRecoveryCode={setRecoveryCodeToShow} />
   }
 
+  // No se ha podido abrir el hogar: no se enseñan datos de otro sitio ni se guarda nada.
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="max-w-md space-y-4 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-600 mx-auto" />
+          <h1 className="text-2xl font-bold text-foreground">No se ha podido abrir tu hogar</h1>
+          <p className="text-muted-foreground">{loadError}</p>
+          <p className="text-sm text-muted-foreground">
+            Tus datos siguen en la nube; no se ha cambiado nada. Comprueba la conexión y vuelve a intentarlo.
+          </p>
+          <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    )
+  }
+
   // Los datos del hogar necesitan una versión más nueva que esta (ver `lib/app-version.ts`).
   if (householdInfo?.minAppVersion && isOlderVersion(APP_VERSION, householdInfo.minAppVersion)) {
     return <UpdateRequired minVersion={householdInfo.minAppVersion} />
@@ -612,6 +630,21 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Documentos dañados que no se han podido leer: el resto funciona (ver `createDecryptingCache`). */}
+      {householdInfo?.unreadable ? (
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-600">
+              {householdInfo.unreadable === 1
+                ? "Hay un movimiento o informe que no se ha podido leer (está dañado)."
+                : `Hay ${householdInfo.unreadable} movimientos o informes que no se han podido leer (están dañados).`}{" "}
+              El resto de tus datos funciona con normalidad y no se ha borrado nada.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
       {!cloudTarget && !isTourActive && <LocalStorageNotice />}
