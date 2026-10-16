@@ -4,6 +4,8 @@
  *              `data-tour="…"`. Algunos abren una ventana (`open`) para enseñarla por dentro: el
  *              formulario de nueva transacción y el cierre de mes. En móvil, los botones
  *              secundarios van dentro del menú "⋮", así que se explican en un solo paso.
+ *              En pareja, los datos de ejemplo llevan aportaciones a la cuenta compartida (ver
+ *              `lib/tour-data.ts`) y los pasos la explican; en modo individual no hay compartida.
  */
 
 import type { TourStep } from "@/components/app-tour"
@@ -31,18 +33,27 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
     {
       target: "card-expenses",
       title: "Hoy y Previsto",
-      text: "«Hoy» cuenta solo los gastos ya marcados como pagados; «Previsto» los cuenta todos, como acabará el mes. Si no queda nada por pagar, verás una sola cifra.",
+      text: singleMode
+        ? "«Hoy» cuenta solo los gastos ya marcados como pagados; «Previsto» los cuenta todos, como acabará el mes. Si no queda nada por pagar, verás una sola cifra."
+        : "«Hoy» cuenta solo los gastos ya pagados y las aportaciones ya enviadas; «Previsto» lo cuenta todo, como acabará el mes. Si no queda nada pendiente, verás una sola cifra.",
     },
     !singleMode && {
       target: "card-individual",
-      title: "Balance por persona",
-      text: `Lo que le queda a ${person1Name} y a ${person2Name}: sus ingresos menos su parte de cada gasto, según el reparto.`,
+      title: "Balance por cuenta",
+      text: `Lo que tiene ${person1Name} en su cuenta y lo que tiene ${person2Name} en la suya (lo que veríais en el banco). Debajo, en pequeño, el total de cada uno: su cuenta más su parte en la compartida.`,
+    },
+    !singleMode && {
+      target: "card-individual",
+      title: "Cuenta compartida",
+      text: "Si enviáis dinero a una cuenta de los dos, apúntalo como «aportación»: no es un gasto, el dinero sigue siendo de quien lo envía. Todo lo compartido sale de ella, y la fila «Compartida» dice cuánto queda y de quién es. En «Hoy» la compartida tiene más porque aún quedan gastos compartidos por pagar.",
     },
     // ---- Lateral
     {
       target: "cumulative",
       title: "Total acumulado",
-      text: "La suma de todos los meses desde el principio: lo ahorrado en total y por persona. No cuenta los gastos no computables.",
+      text: singleMode
+        ? "La suma de todos los meses desde el principio: lo ahorrado en total. No cuenta los gastos no computables."
+        : "La suma de todos los meses desde el principio: lo ahorrado en total, en la cuenta de cada uno y en la compartida (lo que sobra en ella se queda ahí). No cuenta los gastos no computables.",
     },
     {
       target: "evolution",
@@ -76,25 +87,34 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       target: "tx-row",
       title: "Tus movimientos",
       text: isDesktop
-        ? "Cada transacción con su fecha, nombre, tipo y categoría, a quién pertenece e importe. A la derecha, los botones para editarla o borrarla."
-        : "Cada transacción con su fecha, importe, tipo y categoría. Deslízala a la izquierda para editarla o borrarla.",
+        ? "Cada transacción con su fecha, nombre, tipo y categoría, a quién pertenece e importe. A la derecha, los botones para editarla o borrarla." +
+          (singleMode ? "" : " Las aportaciones llevan una flecha: no suman ni restan, solo cambian el dinero de cuenta.")
+        : "Cada transacción con su fecha, importe, tipo y categoría. Deslízala a la izquierda para editarla o borrarla." +
+          (singleMode ? "" : " Las aportaciones llevan una flecha: no suman ni restan."),
     },
     {
       target: "paid",
       title: "Marcar como pagado",
-      text: "Pulsa el círculo al pagar un gasto: cuenta para la cifra de «Hoy». Al empezar un mes nuevo, la app te pregunta por los que hayan quedado pendientes.",
+      text: singleMode
+        ? "Pulsa el círculo al pagar un gasto: cuenta para la cifra de «Hoy». Al empezar un mes nuevo, la app te pregunta por los que hayan quedado pendientes."
+        : "Pulsa el círculo al pagar un gasto o al enviar una aportación: cuenta para la cifra de «Hoy». Al empezar un mes nuevo, la app te pregunta por lo que haya quedado pendiente.",
     },
     // ---- Nueva transacción, por dentro
     {
       target: "fab-add",
       title: "Añadir",
-      text: "Con este botón creas un ingreso o un gasto. Vamos a verlo por dentro.",
+      text: singleMode
+        ? "Con este botón creas un ingreso o un gasto. Vamos a verlo por dentro."
+        : "Con este botón creas un ingreso, un gasto o una aportación a la compartida. Vamos a verlo por dentro.",
     },
     {
       target: "form-type",
       open: "transaction-form",
       title: "Tipo y categoría",
-      text: "El tipo es gasto variable, gasto fijo (los que se copian de un mes a otro) o ingreso. La categoría (Supermercado, Casa, Ocio…) sirve para ver en qué se va el dinero; la lista se cambia en Configuración.",
+      text:
+        "El tipo es gasto variable, gasto fijo (los que se copian de un mes a otro) o ingreso" +
+        (singleMode ? "" : ", o aportación a la compartida (lo que cada uno envía a la cuenta de los dos)") +
+        ". La categoría (Supermercado, Casa, Ocio…) sirve para ver en qué se va el dinero; la lista se cambia en Configuración.",
     },
     {
       target: "form-name",
@@ -112,26 +132,33 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       target: "form-share",
       open: "transaction-form",
       title: "Reparto",
-      text: `El deslizador dice qué parte es de cada uno. Al 100% para ${person1Name} o para ${person2Name}, la transacción es solo suya; cualquier otro reparto es compartido.`,
+      text: `El deslizador dice qué parte es de cada uno. Al 100% para ${person1Name} o para ${person2Name}, la transacción es solo suya; cualquier otro reparto es compartido y sale de la cuenta compartida. En una aportación, en vez del deslizador, se elige quién aporta.`,
     },
     // ---- Cierre de mes, por dentro
     {
       target: "close-real-money",
       open: "close-month",
       title: "Cerrar el mes",
-      text: "Al acabar el mes, escribe el dinero real que tiene cada uno. La app lo compara con el balance calculado.",
+      text: singleMode
+        ? "Al acabar el mes, escribe el dinero real que tienes. La app lo compara con el balance calculado."
+        : "Al acabar el mes, escribe lo que le queda a cada uno en su cuenta y el saldo de la compartida en el banco. La app lo compara con lo calculado.",
     },
     {
       target: "close-adjustments",
       open: "close-month",
       title: "Ajustes de cierre",
-      text: "La diferencia se convierte en una transacción de ajuste por persona, para que las cuentas cuadren, y se guarda el informe. El mes queda cerrado; si hace falta, el del mes anterior se puede actualizar.",
+      text:
+        "La diferencia se convierte en una transacción de ajuste por persona" +
+        (singleMode ? "" : " (y en la compartida, un ajuste a medias)") +
+        ", para que las cuentas cuadren, y se guarda el informe. El mes queda cerrado; si hace falta, el del mes anterior se puede actualizar.",
     },
     // ---- Botones flotantes y cuenta
     isDesktop && {
       target: "fab-copy",
-      title: "Copiar fijos e ingresos",
-      text: "Copia los gastos fijos y los ingresos del mes anterior al que estás viendo. Antes puedes revisar los importes uno a uno.",
+      title: singleMode ? "Copiar fijos e ingresos" : "Copiar fijos, ingresos y aportaciones",
+      text: singleMode
+        ? "Copia los gastos fijos y los ingresos del mes anterior al que estás viendo. Antes puedes revisar los importes uno a uno."
+        : "Copia los gastos fijos, los ingresos y las aportaciones del mes anterior al que estás viendo. Antes puedes revisar los importes uno a uno.",
     },
     isDesktop && {
       target: "fab-theme",
@@ -159,7 +186,9 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       : {
           target: "fab-menu",
           title: "Más opciones",
-          text: "Aquí están copiar fijos e ingresos, el modo claro u oscuro, la configuración y la ayuda. Desde el menú del navegador puedes instalar 2Budget como una app más. ¡Ya puedes empezar!",
+          text:
+            (singleMode ? "Aquí están copiar fijos e ingresos" : "Aquí están copiar fijos, ingresos y aportaciones") +
+            ", el modo claro u oscuro, la configuración y la ayuda. Desde el menú del navegador puedes instalar 2Budget como una app más. ¡Ya puedes empezar!",
         },
   ]
   return steps.filter((step): step is TourStep => step !== false)
