@@ -35,6 +35,7 @@ import {
   CheckCircle2,
   Circle,
   ArrowRightLeft,
+  MoreHorizontal,
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 
@@ -820,6 +821,7 @@ export function TransactionsTable({
                                   ? HIDDEN_EDIT_HINT
                                   : "Editar"
                             }
+                            aria-label={`Editar ${transaction.name}`}
                             className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
                           >
                             <Edit className="h-4 w-4" />
@@ -830,6 +832,7 @@ export function TransactionsTable({
                             onClick={() => onDelete(transaction.id)}
                             disabled={isClosingAdjustment(transaction)}
                             title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Eliminar"}
+                            aria-label={`Eliminar ${transaction.name}`}
                             className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -911,6 +914,18 @@ export function TransactionsTable({
                         </div>
                         <div className="flex justify-between items-center text-xs text-muted-foreground">
                           {getCategoryBadge(transaction)}
+                          {/* Alternativa al gesto de deslizar (teclado, VoiceOver o quien no lo conozca). */}
+                          {!isRowLocked(transaction) && (
+                            <button
+                              type="button"
+                              onClick={() => setOpenSwipeId(openSwipeId === transaction.id ? null : transaction.id)}
+                              aria-expanded={openSwipeId === transaction.id}
+                              aria-label={`Más acciones para ${transaction.name}`}
+                              className="-my-2 -mr-2 p-2 text-muted-foreground hover:text-foreground"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                       {/* Contenedor de acciones de swipe (oculto por defecto, visible con swipe) */}
@@ -920,31 +935,34 @@ export function TransactionsTable({
                           openSwipeId === transaction.id ? "translate-x-0" : "translate-x-full", // Mueve las acciones.
                         )}
                         style={{ width: "120px" }} // Ancho fijo para las acciones.
+                        aria-hidden={openSwipeId !== transaction.id} // Fuera de pantalla: ni se lee ni se tabula.
                       >
                         <Button
                           size="sm"
                           className="flex-1 bg-amber-600 text-primary-foreground hover:bg-amber-700"
                           disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
+                          tabIndex={openSwipeId === transaction.id ? 0 : -1}
                           onClick={() => {
                             onEdit(transaction)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.
                           }}
                         >
                           <Edit className="h-4 w-4" />
-                          <span className="sr-only">Editar</span>
+                          <span className="sr-only">Editar {transaction.name}</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
                           className="flex-1"
                           disabled={isClosingAdjustment(transaction)}
+                          tabIndex={openSwipeId === transaction.id ? 0 : -1}
                           onClick={() => {
                             onDelete(transaction.id)
                             setOpenSwipeId(null) // Cierra el swipe después de la acción.
                           }}
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Eliminar</span>
+                          <span className="sr-only">Eliminar {transaction.name}</span>
                         </Button>
                       </div>
                     </div>
