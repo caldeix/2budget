@@ -256,7 +256,8 @@ export function HouseholdManager({
     setIsBusy(true)
     try {
       const dek = await unlockExtractableDek(services.db, householdId, user.uid, inviteMasterPassword)
-      setInvite(await createInvite(services.db, householdId, user.uid, dek))
+      // El código anterior (si se estaba enseñando) se invalida al generar el nuevo.
+      setInvite(await createInvite(services.db, householdId, user.uid, dek, invite?.code))
       setInviteMasterPassword("")
       setCopied(false)
     } catch (err) {

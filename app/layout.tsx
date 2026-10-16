@@ -28,6 +28,29 @@ export const viewport: Viewport = {
   themeColor: "#17182c",
 }
 
+/**
+ * Content-Security-Policy (3.0.3). GitHub Pages no deja poner cabeceras, así que va por `<meta>`.
+ * Limita de dónde se cargan scripts, marcos e imágenes y, sobre todo, A DÓNDE se pueden enviar datos
+ * (`connect-src`): aunque un script ajeno llegara a ejecutarse, no podría mandar los datos descifrados
+ * a otro sitio. Firebase (Auth, Firestore, App Check) va por *.googleapis.com y reCAPTCHA Enterprise por
+ * google.com y gstatic.com. Next exporta scripts y estilos en línea, de ahí 'unsafe-inline'.
+ * Solo en producción: el modo desarrollo de Next necesita `eval`.
+ */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com https://apis.google.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://www.google.com https://www.gstatic.com",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://www.google.com https://www.gstatic.com",
+  "frame-src https://www.google.com https://recaptcha.google.com https://*.firebaseapp.com",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join("; ")
+
 /** Script de tema que se ejecuta antes de pintar la página (ver el `<head>`). */
 const THEME_SCRIPT =
   "(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d)}catch(e){}})()"
@@ -40,6 +63,9 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        {process.env.NODE_ENV === "production" && (
+          <meta httpEquiv="Content-Security-Policy" content={CONTENT_SECURITY_POLICY} />
+        )}
         {/* Pone el tema antes de pintar (la preferencia guardada o la del sistema): sin esto, quien usa
             el tema oscuro veía un destello claro al abrir. Mismo criterio que `ThemeProvider`. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

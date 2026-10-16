@@ -26,8 +26,15 @@ export const RECOVERY_KDF_ITERATIONS = 100_000
 /** Longitud del código de recuperación. */
 export const RECOVERY_CODE_LENGTH = 24
 
-/** Longitud mínima de la contraseña maestra. */
-export const MIN_MASTER_PASSWORD_LENGTH = 8
+/**
+ * Longitud mínima de una contraseña maestra NUEVA (al crearla o cambiarla). Era 8 hasta la 3.0.3:
+ * las que ya existen siguen valiendo para desbloquear. Quien llegue a leer una clave envuelta puede
+ * probar contraseñas sin conexión, y las iteraciones de PBKDF2 solo frenan; la longitud es lo que más pesa.
+ */
+export const MIN_MASTER_PASSWORD_LENGTH = 12
+
+/** Caracteres distintos mínimos: rechaza "aaaaaaaaaaaa" o "121212121212". */
+export const MIN_MASTER_PASSWORD_DISTINCT = 5
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()

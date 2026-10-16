@@ -45,7 +45,42 @@ service cloud.firestore {
         && after.roles[request.auth.uid] == 'person2'
         && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid])
         && invite.householdId == hid
-        && invite.expiresAt > request.time;
+        && invite.expiresAt > request.time
+        // La invitación se gasta en la misma escritura (3.0.3): no se puede reutilizar.
+        && !existsAfter(/databases/$(database)/documents/invites/$(after.joinCode));
+    }
+
+    // Lo que un miembro puede cambiar en el hogar (3.0.3). Antes bastaba con no añadir miembros,
+    // y un miembro podía quitar al otro, intercambiar roles o dejar el hogar sin nadie.
+    function isMemberUpdate() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+      return signedIn()
+        && request.auth.uid in before.members
+        && (
+          // Los datos cifrados (configuración) y la versión mínima de la app.
+          changed.hasOnly(['enc', 'minAppVersion'])
+          // Su propio email.
+          || (changed.hasOnly(['memberEmails'])
+            && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid]))
+          // Salir: se quita a sí mismo, con su rol y su email; el otro miembro se queda.
+          || (changed.hasOnly(['members', 'roles', 'memberEmails'])
+            && before.members.size() == 2
+            && after.members == before.members.removeAll([request.auth.uid])
+            && after.roles.diff(before.roles).affectedKeys().hasOnly([request.auth.uid])
+            && !(request.auth.uid in after.roles)
+            && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid])
+            && !(request.auth.uid in after.memberEmails))
+        );
+    }
+
+    // Un documento de datos solo lleva el texto cifrado (3.0.3): un cliente con un error no puede
+    // subir datos en claro ni documentos enormes (el límite de Firestore es 1 MiB).
+    function isEncryptedDoc() {
+      return request.resource.data.keys().hasOnly(['enc'])
+        && request.resource.data.enc is string
+        && request.resource.data.enc.size() < 1000000;
     }
 
     // Perfil: solo su dueño.
@@ -56,28 +91,29 @@ service cloud.firestore {
     match /households/{hid} {
       allow read: if signedIn() && request.auth.uid in resource.data.members;
 
-      // Se crea con el usuario como único miembro.
+      // Se crea con el usuario como único miembro y solo con los campos esperados.
       allow create: if signedIn()
         && request.resource.data.members == [request.auth.uid]
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.keys().hasOnly(['members', 'roles', 'memberEmails', 'enc', 'cryptoVersion', 'createdBy', 'createdAt'])
+        && request.resource.data.enc is string;
 
-      // Un miembro puede editarlo, pero no añadir miembros (solo salir o quitar).
+      // Un miembro solo cambia lo que permite `isMemberUpdate` (datos cifrados, su email o salir).
       // Un no miembro solo puede unirse con invitación.
-      allow update: if (signedIn()
-          && request.auth.uid in resource.data.members
-          && request.resource.data.members.hasOnly(resource.data.members))
-        || isValidJoin(hid);
+      allow update: if isMemberUpdate() || isValidJoin(hid);
 
       // Solo se borra cuando lo deja el último miembro.
       allow delete: if signedIn()
         && resource.data.members == [request.auth.uid];
 
       match /transactions/{transactionId} {
-        allow read, write: if isMember(hid);
+        allow read, delete: if isMember(hid);
+        allow create, update: if isMember(hid) && isEncryptedDoc();
       }
 
       match /reports/{reportId} {
-        allow read, write: if isMember(hid);
+        allow read, delete: if isMember(hid);
+        allow create, update: if isMember(hid) && isEncryptedDoc();
       }
 
       // Clave del hogar envuelta con la contraseña maestra de cada miembro: solo la suya.
@@ -95,13 +131,17 @@ service cloud.firestore {
       }
     }
 
-    // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar.
+    // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar, con
+    // caducidad de 48 horas como mucho. Las borra un miembro, o quien se une en la misma escritura.
     match /invites/{code} {
       allow get: if signedIn();
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['householdId', 'createdBy', 'expiresAt', 'salt', 'iv', 'wrappedKey', 'iterations'])
         && request.resource.data.createdBy == request.auth.uid
-        && isMember(request.resource.data.householdId);
-      allow delete: if isMember(resource.data.householdId);
+        && isMember(request.resource.data.householdId)
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time + duration.value(49, 'h');
+      allow delete: if isMember(resource.data.householdId) || isMemberAfter(resource.data.householdId);
     }
   }
 }
