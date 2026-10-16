@@ -59,8 +59,14 @@ service cloud.firestore {
       return signedIn()
         && request.auth.uid in before.members
         && (
-          // Los datos cifrados (configuración) y la versión mínima de la app.
-          changed.hasOnly(['enc', 'minAppVersion'])
+          // Los datos cifrados (configuración) y la versión mínima de la app. Al cambiar la
+          // configuración hay que decir de qué revisión se parte (3.1.1): si en el servidor ya hay
+          // otra (la pareja la cambió antes), se rechaza y la app la vuelve a aplicar encima.
+          (changed.hasOnly(['enc', 'minAppVersion', 'rev', 'prevRev'])
+            && (!changed.hasAny(['enc', 'rev', 'prevRev'])
+              || (after.rev is string
+                && after.rev != before.get('rev', '')
+                && after.prevRev == before.get('rev', ''))))
           // Su propio email.
           || (changed.hasOnly(['memberEmails'])
             && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid]))

@@ -458,19 +458,19 @@ export default function HomePage() {
   }, [markCurrentMonthSeen])
 
   // "Marcar todas": todos los gastos del mes que se cierra quedan pagados.
+  // Solo se envía lo que se ha cambiado en la ventana (3.1.1): si la pareja marcó o desmarcó algo
+  // mientras estaba abierta, no se le deshace.
   const handleReconcileMarkAll = () => {
-    setTransactionsPaid(
-      reconcileExpenses.map((e) => e.id),
-      true,
-    )
+    const toPaid = reconcileExpenses.filter((e) => !e.paid).map((e) => e.id)
+    if (toPaid.length) setTransactionsPaid(toPaid, true)
     finishReconcile()
   }
 
-  // "Guardar": los IDs marcados quedan pagados; el resto del mes, sin pagar.
+  // "Guardar": los marcados quedan pagados y los desmarcados, sin pagar (respecto a cómo se abrió).
   const handleReconcileSave = (paidIds: string[]) => {
     const paidSet = new Set(paidIds)
-    const toPaid = reconcileExpenses.filter((e) => paidSet.has(e.id)).map((e) => e.id)
-    const toUnpaid = reconcileExpenses.filter((e) => !paidSet.has(e.id)).map((e) => e.id)
+    const toPaid = reconcileExpenses.filter((e) => paidSet.has(e.id) && !e.paid).map((e) => e.id)
+    const toUnpaid = reconcileExpenses.filter((e) => !paidSet.has(e.id) && e.paid).map((e) => e.id)
     if (toPaid.length) setTransactionsPaid(toPaid, true)
     if (toUnpaid.length) setTransactionsPaid(toUnpaid, false)
     finishReconcile()
