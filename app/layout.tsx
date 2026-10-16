@@ -5,6 +5,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Footer } from "@/components/footer"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
+import { APP_VERSION } from "@/lib/app-version"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
@@ -69,6 +70,8 @@ export default function RootLayout({
         {/* Pone el tema antes de pintar (la preferencia guardada o la del sistema): sin esto, quien usa
             el tema oscuro veía un destello claro al abrir. Mismo criterio que `ThemeProvider`. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* Versión publicada: la app abierta la compara para avisar de una nueva (ver `UpdateNotice`). */}
+        <meta name="app-version" content={APP_VERSION} />
       </head>
       {/* Los iconos (favicon.ico, icon1.png, icon2.png y apple-icon.png) están en app/: Next.js
           genera sus enlaces con la ruta base /2budget. Puestos aquí a mano daban 404 en producción. */}

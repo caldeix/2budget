@@ -15,7 +15,8 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import type { Firestore } from "firebase/firestore"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
 import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
-import { subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
+import { ensureMinAppVersion, subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
+import { APP_VERSION, DATA_MIN_APP_VERSION, isOlderVersion } from "@/lib/app-version" // Compatibilidad de versiones.
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
@@ -154,6 +155,20 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
       },
     )
   }, [db, householdId, dek])
+
+  // Versión mínima del hogar (3.1.0): si está por debajo de la que necesitan los datos actuales, la
+  // sube (una vez por hogar). Una app que se ha quedado atrás no la toca: se bloquea en la página.
+  const minVersionCheckedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!db || !householdId || !householdInfo || minVersionCheckedRef.current === householdId) return
+    minVersionCheckedRef.current = householdId
+    const current = householdInfo.minAppVersion
+    if (isOlderVersion(APP_VERSION, DATA_MIN_APP_VERSION)) return
+    if (current && !isOlderVersion(current, DATA_MIN_APP_VERSION)) return
+    ensureMinAppVersion(db, householdId, DATA_MIN_APP_VERSION).catch((error) =>
+      console.error("Error updating the minimum app version:", error),
+    )
+  }, [db, householdId, householdInfo])
 
   /**
    * @function commit

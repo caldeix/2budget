@@ -35,6 +35,8 @@ import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
+import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
+import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
@@ -561,6 +563,11 @@ export default function HomePage() {
     return <VaultUnlock session={session} vault={vault} onRecoveryCode={setRecoveryCodeToShow} />
   }
 
+  // Los datos del hogar necesitan una versión más nueva que esta (ver `lib/app-version.ts`).
+  if (householdInfo?.minAppVersion && isOlderVersion(APP_VERSION, householdInfo.minAppVersion)) {
+    return <UpdateRequired minVersion={householdInfo.minAppVersion} />
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -985,6 +992,7 @@ export default function HomePage() {
       />
 
       {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} onOpenChange={handleTourOpenChange} />}
+      <UpdateNotice />
     </div>
   )
 }

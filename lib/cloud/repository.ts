@@ -96,6 +96,8 @@ export interface HouseholdInfo {
   members: string[]
   roles: Record<string, MemberRole>
   memberEmails: Record<string, string>
+  /** Versión más antigua de la app que entiende los datos del hogar (ver `lib/app-version.ts`). */
+  minAppVersion?: string
 }
 
 /** Duración de un código de invitación. */
@@ -444,8 +446,23 @@ async function readHouseholdDoc(
   return {
     config: { ...defaultConfig, ...(payload.config ?? {}) },
     version: typeof payload.version === "number" ? payload.version : DATA_VERSION,
-    info: { members: raw.members ?? [], roles: raw.roles ?? {}, memberEmails: raw.memberEmails ?? {} },
+    info: {
+      members: raw.members ?? [],
+      roles: raw.roles ?? {},
+      memberEmails: raw.memberEmails ?? {},
+      ...(typeof raw.minAppVersion === "string" && { minAppVersion: raw.minAppVersion }),
+    },
   }
+}
+
+/**
+ * @function ensureMinAppVersion
+ * @description Sube la versión mínima del hogar a la que necesitan sus datos, si estaba por debajo
+ *              (ver `lib/app-version.ts`). Un campo en claro del hogar: así una app más antigua sabe
+ *              que no puede seguir sin descifrar nada.
+ */
+export async function ensureMinAppVersion(db: Firestore, hid: string, required: string): Promise<void> {
+  await updateDoc(householdRef(db, hid), { minAppVersion: required })
 }
 
 /**
