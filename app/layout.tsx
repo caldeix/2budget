@@ -38,7 +38,8 @@ export default function RootLayout({
       {/* Los iconos (favicon.ico, icon1.png, icon2.png y apple-icon.png) están en app/: Next.js
           genera sus enlaces con la ruta base /2budget. Puestos aquí a mano daban 404 en producción. */}
       <body className={`${inter.variable} ${poppins.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        {/* El tema lo decide `ThemeProvider` (preferencia guardada o la del sistema). */}
+        <ThemeProvider>
           {children}
           <Footer />
           <ServiceWorkerRegister />
