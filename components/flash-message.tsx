@@ -33,7 +33,7 @@ export function FlashMessage({ flash, onClose }: { flash: Flash | null; onClose:
     error: "border-red-200 bg-red-50 text-red-700",
   }[flash.tone]
   return (
-    <div className="fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 pointer-events-none">
+    <div data-keep-modal className="fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 pointer-events-none">
       <div
         role={isError ? "alert" : "status"}
         className={`pointer-events-auto flex max-w-md items-start gap-3 rounded-2xl border p-4 shadow-lg ${toneClass}`}

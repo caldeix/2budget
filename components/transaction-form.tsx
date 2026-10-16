@@ -525,6 +525,8 @@ export function TransactionForm({
                 max={100} // Valor máximo del deslizador.
                 step={1} // Incremento/decremento del deslizador.
                 className="flex-1"
+                thumbLabel="Reparto"
+                thumbValueText={`${person1Name} ${formData.person1Percentage} %, ${person2Name} ${formData.person2Percentage} %`}
               />
               <span className="text-sm font-medium text-foreground w-20 text-left">
                 {person2Name}: {formData.person2Percentage}%

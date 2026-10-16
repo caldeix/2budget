@@ -7,6 +7,7 @@ import { Footer } from "@/components/footer"
 import { ServiceWorkerRegister } from "@/components/service-worker-register"
 import { ErrorRecorder } from "@/components/error-screen"
 import { APP_VERSION } from "@/lib/app-version"
+import { THEME_COLORS } from "@/lib/theme-colors"
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
 
@@ -26,8 +27,14 @@ export const metadata: Metadata = {
 }
 
 // Color de la barra del sistema con la app instalada (el de la cabecera en el tema oscuro).
+// Color de la barra del sistema (iOS/Android) igual que la cabecera de la app en cada tema. El de
+// la preferencia del sistema vale para el primer pintado; si se ha elegido otro tema en la app, el
+// script del tema y `ThemeProvider` lo corrigen (ver `THEME_COLORS`).
 export const viewport: Viewport = {
-  themeColor: "#17182c",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+  ],
 }
 
 /**
@@ -54,8 +61,7 @@ const CONTENT_SECURITY_POLICY = [
 ].join("; ")
 
 /** Script de tema que se ejecuta antes de pintar la página (ver el `<head>`). */
-const THEME_SCRIPT =
-  "(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d)}catch(e){}})()"
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute('content',d?'${THEME_COLORS.dark}':'${THEME_COLORS.light}')})}catch(e){}})()`
 
 export default function RootLayout({
   children,

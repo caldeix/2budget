@@ -5,6 +5,9 @@
 @layer base {
   :root {
     --primary: 43 64% 52%;
+    /* Dorado como TEXTO (3.1.1): sobre fondo claro el dorado de los botones se lee a 2,2:1; este
+       más oscuro llega a 4,9:1. Los fondos dorados siguen con el dorado de siempre. */
+    --primary-text: 43 64% 32%;
     --secondary: 271 76% 53%;
     --accent: 43 64% 52%;
     --background: 210 20% 97%;
@@ -15,7 +18,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 218 28% 11%;
 
-    --primary-foreground: 0 0% 100%;
+    /* Texto oscuro sobre dorado: el blanco se leía a 2,2:1; el oscuro, a 7,7:1. */
+    --primary-foreground: 218 28% 11%;
     --secondary-foreground: 0 0% 100%;
     --destructive: 0 100% 60%;
     --destructive-foreground: 0 0% 100%;
@@ -41,8 +45,8 @@
 
     --amber-50: 43 80% 95%;
     --amber-100: 43 80% 90%;
-    --amber-600: 43 64% 48%;
-    --amber-700: 43 64% 38%;
+    --amber-600: 43 64% 32%;
+    --amber-700: 43 64% 26%;
 
     --card-balance-bg: 271 40% 94%;
     --card-income-bg: 142 70% 97%;
@@ -52,6 +56,8 @@
   /* Dark theme — Gold × Violet premium palette */
   .dark {
     --primary: 43 64% 52%;
+    /* Sobre fondo oscuro el dorado se lee bien como texto (7,7:1). */
+    --primary-text: 43 64% 52%;
     --secondary: 271 76% 53%;
     --accent: 43 64% 52%;
     --background: 230 25% 5%;
@@ -62,12 +68,12 @@
     --popover: 233 33% 8%;
     --popover-foreground: 0 0% 100%;
 
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 218 28% 11%;
     --secondary-foreground: 0 0% 100%;
     --destructive: 0 100% 60%;
     --destructive-foreground: 0 0% 100%;
     --muted: 233 28% 11%;
-    --accent-foreground: 0 0% 100%;
+    --accent-foreground: 218 28% 11%;
     --border: 235 20% 20%;
     --input: 235 24% 17%;
     --ring: 43 64% 52%;

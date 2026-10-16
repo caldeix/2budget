@@ -2,15 +2,18 @@
  * @file components/ui/modal.tsx
  * @description Este archivo define el componente `Modal`, una ventana emergente reutilizable
  *              que se superpone al contenido principal de la aplicación.
- *              Es un Client Component (`"use client"`) porque gestiona su propia visibilidad
- *              y efectos secundarios (como el bloqueo del scroll del cuerpo).
+ *              Desde la 3.1.1 se monta sobre el Dialog de Radix: es un diálogo accesible
+ *              (`role="dialog"`, `aria-modal`, título enlazado), lleva el foco dentro, no deja que
+ *              salga con el tabulador y lo devuelve al cerrar. Con dos modales abiertos, Escape
+ *              cierra solo el de encima. También bloquea el scroll del fondo.
  */
 
 "use client"
 
 import type React from "react"
 
-import { useEffect } from "react"
+import { createContext, useContext, useRef } from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react" // Icono de cierre.
 import { cn } from "@/lib/utils" // Utilidad para combinar clases de Tailwind CSS.
 
@@ -38,100 +41,104 @@ interface ModalProps {
 }
 
 /**
+ * Objeto que mapea los tamaños (`sm`, `md`, `lg`, `xl`) a las clases de Tailwind CSS
+ * que controlan el ancho máximo del modal.
+ */
+const sizeClasses = {
+  sm: "max-w-md",
+  md: "max-w-lg",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+}
+
+/**
+ * Elementos fijos de la app que se pueden pulsar con un modal abierto sin cerrarlo (p. ej. el aviso
+ * breve de abajo, que sale encima de Configuración al importar).
+ */
+const KEEP_MODAL_SELECTOR = "[data-keep-modal]"
+
+/**
+ * Con el tour de bienvenida activo, el tour abre algunos modales para enseñarlos por dentro. Esos
+ * modales no deben bloquear el tour: no atrapan el foco, no ocultan el resto a los lectores de
+ * pantalla ni se cierran al pulsar fuera (el tour decide cuándo se cierran).
+ */
+export const NonModalContext = createContext(false)
+
+/**
  * @function Modal
  * @description Componente React que renderiza un modal (ventana emergente).
- *              Controla el scroll del cuerpo y permite cerrar el modal con la tecla 'Escape'.
  * @param {ModalProps} props - Propiedades del componente.
- * @returns {JSX.Element | null} El componente modal si `isOpen` es `true`, de lo contrario `null`.
+ * @returns {JSX.Element} El componente modal.
  */
 export function Modal({ isOpen, onClose, title, children, size = "md", dismissible = true, centerTitle = false }: ModalProps) {
-  /**
-   * `useEffect` para controlar el scroll del cuerpo de la página.
-   * Cuando el modal está abierto (`isOpen` es `true`), el scroll del `body` se oculta (`overflow = "hidden"`).
-   * Cuando el modal se cierra, el scroll se restaura (`overflow = "unset"`).
-   * La función de retorno (`return () => ...`) es una función de limpieza que se ejecuta
-   * cuando el componente se desmonta o antes de que el efecto se vuelva a ejecutar.
-   */
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden" // Evita el scroll del fondo cuando el modal está abierto.
-    } else {
-      document.body.style.overflow = "unset" // Restaura el scroll cuando el modal está cerrado.
-    }
+  const contentRef = useRef<HTMLDivElement>(null)
+  const nonModal = useContext(NonModalContext)
 
-    // Función de limpieza: asegura que el scroll se restaure si el componente se desmonta.
-    return () => {
-      document.body.style.overflow = "unset"
-    }
-  }, [isOpen]) // Dependencia: el efecto se ejecuta cada vez que `isOpen` cambia.
-
-  /**
-   * `useEffect` para manejar el cierre del modal con la tecla 'Escape'.
-   * Añade un event listener al documento cuando el modal está abierto.
-   * Elimina el event listener cuando el modal se cierra o el componente se desmonta.
-   */
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && dismissible) {
-        onClose() // Cierra con 'Escape' salvo que el modal sea forzado (dismissible=false).
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener("keydown", handleEscape) // Añade el listener.
-    }
-
-    // Función de limpieza: elimina el event listener para evitar fugas de memoria.
-    return () => {
-      document.removeEventListener("keydown", handleEscape)
-    }
-  }, [isOpen, onClose, dismissible]) // Se re-ejecuta si cambian isOpen, onClose o dismissible.
-
-  // Si el modal no está abierto, no renderiza nada.
-  if (!isOpen) return null
-
-  /**
-   * Objeto que mapea los tamaños (`sm`, `md`, `lg`, `xl`) a las clases de Tailwind CSS
-   * que controlan el ancho máximo del modal.
-   */
-  const sizeClasses = {
-    sm: "max-w-md",
-    md: "max-w-lg",
-    lg: "max-w-2xl",
-    xl: "max-w-4xl",
+  // Al abrir, el foco va al diálogo y no a su primer campo: en el móvil, enfocar un campo saca el
+  // teclado sin que se haya pedido. Con el tour, el foco se queda en el botón del tour.
+  const handleOpenAutoFocus = (event: Event) => {
+    event.preventDefault()
+    if (!nonModal) contentRef.current?.focus()
   }
 
-  return (
-    // Contenedor principal del modal: fija la posición y centra el contenido.
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Fondo oscuro semitransparente que cierra el modal al hacer clic. */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={dismissible ? onClose : undefined} />
-      {/* Contenedor del contenido del modal. */}
-      <div
-        className={cn(
-          "relative bg-card rounded-2xl shadow-lg w-full mx-4 max-h-[90vh] overflow-hidden",
-          sizeClasses[size], // Aplica la clase de tamaño dinámicamente.
+  // Pulsar fuera cierra el modal, salvo que sea forzado, que lo controle el tour o que se pulse un
+  // aviso de la app.
+  const handleInteractOutside = (event: Event) => {
+    const target = event.target as Element | null
+    if (!dismissible || nonModal || target?.closest?.(KEEP_MODAL_SELECTOR)) event.preventDefault()
+  }
+
+  // Contenido del diálogo: igual en los dos modos.
+  const content = (
+    <DialogPrimitive.Content
+      ref={contentRef}
+      aria-modal={nonModal ? undefined : "true"}
+      aria-describedby={undefined}
+      onOpenAutoFocus={handleOpenAutoFocus}
+      onEscapeKeyDown={(event) => (!dismissible || nonModal) && event.preventDefault()}
+      onInteractOutside={handleInteractOutside}
+      className={cn(
+        "relative bg-card rounded-2xl shadow-lg w-full mx-4 max-h-[90dvh] overflow-hidden focus:outline-none",
+        sizeClasses[size], // Aplica la clase de tamaño dinámicamente.
+      )}
+    >
+      {/* Cabecera del modal: título y botón de cierre. */}
+      <div className="flex items-center justify-between p-6 border-b">
+        {/* Hueco del ancho del botón de cerrar: así el título queda centrado de verdad. */}
+        {centerTitle && dismissible && <span aria-hidden className="w-9 shrink-0" />}
+        <DialogPrimitive.Title
+          className={cn("text-xl font-semibold text-foreground", centerTitle && "flex-1 text-center")}
+        >
+          {title}
+        </DialogPrimitive.Title>
+        {dismissible && (
+          <DialogPrimitive.Close
+            className="p-2 hover:bg-muted rounded-full transition-colors"
+            aria-label="Cerrar" // Etiqueta para accesibilidad.
+          >
+            <X className="w-5 h-5" /> {/* Icono de cierre. */}
+          </DialogPrimitive.Close>
         )}
-      >
-        {/* Cabecera del modal: título y botón de cierre. */}
-        <div className="flex items-center justify-between p-6 border-b">
-          {/* Hueco del ancho del botón de cerrar: así el título queda centrado de verdad. */}
-          {centerTitle && dismissible && <span aria-hidden className="w-9 shrink-0" />}
-          <h2 className={cn("text-xl font-semibold text-foreground", centerTitle && "flex-1 text-center")}>{title}</h2>
-          {dismissible && (
-            <button
-              onClick={onClose} // Cierra el modal al hacer clic.
-              className="p-2 hover:bg-muted rounded-full transition-colors"
-              aria-label="Cerrar modal" // Etiqueta para accesibilidad.
-            >
-              <X className="w-5 h-5" /> {/* Icono de cierre. */}
-            </button>
-          )}
-        </div>
-        {/* Cuerpo del modal: donde se renderiza el `children`.
-            Permite scroll interno si el contenido es demasiado largo. */}
-        <div className="overflow-y-auto max-h-[calc(90vh-80px)]">{children}</div>
       </div>
-    </div>
+      {/* Cuerpo del modal: donde se renderiza el `children`.
+          Permite scroll interno si el contenido es demasiado largo. */}
+      <div className="overflow-y-auto max-h-[calc(90dvh-80px)]">{children}</div>
+    </DialogPrimitive.Content>
+  )
+
+  return (
+    <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => !open && onClose()} modal={!nonModal}>
+      <DialogPrimitive.Portal>
+        {nonModal ? (
+          // Radix no pinta su fondo en modo no modal: el mismo fondo, sin bloquear nada.
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">{content}</div>
+        ) : (
+          /* Fondo oscuro semitransparente; centra el contenido y bloquea el scroll de detrás. */
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            {content}
+          </DialogPrimitive.Overlay>
+        )}
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }

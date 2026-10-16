@@ -8,7 +8,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { version } from "@/package.json"
+import { APP_VERSION } from "@/lib/app-version"
 
 // Misma base que la app (ver `next.config.mjs`).
 const BASE = process.env.NODE_ENV === "production" ? "/2budget/" : "/"
@@ -19,7 +19,7 @@ export function ServiceWorkerRegister() {
     // La versión en la URL hace que cada versión publicada instale un service worker nuevo con
     // su propia caché (y borre la anterior).
     navigator.serviceWorker
-      .register(`${BASE}sw.js?v=${version}`, { scope: BASE })
+      .register(`${BASE}sw.js?v=${APP_VERSION}`, { scope: BASE })
       .catch((error) => console.error("Error registering service worker:", error))
   }, [])
 

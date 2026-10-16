@@ -29,6 +29,7 @@ import {
   increment,
   getDocs,
   onSnapshot,
+  runTransaction,
   setDoc,
   Timestamp,
   updateDoc,
@@ -41,7 +42,7 @@ import {
 } from "firebase/firestore"
 import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
 import { DATA_VERSION, defaultConfig, normalizeReport, normalizeTransaction } from "@/lib/storage"
-import { diffAppData, isEmptyDiff, type AppDataDiff } from "@/lib/cloud/diff"
+import { diffAppData, isEmptyDiff, mergeConfigChanges, type AppDataDiff } from "@/lib/cloud/diff"
 import { dedupeAppData } from "@/lib/dedupe"
 import {
   archivedMonthsOf,
@@ -459,12 +460,14 @@ async function readHouseholdDoc(
   dek: CryptoKey,
   hid: string,
   snap: DocumentSnapshot,
-): Promise<{ config: AppConfig; version: number; info: HouseholdInfo }> {
+): Promise<{ config: AppConfig; version: number; rev: string; info: HouseholdInfo }> {
   const raw = snap.data() ?? {}
   const payload = await decryptJson<{ config: AppConfig; version: number }>(dek, raw.enc, context.household(hid))
   return {
     config: { ...defaultConfig, ...(payload.config ?? {}) },
     version: typeof payload.version === "number" ? payload.version : DATA_VERSION,
+    // Revisión de la configuración (3.1.1, ver `writeHouseholdConfig`); "" en hogares anteriores.
+    rev: typeof raw.rev === "string" ? raw.rev : "",
     info: {
       members: raw.members ?? [],
       roles: raw.roles ?? {},
@@ -500,7 +503,7 @@ export function subscribeHousehold(
   onLost: () => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
-  let household: { config: AppConfig; version: number; info: HouseholdInfo } | null = null
+  let household: { config: AppConfig; version: number; rev: string; info: HouseholdInfo } | null = null
   // Tal cual están en la nube: transacciones sueltas e informes (los cerrados, con su archivo).
   let live: Transaction[] | null = null
   let storedReports: StoredReport[] | null = null
@@ -560,6 +563,7 @@ export function subscribeHousehold(
         }
         enqueue(async () => {
           household = await readHouseholdDoc(dek, hid, snap)
+          householdRevByHid.set(hid, household.rev)
           emit()
         })
       },
@@ -599,18 +603,78 @@ export function subscribeHousehold(
 }
 
 /**
- * @function diffToOps
- * @description Convierte una diferencia en operaciones de escritura cifradas sobre el hogar.
+ * Revisión de la configuración de cada hogar que tiene este dispositivo (la del último snapshot, o
+ * la de su última escritura, que aún puede no haber llegado en un snapshot).
  */
-async function diffToOps(db: Firestore, hid: string, dek: CryptoKey, diff: AppDataDiff, next: AppData): Promise<BatchOp[]> {
+const householdRevByHid = new Map<string, string>()
+
+/** Revisión nueva de la configuración: cualquier valor distinto del anterior. */
+const newRev = () => crypto.randomUUID()
+
+/** Código de un error de Firestore (`permission-denied`, `not-found`...). */
+const errorCode = (error: unknown) => (error as { code?: string } | null)?.code
+
+/**
+ * @function writeHouseholdConfig
+ * @description Escribe la configuración del hogar (3.1.1). La configuración es un único documento
+ *              cifrado y antes ganaba el último en escribir: si la pareja cambiaba otra cosa a la
+ *              vez (o sin conexión), se perdía. Ahora cada escritura dice de qué revisión parte
+ *              (`prevRev`) y las reglas la rechazan si en el servidor ya hay otra. Entonces se
+ *              vuelve a leer y se aplican, en una transacción, solo los campos que cambió este
+ *              dispositivo (ver `mergeConfigChanges`).
+ */
+async function writeHouseholdConfig(
+  db: Firestore,
+  hid: string,
+  dek: CryptoKey,
+  prev: AppData,
+  next: AppData,
+): Promise<{ acknowledged: Promise<void> }> {
+  const version = next.version ?? DATA_VERSION
+  const enc = await encryptJson(dek, { config: next.config, version }, context.household(hid))
+  const rev = newRev()
+  const prevRev = householdRevByHid.get(hid) ?? ""
+  householdRevByHid.set(hid, rev)
+  const batch = writeBatch(db)
+  batch.update(householdRef(db, hid), { enc, rev, prevRev })
+  const acknowledged = batch.commit().catch(async (error) => {
+    if (errorCode(error) !== "permission-denied") throw error
+    // Otra revisión en el servidor: se vuelve a aplicar este cambio sobre ella.
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(householdRef(db, hid))
+      if (!snap.exists()) throw error
+      const server = await readHouseholdDoc(dek, hid, snap)
+      const config = mergeConfigChanges(server.config, prev.config, next.config)
+      const mergedEnc = await encryptJson(dek, { config, version }, context.household(hid))
+      const mergedRev = newRev()
+      householdRevByHid.set(hid, mergedRev)
+      tx.update(householdRef(db, hid), { enc: mergedEnc, rev: mergedRev, prevRev: server.rev })
+    })
+  })
+  return { acknowledged }
+}
+
+/**
+ * @function diffToOps
+ * @description Convierte una diferencia en operaciones de escritura cifradas sobre el hogar (la
+ *              configuración va aparte, ver `writeHouseholdConfig`). Las ediciones de transacciones
+ *              que ya existían van en `updates`, cada una en su propio lote (ver `writeChanges`).
+ */
+async function diffToOps(
+  db: Firestore,
+  hid: string,
+  dek: CryptoKey,
+  diff: AppDataDiff,
+): Promise<{ ops: BatchOp[]; updates: BatchOp[] }> {
   const ops: BatchOp[] = []
-  if (diff.householdChanged) {
-    const enc = await encryptJson(dek, { config: next.config, version: next.version ?? DATA_VERSION }, context.household(hid))
-    ops.push((batch) => batch.update(householdRef(db, hid), { enc }))
-  }
+  const updates: BatchOp[] = []
   for (const t of diff.transactionsToSet) {
     const enc = await encryptJson(dek, t, context.transaction(t.id))
     ops.push((batch) => batch.set(doc(transactionsCol(db, hid), t.id), { enc }))
+  }
+  for (const t of diff.transactionsToUpdate) {
+    const enc = await encryptJson(dek, t, context.transaction(t.id))
+    updates.push((batch) => batch.update(doc(transactionsCol(db, hid), t.id), { enc }))
   }
   for (const id of diff.transactionIdsToDelete) ops.push((batch) => batch.delete(doc(transactionsCol(db, hid), id)))
   for (const r of diff.reportsToSet) {
@@ -618,7 +682,7 @@ async function diffToOps(db: Firestore, hid: string, dek: CryptoKey, diff: AppDa
     ops.push((batch) => batch.set(doc(reportsCol(db, hid), r.id), { enc }))
   }
   for (const id of diff.reportIdsToDelete) ops.push((batch) => batch.delete(doc(reportsCol(db, hid), id)))
-  return ops
+  return { ops, updates }
 }
 
 /**
@@ -643,12 +707,21 @@ export async function writeChanges(
   const diff = diffAppData(storedPrev, storedNext)
   if (isEmptyDiff(diff)) return { acknowledged: Promise.resolve(), changed: false }
 
-  const ops = await diffToOps(db, hid, dek, diff, storedNext)
+  const { ops, updates } = await diffToOps(db, hid, dek, diff)
   const commits: Promise<void>[] = []
+  if (diff.householdChanged) commits.push((await writeHouseholdConfig(db, hid, dek, prev, next)).acknowledged)
   for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
     const batch = writeBatch(db)
     ops.slice(i, i + BATCH_LIMIT).forEach((op) => op(batch))
     commits.push(batch.commit())
+  }
+  // Cada edición en su lote: si la pareja borró esa transacción, solo falla esa (y no reaparece).
+  for (const op of updates) {
+    const batch = writeBatch(db)
+    op(batch)
+    commits.push(batch.commit().catch((error) => {
+      if (errorCode(error) !== "not-found") throw error
+    }))
   }
   return { acknowledged: Promise.all(commits).then(() => undefined), changed: true }
 }
