@@ -6,6 +6,7 @@ import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financi
 import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
+import { useCopyPreviousMonth } from "@/hooks/use-copy-previous-month"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, getMonthName } from "@/lib/utils"
 import {
   downloadAppData,
@@ -19,7 +20,7 @@ import {
   setLastSeenMonth,
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
-import { isClosingAdjustment, isContribution, isPayable } from "@/lib/aggregations"
+import { isClosingAdjustment, isPayable } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
 import { laterSharedClosings } from "@/lib/shared-account"
 import { isZeroMoney, subtractMoney } from "@/lib/money"
@@ -36,14 +37,14 @@ import { MonthlyReportModal as MonthlyReportModalComponent } from "@/components/
 import { ReportDetailModal } from "@/components/report-detail-modal"
 import { ReportButton, ReportsListModal, sortReportsDesc } from "@/components/reports-list-modal"
 import { SettingsModal } from "@/components/settings-modal"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { FloatingActions } from "@/components/floating-actions"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
 import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
-import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
+import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
@@ -59,17 +60,11 @@ import { createTourData } from "@/lib/tour-data"
 
 import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
-import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { FileText, Calendar, Heart, AlertTriangle, List } from "lucide-react"
 
-const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
 // En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
 const RECENT_REPORTS = 3
 
-// Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
-const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
-// Las aportaciones a la cuenta compartida se copian como los fijos y los ingresos.
-const isCopyableContribution = (t: Transaction) => isContribution(t)
 
 export default function HomePage() {
   // Sesión en la nube: con hogar (y desbloqueado con la contraseña maestra), los datos se leen
@@ -119,8 +114,6 @@ export default function HomePage() {
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
-  // Móvil: los botones flotantes secundarios se despliegan con el botón de menú (en PC se ven siempre).
-  const [isFabMenuOpen, setIsFabMenuOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -151,8 +144,6 @@ export default function HomePage() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
 
-  const [isConfirmCopyModalOpen, setIsConfirmCopyModalOpen] = useState(false)
-  const [transactionsToCopy, setTransactionsToCopy] = useState<Transaction[]>([])
 
   const [isPaidReconcileOpen, setIsPaidReconcileOpen] = useState(false)
   const [reconcileExpenses, setReconcileExpenses] = useState<Transaction[]>([])
@@ -176,19 +167,16 @@ export default function HomePage() {
     [getTransactionsForMonth, selectedMonth, selectedYear],
   )
 
-  const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(isFixedExpense)
-  const hasIncomesInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableIncome)
-  const hasContributionsInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableContribution)
-  // Las aportaciones solo faltan si el mes anterior las tenía (sin cuenta compartida no hay nada que copiar).
-  const previousMonthHasContributions = useMemo(() => {
-    const { month, year } = getPreviousMonthYear(selectedMonth, selectedYear)
-    return getTransactionsForMonth(month, year).some(isCopyableContribution)
-  }, [selectedMonth, selectedYear, getTransactionsForMonth])
-  // Cada tipo se copia solo si el mes seleccionado aún no lo tiene, para no duplicar.
-  const hasNothingToCopy =
-    hasFixedExpensesInCurrentMonth &&
-    hasIncomesInCurrentMonth &&
-    (hasContributionsInCurrentMonth || !previousMonthHasContributions)
+  // Copiar los fijos, ingresos y aportaciones del mes anterior (ver el hook).
+  const copyPrevious = useCopyPreviousMonth({
+    selectedMonth,
+    selectedYear,
+    monthTransactions: allTransactionsForSelectedMonth,
+    getTransactionsForMonth,
+    addTransaction,
+    onFlash: setFlash,
+  })
+  const { hasNothingToCopy, previousMonthHasContributions } = copyPrevious
 
   const actualCurrentMonth = getCurrentMonth()
   const actualCurrentYear = getCurrentYear()
@@ -304,72 +292,6 @@ export default function HomePage() {
     setIsTransactionFormOpen(false)
     setEditingTransaction(null)
   }
-
-  const prepareCopyFixedExpenses = useCallback(() => {
-    // El origen es el mes ANTERIOR al mes seleccionado (no al mes real de hoy).
-    const { month: sourceMonth, year: sourceYear } = getPreviousMonthYear(selectedMonth, selectedYear)
-    const sourceMonthName = getMonthName(sourceMonth)
-    const sourceTransactions = getTransactionsForMonth(sourceMonth, sourceYear)
-    const toCopy = sourceTransactions.filter(
-      (t) =>
-        (!hasFixedExpensesInCurrentMonth && isFixedExpense(t)) ||
-        (!hasIncomesInCurrentMonth && isCopyableIncome(t)) ||
-        (!hasContributionsInCurrentMonth && isCopyableContribution(t))
-    )
-
-    if (toCopy.length === 0) {
-      setFlash({
-        text: `No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`,
-        tone: "error",
-      })
-      return
-    }
-
-    setTransactionsToCopy(toCopy)
-    setIsConfirmCopyModalOpen(true)
-  }, [
-    selectedMonth,
-    selectedYear,
-    getTransactionsForMonth,
-    hasFixedExpensesInCurrentMonth,
-    hasIncomesInCurrentMonth,
-    hasContributionsInCurrentMonth,
-  ])
-
-  const confirmCopyTransactions = useCallback((amounts: CopyAmounts) => {
-    // Las copias se fechan el día 1 del mes SELECCIONADO (string directo, sin conversión a UTC).
-    const formattedDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
-
-    transactionsToCopy.forEach((transaction) => {
-      const newTransaction: TransactionFormData = {
-        type: transaction.type,
-        category: transaction.category,
-        // Se copia con el mismo nombre, limpiando el sufijo " (copiado)" que dejaban versiones anteriores.
-        name: transaction.name.replace(/( \(copiado\))+$/, ""),
-        // Importe revisado en el modal ("Revisar importes"), o el del mes anterior.
-        amount: amounts[transaction.id] ?? transaction.amount,
-        owner: transaction.owner,
-        person1Percentage: transaction.person1Percentage ?? 50,
-        person2Percentage: transaction.person2Percentage ?? 50,
-        date: formattedDate,
-        nonComputable: transaction.nonComputable,
-        // La copia conserva la categoría de la original (antes quedaba en "Sin categoría").
-        categoryId: transaction.categoryId,
-      }
-      addTransaction(newTransaction)
-    })
-
-    const expenseCount = transactionsToCopy.filter(isFixedExpense).length
-    const incomeCount = transactionsToCopy.filter(isCopyableIncome).length
-    const contributionCount = transactionsToCopy.filter(isCopyableContribution).length
-    setIsConfirmCopyModalOpen(false)
-    setTransactionsToCopy([])
-    const copied =
-      contributionCount > 0
-        ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
-        : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
-    setFlash({ text: `${copied} copiados a ${getMonthName(selectedMonth)} ${selectedYear}`, tone: "success" })
-  }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
     setMonthToCloseReport(actualCurrentMonth)
@@ -539,7 +461,7 @@ export default function HomePage() {
     isEvolutionOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
-    isConfirmCopyModalOpen
+    copyPrevious.isConfirmOpen
   const canAutoStartTour =
     !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
 
@@ -547,7 +469,6 @@ export default function HomePage() {
     // Siempre sobre el mes actual, con los nombres y el modo de la configuración real.
     setSelectedMonth(getCurrentMonth())
     setSelectedYear(getCurrentYear())
-    setIsFabMenuOpen(false)
     window.scrollTo({ top: 0 })
     setTourData(createTourData(new Date(), data.config))
     setTourSteps(
@@ -822,104 +743,35 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Botones flotantes. En móvil solo se ven "+" y el menú, que despliega el resto (así no
-          tapan el contenido); en PC se ven todos, con "+" arriba. */}
-      <div className="mb-8 fixed bottom-6 left-6 flex flex-col gap-3 z-50">
-        <Button
-          onClick={() => setIsTransactionFormOpen(true)}
-          variant="secondary"
-          size="icon"
-          className="shadow-lg order-2 sm:order-1"
-          data-tour="fab-add"
-        >
-          <Plus className="h-5 w-5" />
-          <span className="sr-only">Nueva Transacción</span>
-        </Button>
-
-        <div className={cn("flex-col gap-3 order-1 sm:order-2 sm:flex", isFabMenuOpen ? "flex" : "hidden")}>
-          <Button
-            onClick={() => {
-              setIsFabMenuOpen(false)
-              prepareCopyFixedExpenses()
-            }}
-            variant={hasNothingToCopy || isCopyBlockedByFuture ? "outline" : "destructive"}
-            size="icon"
-            className={`shadow-lg ${!hasNothingToCopy && !isCopyBlockedByFuture ? "hover:bg-red-600" : "opacity-50 cursor-not-allowed"}`}
-            disabled={hasNothingToCopy || isCopyBlockedByFuture}
-            data-tour="fab-copy"
-            title={
-              hasNothingToCopy
-                ? previousMonthHasContributions
-                  ? "Ya hay gastos fijos, ingresos y aportaciones este mes"
-                  : "Ya hay gastos fijos e ingresos este mes"
-                : isCopyBlockedByFuture
-                  ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
-                  : previousMonthHasContributions
-                    ? "Copiar gastos fijos, ingresos y aportaciones del mes anterior"
-                    : "Copiar gastos fijos e ingresos del mes anterior"
-            }
-          >
-            <Copy className="h-5 w-5" />
-            <span className="sr-only">Copiar gastos fijos e ingresos</span>
-          </Button>
-
-          <div data-tour="fab-theme" className="flex">
-            <ThemeToggle />
-          </div>
-
-          <Button
-            onClick={() => {
-              setIsFabMenuOpen(false)
-              setIsSettingsModal(true)
-            }}
-            variant="outline"
-            size="icon"
-            className="shadow-lg"
-            data-tour="fab-settings"
-          >
-            <Settings className="h-4 w-4" />
-            <span className="sr-only">Configuración</span>
-          </Button>
-
-          <Button
-            onClick={() => {
-              setIsFabMenuOpen(false)
-              setIsDocumentationModalOpen(true)
-            }}
-            variant="outline"
-            size="icon"
-            className="shadow-lg"
-            data-tour="fab-info"
-          >
-            <Info className="h-4 w-4" />
-            <span className="sr-only">Documentación</span>
-          </Button>
-        </div>
-
-        <Button
-          onClick={() => setIsFabMenuOpen((open) => !open)}
-          variant="outline"
-          size="icon"
-          className="shadow-lg order-3 sm:hidden"
-          aria-expanded={isFabMenuOpen}
-          data-tour="fab-menu"
-        >
-          {isFabMenuOpen ? <X className="h-4 w-4" /> : <MoreVertical className="h-4 w-4" />}
-          <span className="sr-only">{isFabMenuOpen ? "Cerrar menú" : "Más opciones"}</span>
-        </Button>
-      </div>
+      <FloatingActions
+        onAdd={() => setIsTransactionFormOpen(true)}
+        onCopy={copyPrevious.prepare}
+        copyDisabled={hasNothingToCopy || isCopyBlockedByFuture}
+        copyTitle={
+          hasNothingToCopy
+            ? previousMonthHasContributions
+              ? "Ya hay gastos fijos, ingresos y aportaciones este mes"
+              : "Ya hay gastos fijos e ingresos este mes"
+            : isCopyBlockedByFuture
+              ? "No se pueden copiar transacciones a un mes futuro hasta cerrar el informe del mes anterior"
+              : previousMonthHasContributions
+                ? "Copiar gastos fijos, ingresos y aportaciones del mes anterior"
+                : "Copiar gastos fijos e ingresos del mes anterior"
+        }
+        onSettings={() => setIsSettingsModal(true)}
+        onHelp={() => setIsDocumentationModalOpen(true)}
+        isTourActive={isTourActive}
+      />
 
       <ConfirmCopyModal
-        isOpen={isConfirmCopyModalOpen}
-        onClose={() => setIsConfirmCopyModalOpen(false)}
-        onConfirm={confirmCopyTransactions}
+        isOpen={copyPrevious.isConfirmOpen}
+        onClose={copyPrevious.closeConfirm}
+        onConfirm={copyPrevious.confirm}
         monthName={getMonthName(selectedMonth)}
         year={selectedYear}
-        transactions={transactionsToCopy}
+        transactions={copyPrevious.transactionsToCopy}
         isAmountHidden={isAmountHidden}
-        expenseCount={transactionsToCopy.filter(isFixedExpense).length}
-        incomeCount={transactionsToCopy.filter(isCopyableIncome).length}
-        contributionCount={transactionsToCopy.filter(isCopyableContribution).length}
+        {...copyPrevious.counts}
       />
 
       <CategorySpreadModal

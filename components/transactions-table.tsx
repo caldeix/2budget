@@ -15,15 +15,12 @@ import { Input } from "@/components/ui/input" // Componente de input de Shadcn U
 
 import { useState, useMemo, useRef, useEffect } from "react" // Hooks de React.
 import type { Transaction } from "@/types" // Tipo de transacción.
-import { formatCurrency, formatDate, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
-import { aggregateTransactions, isClosingAdjustment, isContribution, isPayable, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
+import { formatCurrency, cn, getPreviousMonthYear, getNextMonthYear } from "@/lib/utils" // Utilidades.
+import { aggregateTransactions, isClosingAdjustment, isContribution, isSettled } from "@/lib/aggregations" // Núcleo único de agregación.
 import { HIDDEN_AMOUNT } from "@/lib/privacy" // Importe oculto por la pareja.
 import { UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
-import { Button } from "@/components/ui/button" // Componente de botón.
 import {
-  Edit,
-  Trash2,
   Search,
   ArrowUpDown,
   ArrowUp,
@@ -32,15 +29,10 @@ import {
   TrendingDown,
   Calendar,
   DollarSign,
-  CheckCircle2,
-  Circle,
   ArrowRightLeft,
-  MoreHorizontal,
 } from "lucide-react" // Iconos.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
-
-/** Los ajustes de cierre los gestiona el informe: no se editan ni se borran a mano. */
-const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes\" o borrando el informe"
+import { TransactionRowDesktop, TransactionRowMobile, type RowContext } from "@/components/transaction-rows" // Filas de PC y móvil.
 
 /**
  * @interface TransactionsTableProps
@@ -91,9 +83,6 @@ interface TransactionsTableProps {
 /** Sin privacidad activada, nada se oculta. */
 const neverHidden = () => false
 
-/** Texto de los botones de editar de una transacción con el importe oculto. */
-const HIDDEN_EDIT_HINT = "Tu pareja ha ocultado el importe de sus transacciones individuales"
-
 /**
  * @typedef {'date' | 'name' | 'amount' | 'type'} SortField
  * @description Tipo para los campos por los que se puede ordenar la tabla.
@@ -106,21 +95,6 @@ type SortField = "date" | "name" | "amount" | "type" | "paid"
  */
 const paidRank = (t: Transaction) => (t.type === "income" ? 0 : isSettled(t) ? 1 : 2)
 
-/** Color del punto y del importe: ingreso verde, aportación violeta, no computable gris, gasto rojo. */
-const amountTone = (t: Transaction, tones: { income: string; contribution: string; nonComputable: string; expense: string }) =>
-  t.type === "income"
-    ? tones.income
-    : isContribution(t)
-      ? tones.contribution
-      : t.nonComputable
-        ? tones.nonComputable
-        : tones.expense
-const dotColor = (t: Transaction) =>
-  amountTone(t, { income: "bg-green-600", contribution: "bg-primary", nonComputable: "bg-gray-500", expense: "bg-red-600" })
-const amountColor = (t: Transaction) =>
-  amountTone(t, { income: "text-green-600", contribution: "text-primary", nonComputable: "text-gray-500", expense: "text-red-600" })
-/** Signo del importe: una aportación no suma ni resta (es un traspaso), lleva una flecha. */
-const amountSign = (t: Transaction) => (t.type === "income" ? "+" : isContribution(t) ? "→ " : "-")
 /**
  * @typedef {'asc' | 'desc'} SortDirection
  * @description Tipo para la dirección de ordenación (ascendente o descendente).
@@ -484,18 +458,6 @@ export function TransactionsTable({
     </span>
   )
 
-  /** Textos del botón de pagado: una aportación se marca como "enviada". */
-  const paidTitle = (t: Transaction) =>
-    isContribution(t)
-      ? t.paid
-        ? "Enviada — clic para marcar pendiente"
-        : "Marcar como enviada"
-      : t.paid
-        ? "Pagado — clic para marcar pendiente"
-        : "Marcar como pagado"
-  const paidLabel = (t: Transaction) =>
-    isContribution(t) ? (t.paid ? "Enviada" : "Pendiente de enviar") : t.paid ? "Pagado" : "Pendiente"
-
   /** Icono del tipo: ingreso (verde), aportación (violeta, flechas), gasto fijo (rojo, calendario) o gasto variable (naranja). */
   const getTypeIcon = (transaction: Transaction) => {
     const base = "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
@@ -529,6 +491,20 @@ export function TransactionsTable({
         <span className="sr-only">Gasto variable</span>
       </span>
     )
+  }
+
+  // Lo que necesitan las filas (ver `components/transaction-rows.tsx`).
+  const rowContext: RowContext = {
+    singleMode,
+    desktopGridCols,
+    isOtherMonth,
+    isRowLocked,
+    isAmountHidden,
+    getOwnerDisplay,
+    getCategoryBadge,
+    onEdit,
+    onDelete,
+    onTogglePaid,
   }
 
   // Calcula ingresos y gastos del conjunto FILTRADO (búsqueda/tipo/categoría), no de la lista completa,
@@ -738,236 +714,17 @@ export function TransactionsTable({
             <div className="divide-y divide-border">
               {filteredAndSortedTransactions.map((transaction, index) => (
                 <React.Fragment key={transaction.id}>
-                  {/* Fila de escritorio (diseño de tarjeta, visible solo en pantallas grandes) */}
-                  <div data-tour={index === 0 ? "tx-row" : undefined} className={cn(
-                    "hidden sm:grid items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
-                    desktopGridCols,
-                    transaction.nonComputable && "opacity-70"
-                  )}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${dotColor(transaction)}`} />
-                      <div>
-                        <div
-                          className={cn(
-                            "text-sm font-medium",
-                            transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
-                            isOtherMonth(transaction) && "text-primary",
-                          )}
-                          title={isOtherMonth(transaction) ? "De otro mes" : undefined}
-                        >
-                          {formatDate(transaction.date)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn("text-sm font-medium", transaction.nonComputable && "text-muted-foreground")}>
-                        {transaction.name}
-                      </span>
-                      {/* Sin columna de propietario (modo individual), la etiqueta va junto al nombre si la hay. */}
-                      {singleMode && getOwnerDisplay(transaction) && (
-                        <span className="text-xs text-muted-foreground whitespace-pre-line">
-                          ({getOwnerDisplay(transaction)})
-                        </span>
-                      )}
-                    </div>
-                    <div>{getCategoryBadge(transaction, true)}</div>
-                    {!singleMode && (
-                      <div className={cn("text-sm", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
-                        {getOwnerDisplay(transaction)}
-                      </div>
-                    )}
-                    <div
-                      className={cn(
-                        "text-lg font-semibold text-right",
-                        amountColor(transaction),
-                        transaction.nonComputable && "italic"
-                      )}
-                    >
-                      {amountSign(transaction)}
-                      {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
-                    </div>
-                    {/* Mes cerrado: sin acciones. Ajuste de cierre: editar y borrar desactivados. */}
-                    <div className="flex items-center justify-end gap-1">
-                      {!isRowLocked(transaction) && isPayable(transaction) && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          data-tour="paid"
-                          onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
-                          className={cn(
-                            "h-8 w-8 p-0",
-                            transaction.paid
-                              ? "text-green-600 hover:text-green-700 hover:bg-green-600/10"
-                              : "text-muted-foreground hover:text-foreground",
-                          )}
-                          title={paidTitle(transaction)}
-                        >
-                          {transaction.paid ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
-                          <span className="sr-only">{paidLabel(transaction)}</span>
-                        </Button>
-                      )}
-                      {!isRowLocked(transaction) && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onEdit(transaction)}
-                            // Editar enseñaría el importe: no se puede con los ocultos por la pareja.
-                            disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
-                            title={
-                              isClosingAdjustment(transaction)
-                                ? ADJUSTMENT_LOCKED_HINT
-                                : isAmountHidden(transaction)
-                                  ? HIDDEN_EDIT_HINT
-                                  : "Editar"
-                            }
-                            aria-label={`Editar ${transaction.name}`}
-                            className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => onDelete(transaction.id)}
-                            disabled={isClosingAdjustment(transaction)}
-                            title={isClosingAdjustment(transaction) ? ADJUSTMENT_LOCKED_HINT : "Eliminar"}
-                            aria-label={`Eliminar ${transaction.name}`}
-                            className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Fila móvil (diseño con swipe, visible solo en pantallas pequeñas) */}
-                  <div data-tour={index === 0 ? "tx-row" : undefined} className="sm:hidden">
-                    <div className="p-0 relative overflow-hidden">
-                      <div
-                        className={cn(
-                          "flex flex-col gap-2 p-4 transition-transform duration-300 ease-out",
-                          openSwipeId === transaction.id ? "-translate-x-[120px]" : "translate-x-0", // Mueve la fila para revelar acciones.
-                        )}
-                        onTouchStart={handleTouchStartRow}
-                        onTouchEnd={(e) => handleTouchEndRow(e, transaction.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${dotColor(transaction)}`} />
-                            <div>
-                              <span
-                                className={cn(
-                                  "text-sm font-medium",
-                                  transaction.nonComputable ? "text-muted-foreground" : "text-foreground",
-                                  isOtherMonth(transaction) && "text-primary",
-                                )}
-                              >
-                                {formatDate(transaction.date)}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <span
-                              className={cn(
-                                "text-lg font-semibold",
-                                amountColor(transaction),
-                                transaction.nonComputable && "italic"
-                              )}
-                            >
-                              {amountSign(transaction)}
-                              {isAmountHidden(transaction) ? HIDDEN_AMOUNT : formatCurrency(transaction.amount)}
-                            </span>
-                            {transaction.nonComputable && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">
-                                NC
-                              </span>
-                            )}
-                            {!isRowLocked(transaction) && isPayable(transaction) && (
-                              <button
-                                type="button"
-                                data-tour="paid"
-                                onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
-                                className={cn(
-                                  // Área táctil de 44 px (la recomendada en iOS) sin mover el icono.
-                                  "-my-3 -mr-3 -ml-1.5 p-3",
-                                  transaction.paid ? "text-green-600" : "text-muted-foreground",
-                                )}
-                                aria-label={paidLabel(transaction)}
-                              >
-                                {transaction.paid ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
-                              {transaction.name}
-                            </span>
-                          </div>
-                          {getOwnerDisplay(transaction) && (
-                            <span className={transaction.nonComputable ? "text-muted-foreground" : ""}>
-                              {getOwnerDisplay(transaction)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex justify-between items-center text-xs text-muted-foreground">
-                          {getCategoryBadge(transaction)}
-                          {/* Alternativa al gesto de deslizar (teclado, VoiceOver o quien no lo conozca). */}
-                          {!isRowLocked(transaction) && (
-                            <button
-                              type="button"
-                              onClick={() => setOpenSwipeId(openSwipeId === transaction.id ? null : transaction.id)}
-                              aria-expanded={openSwipeId === transaction.id}
-                              aria-label={`Más acciones para ${transaction.name}`}
-                              className="-my-3.5 -mr-3.5 p-3.5 text-muted-foreground hover:text-foreground"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {/* Contenedor de acciones de swipe (oculto por defecto, visible con swipe) */}
-                      <div
-                        className={cn(
-                          "absolute inset-y-0 right-0 flex items-center gap-2 pr-4 transition-transform duration-300 ease-out",
-                          openSwipeId === transaction.id ? "translate-x-0" : "translate-x-full", // Mueve las acciones.
-                        )}
-                        style={{ width: "120px" }} // Ancho fijo para las acciones.
-                        aria-hidden={openSwipeId !== transaction.id} // Fuera de pantalla: ni se lee ni se tabula.
-                      >
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                          disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
-                          tabIndex={openSwipeId === transaction.id ? 0 : -1}
-                          onClick={() => {
-                            onEdit(transaction)
-                            setOpenSwipeId(null) // Cierra el swipe después de la acción.
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                          <span className="sr-only">Editar {transaction.name}</span>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="flex-1"
-                          disabled={isClosingAdjustment(transaction)}
-                          tabIndex={openSwipeId === transaction.id ? 0 : -1}
-                          onClick={() => {
-                            onDelete(transaction.id)
-                            setOpenSwipeId(null) // Cierra el swipe después de la acción.
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Eliminar {transaction.name}</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  <TransactionRowDesktop transaction={transaction} index={index} ctx={rowContext} />
+                  <TransactionRowMobile
+                    transaction={transaction}
+                    index={index}
+                    ctx={rowContext}
+                    isActionsOpen={openSwipeId === transaction.id}
+                    onToggleActions={() => setOpenSwipeId(openSwipeId === transaction.id ? null : transaction.id)}
+                    onCloseActions={() => setOpenSwipeId(null)}
+                    onTouchStart={handleTouchStartRow}
+                    onTouchEnd={(e) => handleTouchEndRow(e, transaction.id)}
+                  />
                 </React.Fragment>
               ))}
               {/* Mensaje de carga para el scroll infinito */}
