@@ -10,6 +10,7 @@ import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
 import { DEFAULT_CATEGORIES } from "@/lib/categories" // Categorías iniciales.
 import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
 import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
+import { dedupeAppData } from "@/lib/dedupe" // Un informe por mes y una transacción por id.
 
 /**
  * @constant {string} STORAGE_KEY
@@ -167,7 +168,7 @@ export function loadData(): AppData {
      * en futuras versiones, los datos antiguos sigan siendo compatibles y tengan valores por defecto.
      * La configuración también se fusiona para mantener los nombres personalizados.
      */
-    const normalized: AppData = {
+    const normalized: AppData = dedupeAppData({
       ...defaultData, // Empieza con la estructura por defecto
       ...data, // Sobrescribe con los datos cargados
       version: DATA_VERSION,
@@ -175,7 +176,7 @@ export function loadData(): AppData {
       transactions: Array.isArray(data.transactions) ? data.transactions.map(normalizeTransaction) : [],
       reports: Array.isArray(data.reports) ? data.reports.map(normalizeReport) : [],
       config: { ...defaultConfig, ...data.config }, // Fusiona la configuración
-    }
+    })
 
     // Migración de un solo disparo: deja el localStorage ya limpio y evita repetir la
     // reescritura en cada arranque. La app es correcta aunque esto no llegue a ejecutarse,
@@ -276,7 +277,7 @@ export function parseImportedData(jsonString: string): AppData | null {
      * o no tiene el tipo correcto en el JSON importado, se usan arrays vacíos o la configuración por defecto.
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
-    const imported: AppData = {
+    const imported: AppData = dedupeAppData({
       version: DATA_VERSION,
       transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
       // Los informes importados también se normalizan: pueden traer importes sin redondear.
@@ -285,7 +286,7 @@ export function parseImportedData(jsonString: string): AppData | null {
         ...defaultConfig, // Empieza con la configuración por defecto
         ...(typeof raw.config === "object" && raw.config !== null ? raw.config : {}), // Fusiona la configuración importada
       },
-    }
+    })
 
     // Un archivo de una versión anterior a v3 recibe la corrección de céntimos de los meses cerrados.
     const fileVersion = typeof raw.version === "number" ? raw.version : 0
