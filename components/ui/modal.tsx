@@ -98,7 +98,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md", dismissib
       onEscapeKeyDown={(event) => (!dismissible || nonModal) && event.preventDefault()}
       onInteractOutside={handleInteractOutside}
       className={cn(
-        "relative bg-card rounded-2xl shadow-lg w-full mx-4 max-h-[90vh] overflow-hidden focus:outline-none",
+        "relative bg-card rounded-2xl shadow-lg w-full mx-4 max-h-[90dvh] overflow-hidden focus:outline-none",
         sizeClasses[size], // Aplica la clase de tamaño dinámicamente.
       )}
     >
@@ -122,7 +122,7 @@ export function Modal({ isOpen, onClose, title, children, size = "md", dismissib
       </div>
       {/* Cuerpo del modal: donde se renderiza el `children`.
           Permite scroll interno si el contenido es demasiado largo. */}
-      <div className="overflow-y-auto max-h-[calc(90vh-80px)]">{children}</div>
+      <div className="overflow-y-auto max-h-[calc(90dvh-80px)]">{children}</div>
     </DialogPrimitive.Content>
   )
 
