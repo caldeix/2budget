@@ -8,8 +8,10 @@ import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import {
+  downloadAppData,
   getLastSeenMonth,
   hasAccountPromptBeenShown,
+  hasAppData,
   hasSeenTourOnDevice,
   markAccountPromptShown,
   markTourSeenOnDevice,
@@ -419,13 +421,21 @@ export default function HomePage() {
   }
 
   // Importar sirve igual en local y en la nube: los datos pasan por `replaceAllData`.
+  // Antes de sustituir se descarga una copia de lo que había (si había algo), por si el archivo no era
+  // el que tocaba.
   const handleImportData = (content: string): boolean => {
     const imported = parseImportedData(content)
-    if (!imported) {
-      setFlash({ text: "Error al importar los datos. Verifica que el archivo sea válido.", tone: "error" })
+    if (!imported.ok) {
+      setFlash({ text: imported.error, tone: "error" })
       return false
     }
-    replaceAllData(imported)
+    const hadData = hasAppData(data)
+    if (hadData) downloadAppData(data, "antes-de-importar")
+    replaceAllData(imported.data)
+    setFlash({
+      text: hadData ? "Datos importados. Se ha descargado una copia de los anteriores." : "Datos importados.",
+      tone: "success",
+    })
     return true
   }
 

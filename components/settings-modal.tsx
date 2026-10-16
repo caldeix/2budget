@@ -342,8 +342,9 @@ export function SettingsModal({
           </p>
           <p className="text-sm text-muted-foreground">
             {isCloud
-              ? "Los datos están en el hogar de la nube: el cambio afecta a los dos miembros y a todos vuestros dispositivos. Si quieres conservar lo que hay ahora, exporta una copia antes."
-              : "Si quieres conservar lo que hay ahora, exporta una copia antes."}
+              ? "Los datos están en el hogar de la nube: el cambio afecta a los dos miembros y a todos vuestros dispositivos. "
+              : ""}
+            Antes de sustituir se descargará una copia de los datos actuales.
           </p>
           <div className="flex justify-center gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setPendingImport(null)}>
