@@ -28,6 +28,10 @@ export const viewport: Viewport = {
   themeColor: "#17182c",
 }
 
+/** Script de tema que se ejecuta antes de pintar la página (ver el `<head>`). */
+const THEME_SCRIPT =
+  "(function(){try{var t=localStorage.getItem('theme');var d=t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d)}catch(e){}})()"
+
 export default function RootLayout({
   children,
 }: {
@@ -35,10 +39,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
+      <head>
+        {/* Pone el tema antes de pintar (la preferencia guardada o la del sistema): sin esto, quien usa
+            el tema oscuro veía un destello claro al abrir. Mismo criterio que `ThemeProvider`. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       {/* Los iconos (favicon.ico, icon1.png, icon2.png y apple-icon.png) están en app/: Next.js
           genera sus enlaces con la ruta base /2budget. Puestos aquí a mano daban 404 en producción. */}
       <body className={`${inter.variable} ${poppins.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        {/* El tema lo decide `ThemeProvider` (preferencia guardada o la del sistema). */}
+        <ThemeProvider>
           {children}
           <Footer />
           <ServiceWorkerRegister />

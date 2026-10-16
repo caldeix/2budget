@@ -20,6 +20,7 @@ import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en espa�
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
+import { adjustmentIdFor, reportIdFor } from "@/lib/dedupe" // Ids fijos por mes del informe y sus ajustes.
 import { normalizeName } from "@/lib/categories" // Nombres comparables (sin tildes ni mayúsculas).
 
 /** Indica si la transacción es del mes y año dados. */
@@ -363,16 +364,17 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     ) => {
       commit((prevData) => {
         // 1. Crea nuevas transacciones de ajuste con IDs y fechas de creación.
+        // Ids fijos por mes y dueño (ver `lib/dedupe.ts`): dos cierres a la vez no duplican nada.
+        const { month, year } = reportBaseData
         const newAdjustmentTransactions: Transaction[] = adjustmentsToCreate.map((adj) => ({
           ...adj,
-          id: generateId(),
+          id: adjustmentIdFor(month, year, adj.owner),
           amount: roundMoney(adj.amount), // El ajuste es un valor derivado: se persiste ya redondeado.
           createdAt: new Date().toISOString(),
         }))
 
         // 2. Los ajustes de un cierre anterior de este mes se SUSTITUYEN por los nuevos (el modal
         //    los calcula sin ellos). Las nuevas van al principio, como las más recientes.
-        const { month, year } = reportBaseData
         const withoutOldAdjustments = prevData.transactions.filter(
           (t) => !(isClosingAdjustment(t) && isInMonth(t, month, year)),
         )
@@ -385,25 +387,29 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         //    Esto asegura que los ajustes recién añadidos se incluyan en los totales del informe.
         const finalCalculations = calculateReportTotals(finalReportTransactions)
 
+        // El informe del mes, si ya existe (aunque la pantalla no lo supiera): se actualiza, no se duplica.
+        const reportIdToUpdate =
+          existingReportId ?? prevData.reports.find((r) => r.month === month && r.year === year)?.id
+
         let finalReportsList: MonthlyReport[]
-        if (existingReportId) {
+        if (reportIdToUpdate) {
           // Si existe un ID de informe, actualiza el informe existente.
           const updatedReport: MonthlyReport = {
             ...reportBaseData,
             ...finalCalculations, // Usa los totales recién recalculados.
             transactions: finalReportTransactions, // Incluye todas las transacciones del mes.
-            id: existingReportId,
+            id: reportIdToUpdate,
             // Mantiene la fecha de creación original si el informe ya existía.
-            createdAt: prevData.reports.find((r) => r.id === existingReportId)?.createdAt || new Date().toISOString(),
+            createdAt: prevData.reports.find((r) => r.id === reportIdToUpdate)?.createdAt || new Date().toISOString(),
           }
-          finalReportsList = prevData.reports.map((r) => (r.id === existingReportId ? updatedReport : r))
+          finalReportsList = prevData.reports.map((r) => (r.id === reportIdToUpdate ? updatedReport : r))
         } else {
           // Si no hay ID, crea un nuevo informe.
           const newReport: MonthlyReport = {
             ...reportBaseData,
             ...finalCalculations, // Usa los totales recién recalculados.
             transactions: finalReportTransactions, // Incluye todas las transacciones del mes.
-            id: generateId(), // Genera un nuevo ID para el informe.
+            id: reportIdFor(month, year), // Id fijo por mes (ver `lib/dedupe.ts`).
             createdAt: new Date().toISOString(),
           }
           finalReportsList = [newReport, ...prevData.reports] // Añade el nuevo informe al principio.

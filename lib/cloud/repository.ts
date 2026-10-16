@@ -42,6 +42,7 @@ import {
 import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
 import { DATA_VERSION, defaultConfig, normalizeReport, normalizeTransaction } from "@/lib/storage"
 import { diffAppData, isEmptyDiff, type AppDataDiff } from "@/lib/cloud/diff"
+import { dedupeAppData } from "@/lib/dedupe"
 import {
   archivedMonthsOf,
   fromStored,
@@ -477,7 +478,8 @@ export function subscribeHousehold(
 
   const emit = () => {
     if (!active || !household || !live || !storedReports) return
-    const merged = fromStored(live, storedReports)
+    // Un informe por mes y una transacción por id (ver `lib/dedupe.ts`).
+    const merged = dedupeAppData(fromStored(live, storedReports))
     const transactions = merged.transactions.map(normalizeTransaction).sort(byCreatedAtDesc)
     const reports = merged.reports.map(normalizeReport).sort(byCreatedAtDesc)
     onData({ transactions, reports, config: household.config, version: household.version }, household.info)

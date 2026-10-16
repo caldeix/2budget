@@ -9,7 +9,6 @@
 "use client"
 
 import { useMemo } from "react"
-import { useTheme } from "next-themes" // Importa el hook `useTheme` para acceder al tema actual.
 import { formatCurrency } from "@/lib/money" // Formato monetario canónico (redondea antes de formatear).
 
 /**
@@ -51,9 +50,6 @@ interface PieChartProps {
  *                        o un mensaje de "Sin datos" si no hay datos.
  */
 export function PieChart({ data, size = 200, className, legend = "list" }: PieChartProps) {
-  // `useTheme` permite acceder al tema actual ('light' o 'dark') y a la función para cambiarlo.
-  const { theme } = useTheme()
-
   /**
    * `useMemo` se utiliza para memorizar los cálculos de las rutas SVG de los segmentos del pastel.
    * Esto significa que los cálculos complejos solo se ejecutarán cuando `data` o `size` cambien,
@@ -118,10 +114,10 @@ export function PieChart({ data, size = 200, className, legend = "list" }: PieCh
     return { paths, total }
   }, [data, size]) // Dependencias de useMemo: se recalcula si 'data' o 'size' cambian.
 
-  // Determina el color del borde de los segmentos del gráfico basado en el tema actual.
-  // En modo oscuro, el borde es el color de fondo para que se "mezcle" con el fondo.
-  // En modo claro, el borde es blanco.
-  const borderColor = theme === "dark" ? "hsl(var(--background))" : "white"
+  // Borde de los segmentos del color de la tarjeta que hay detrás: se "mezcla" con el fondo en los
+  // dos temas sin tener que leer cuál está activo (antes se leía de `next-themes`, que la app no usa,
+  // y salía siempre blanco).
+  const borderColor = "hsl(var(--card))"
 
   // Si no hay datos para el gráfico, muestra un mensaje de "Sin datos".
   if (total === 0) {

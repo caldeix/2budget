@@ -365,6 +365,7 @@ export function MonthlyReportModal({
             <div>
               <Label htmlFor="person1Money">{person1Name} (€)</Label>
               <AmountInput
+                allowNegative
                 id="person1Money"
                 value={person1RealMoney}
                 onValueChange={setPerson1RealMoney}
@@ -376,6 +377,7 @@ export function MonthlyReportModal({
               <div>
                 <Label htmlFor="person2Money">{person2Name} (€)</Label>
                 <AmountInput
+                  allowNegative
                   id="person2Money"
                   value={person2RealMoney}
                   onValueChange={setPerson2RealMoney}
@@ -388,6 +390,7 @@ export function MonthlyReportModal({
               <div>
                 <Label htmlFor="sharedMoney">Compartida: saldo en el banco (€)</Label>
                 <AmountInput
+                  allowNegative
                   id="sharedMoney"
                   value={sharedRealMoney}
                   onValueChange={setSharedRealMoney}
