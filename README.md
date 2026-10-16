@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.0.3-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.1.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,18 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.1.0 — Avisos y robustez
+
+- **Versión mínima** — El hogar guarda la versión más antigua que entiende sus datos: una app vieja abierta o en caché se bloquea con un aviso de actualizar en vez de calcular mal. Al volver a la app, si hay una versión nueva publicada, avisa para recargar
+- **Modo local más seguro** — Si el navegador no puede guardar (almacenamiento lleno o bloqueado), avisa; pide almacenamiento persistente y, en iPhone y iPad sin instalar, recuerda que Safari borra los datos tras 7 días sin abrir la web
+- **Errores al abrir el hogar** — Si el hogar no se puede abrir, la app ya no enseña ni guarda los datos de otro sitio: ofrece reintentar. Un documento dañado ya no bloquea todo el hogar: se salta y se avisa
+- **Pantalla de error propia** — Si algo falla, se puede exportar los datos y recargar; el último error se ve en Configuración. Los avisos ya no son ventanas del navegador
+- **Cierres encadenados** — Al actualizar un cierre con compartida, avisa de los cierres posteriores que hay que actualizar después
+- **Importar con control** — Un archivo con datos que la app no sabe leer (sin fecha, importe en texto…) se rechaza diciendo cuáles; antes de sustituir se descarga una copia de los datos actuales
+- **Balance individual más claro** — Al pulsar cada fila se ve de dónde sale su cifra (ingresos − gastos = total previsto; total − parte en la compartida = cuenta), y la Ayuda explica qué cifra repartir
+- **Copia local sin cifrar** — Al pasar a la nube sin subir los datos locales, o al cerrar sesión, se ofrece borrarlos de este dispositivo
+- SemVer: 3.0.3 → 3.1.0 (MINOR)
 
 ### v3.0.3 — Seguridad
 
