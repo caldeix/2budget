@@ -10,6 +10,7 @@
 
 import type { AppConfig, Transaction } from "@/types"
 import { isClosingAdjustment } from "@/lib/aggregations"
+import { fromCents, toCents } from "@/lib/money"
 
 /** Una categoría: para gastos o para ingresos. */
 export interface Category {
@@ -132,9 +133,9 @@ export function expensesByCategory(
   for (const t of transactions) {
     if (t.type !== "expense" || isClosingAdjustment(t) || !isInScope(t, scope)) continue
     const label = categoryNameOf(config, t)
-    cents.set(label, (cents.get(label) ?? 0) + Math.round(t.amount * 100))
+    cents.set(label, (cents.get(label) ?? 0) + toCents(t.amount))
   }
   return [...cents.entries()]
-    .map(([label, value]) => ({ label, value: value / 100 }))
+    .map(([label, value]) => ({ label, value: fromCents(value) }))
     .sort((a, b) => b.value - a.value)
 }

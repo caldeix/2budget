@@ -19,7 +19,7 @@ import { Trash2 } from "lucide-react" // Icono de borrar.
 import { Modal } from "@/components/ui/modal" // Componente base del modal.
 import { PieChart } from "@/components/ui/chart" // Componente de gráfico de pastel.
 import { formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades de formato.
-import { subtractMoney } from "@/lib/money" // Resta monetaria exacta.
+import { addMoney, subtractMoney } from "@/lib/money" // Suma y resta monetarias exactas.
 import { aggregateTransactions, isClosingAdjustment, isContribution } from "@/lib/aggregations" // Agregación.
 import { monthAccountSplit, usesSharedAccount } from "@/lib/shared-account" // Cuenta compartida.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
@@ -134,14 +134,14 @@ export function ReportDetailModal({
       label: "fijo", // Etiqueta para gastos fijos.
       value: report.transactions
         .filter((t) => t.type === "expense" && t.category === "fixed")
-        .reduce((sum, t) => sum + t.amount, 0),
+        .reduce((sum, t) => addMoney(sum, t.amount), 0),
       color: "hsl(var(--red-600))", // Color rojo para gastos fijos.
     },
     {
       label: "variable", // Etiqueta para gastos variables.
       value: report.transactions
         .filter((t) => t.type === "expense" && t.category === "variable")
-        .reduce((sum, t) => sum + t.amount, 0),
+        .reduce((sum, t) => addMoney(sum, t.amount), 0),
       color: "hsl(var(--orange-600))", // Color naranja para gastos variables.
     },
   ]
