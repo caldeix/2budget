@@ -174,12 +174,3 @@ export interface TransactionFormData {
   nonComputable?: boolean
   categoryId?: string
 }
-
-/**
- * @function generateId
- * @description Genera un identificador único aleatorio para transacciones o informes.
- * @returns {string} Un string alfanumérico corto.
- */
-export function generateId(): string {
-  return Math.random().toString(36).substr(2, 9)
-}

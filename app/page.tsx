@@ -6,7 +6,7 @@ import { useFinancialData as useFinancialDataContext } from "@/hooks/use-financi
 import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, getMonthName } from "@/lib/utils"
 import {
   downloadAppData,
   getLastSeenMonth,
@@ -61,13 +61,6 @@ import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
 import { cn } from "@/lib/utils"
-
-// Pure helper — kept outside component to avoid stale-closure issues in callbacks.
-// Devuelve el nombre del mes con la primera letra en mayúscula (ej. "Agosto").
-function getMonthName(month: number): string {
-  const name = new Date(2000, month, 1).toLocaleString("es-ES", { month: "long" })
-  return name.charAt(0).toUpperCase() + name.slice(1)
-}
 
 const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
 // En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
@@ -315,7 +308,7 @@ export default function HomePage() {
   const prepareCopyFixedExpenses = useCallback(() => {
     // El origen es el mes ANTERIOR al mes seleccionado (no al mes real de hoy).
     const { month: sourceMonth, year: sourceYear } = getPreviousMonthYear(selectedMonth, selectedYear)
-    const sourceMonthName = getMonthName(sourceMonth - 1)
+    const sourceMonthName = getMonthName(sourceMonth)
     const sourceTransactions = getTransactionsForMonth(sourceMonth, sourceYear)
     const toCopy = sourceTransactions.filter(
       (t) =>
@@ -375,7 +368,7 @@ export default function HomePage() {
       contributionCount > 0
         ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
         : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
-    setFlash({ text: `${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`, tone: "success" })
+    setFlash({ text: `${copied} copiados a ${getMonthName(selectedMonth)} ${selectedYear}`, tone: "success" })
   }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
@@ -509,7 +502,7 @@ export default function HomePage() {
 
       if (prevExpenses.length > 0 && hasUnpaid) {
         setReconcileExpenses(prevExpenses)
-        setReconcileLabel({ monthName: getMonthName(prevMonth - 1), year: prevYear })
+        setReconcileLabel({ monthName: getMonthName(prevMonth), year: prevYear })
         setIsPaidReconcileOpen(true)
       } else {
         // Nada pendiente del mes anterior: solo actualiza el marcador.
@@ -920,7 +913,7 @@ export default function HomePage() {
         isOpen={isConfirmCopyModalOpen}
         onClose={() => setIsConfirmCopyModalOpen(false)}
         onConfirm={confirmCopyTransactions}
-        monthName={getMonthName(selectedMonth - 1)}
+        monthName={getMonthName(selectedMonth)}
         year={selectedYear}
         transactions={transactionsToCopy}
         isAmountHidden={isAmountHidden}

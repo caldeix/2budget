@@ -142,24 +142,32 @@ export function formatDate(date: string): string {
  * @returns {string} La cadena formateada (ej. "OCTUBRE 2023").
  */
 export function formatMonthYear(month: number, year: number): string {
-  // Convierte el número del mes a un objeto Date para obtener el nombre del mes.
-  // `month - 1` porque los meses en Date son de 0 a 11.
-  const monthName = new Intl.DateTimeFormat("es-ES", {
-    month: "long",
-  })
-    .format(new Date(year, month - 1))
-    .toUpperCase() // Convierte el nombre del mes a mayúsculas.
-  return `${monthName} ${year}`
+  return `${getMonthName(month, "upper")} ${year}`
+}
+
+/**
+ * @function getMonthName
+ * @description Nombre de un mes en español (3.1.1: antes había tres versiones repartidas).
+ * @param {number} month - El número del mes (1-12).
+ * @param {"title" | "upper"} [style="title"] - "Octubre" o "OCTUBRE".
+ * @returns {string} El nombre del mes.
+ */
+export function getMonthName(month: number, style: "title" | "upper" = "title"): string {
+  const name = new Intl.DateTimeFormat("es-ES", { month: "long" }).format(new Date(2000, month - 1, 1))
+  return style === "upper" ? name.toUpperCase() : name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 /**
  * @function generateId
- * @description Genera un identificador único aleatorio.
- *              Útil para asignar IDs a nuevas transacciones o informes.
- * @returns {string} Un string alfanumérico corto.
+ * @description Genera un identificador único para transacciones o informes. Con
+ *              `crypto.randomUUID()` (3.1.1): `Math.random` podía dar ids cortos o repetidos.
+ * @returns {string} Un UUID.
  */
 export function generateId(): string {
-  return Math.random().toString(36).substr(2, 9) // Genera un string aleatorio y toma una subcadena.
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID()
+  // Navegadores sin `randomUUID` (o una página sin HTTPS): 16 bytes aleatorios en hexadecimal.
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
 }
 
 /**
