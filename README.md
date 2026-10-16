@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.0.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.0.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.0.1 — Tour de la cuenta compartida
+
+- **El tour enseña la cuenta compartida** — Los datos de ejemplo del tour llevan aportaciones a la compartida, así que el resumen se ve «Por cuenta», con la fila «Compartida». Paso nuevo «Cuenta compartida» y textos al día en el resumen, el total acumulado, la lista, el formulario (tipo «Aportación»), el cierre de mes (saldo de la compartida) y copiar (también aportaciones). En modo individual el tour no cambia
+- **Cierre de mes** — En PC, las tres casillas de dinero real quedan alineadas aunque la etiqueta de la compartida ocupe dos líneas
+- SemVer: 3.0.0 → 3.0.1 (PATCH)
 
 ### v3.0.0 — Cuenta compartida
 
