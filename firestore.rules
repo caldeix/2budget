@@ -75,6 +75,14 @@ service cloud.firestore {
         );
     }
 
+    // Un documento de datos solo lleva el texto cifrado (3.0.3): un cliente con un error no puede
+    // subir datos en claro ni documentos enormes (el límite de Firestore es 1 MiB).
+    function isEncryptedDoc() {
+      return request.resource.data.keys().hasOnly(['enc'])
+        && request.resource.data.enc is string
+        && request.resource.data.enc.size() < 1000000;
+    }
+
     // Perfil: solo su dueño.
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
@@ -83,10 +91,12 @@ service cloud.firestore {
     match /households/{hid} {
       allow read: if signedIn() && request.auth.uid in resource.data.members;
 
-      // Se crea con el usuario como único miembro.
+      // Se crea con el usuario como único miembro y solo con los campos esperados.
       allow create: if signedIn()
         && request.resource.data.members == [request.auth.uid]
-        && request.resource.data.createdBy == request.auth.uid;
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.keys().hasOnly(['members', 'roles', 'memberEmails', 'enc', 'cryptoVersion', 'createdBy', 'createdAt'])
+        && request.resource.data.enc is string;
 
       // Un miembro solo cambia lo que permite `isMemberUpdate` (datos cifrados, su email o salir).
       // Un no miembro solo puede unirse con invitación.
@@ -97,11 +107,13 @@ service cloud.firestore {
         && resource.data.members == [request.auth.uid];
 
       match /transactions/{transactionId} {
-        allow read, write: if isMember(hid);
+        allow read, delete: if isMember(hid);
+        allow create, update: if isMember(hid) && isEncryptedDoc();
       }
 
       match /reports/{reportId} {
-        allow read, write: if isMember(hid);
+        allow read, delete: if isMember(hid);
+        allow create, update: if isMember(hid) && isEncryptedDoc();
       }
 
       // Clave del hogar envuelta con la contraseña maestra de cada miembro: solo la suya.
@@ -124,6 +136,7 @@ service cloud.firestore {
     match /invites/{code} {
       allow get: if signedIn();
       allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['householdId', 'createdBy', 'expiresAt', 'salt', 'iv', 'wrappedKey', 'iterations'])
         && request.resource.data.createdBy == request.auth.uid
         && isMember(request.resource.data.householdId)
         && request.resource.data.expiresAt > request.time
