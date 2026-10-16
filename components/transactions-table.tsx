@@ -890,7 +890,8 @@ export function TransactionsTable({
                                 data-tour="paid"
                                 onClick={() => onTogglePaid(transaction.id, !transaction.paid)}
                                 className={cn(
-                                  "ml-1 p-0.5",
+                                  // Área táctil de 44 px (la recomendada en iOS) sin mover el icono.
+                                  "-my-3 -mr-3 -ml-1.5 p-3",
                                   transaction.paid ? "text-green-600" : "text-muted-foreground",
                                 )}
                                 aria-label={paidLabel(transaction)}
@@ -921,7 +922,7 @@ export function TransactionsTable({
                               onClick={() => setOpenSwipeId(openSwipeId === transaction.id ? null : transaction.id)}
                               aria-expanded={openSwipeId === transaction.id}
                               aria-label={`Más acciones para ${transaction.name}`}
-                              className="-my-2 -mr-2 p-2 text-muted-foreground hover:text-foreground"
+                              className="-my-3.5 -mr-3.5 p-3.5 text-muted-foreground hover:text-foreground"
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </button>

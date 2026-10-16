@@ -58,6 +58,7 @@ import { getTourSteps } from "@/components/tour-steps"
 import { createTourData } from "@/lib/tour-data"
 
 import { Button } from "@/components/ui/button"
+import { NonModalContext } from "@/components/ui/modal"
 import { Plus, FileText, Settings, Calendar, Info, Heart, Copy, AlertTriangle, List, MoreVertical, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -520,6 +521,12 @@ export default function HomePage() {
   // y en este dispositivo. Sin cuenta (build solo local), solo en el dispositivo.
   const uid = session.user?.uid ?? null
   const isTourActive = tourData !== null
+  // Durante el tour, la app de detrás queda inerte: ni el tabulador ni un lector de pantalla salen
+  // del tour (el tour y sus modales van en portales, fuera de este contenedor).
+  const appRootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    appRootRef.current?.toggleAttribute("inert", isTourActive)
+  }, [isTourActive])
   const hasSeenTour = hasSeenTourOnDevice(uid) || Boolean(profile?.tourCompletedAt)
   // Con cuenta, hay que esperar al perfil para saber si ya lo vio.
   const isProfileReady = !session.enabled || profile !== null
@@ -629,7 +636,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <NonModalContext.Provider value={isTourActive}>
+    <div ref={appRootRef} className="min-h-screen bg-background">
       <header className="bg-card shadow-lg border-b border-border">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-center items-center h-12 sm:h-16">
@@ -1063,5 +1071,6 @@ export default function HomePage() {
       <UpdateNotice />
       <FlashMessage flash={flash} onClose={closeFlash} />
     </div>
+    </NonModalContext.Provider>
   )
 }
