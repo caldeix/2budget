@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.0.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.0.2-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,16 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.0.2 — Datos y cálculos más seguros
+
+- **Cierre con dinero negativo** — El dinero real del cierre admite cifras negativas (una cuenta en descubierto); antes como mínimo se escribía 0 y se creaba un ajuste falso
+- **Nada se pierde al archivar** — Un gasto apuntado sin conexión en un mes que el otro ya cerró se une a ese mes en vez de borrarse al archivar
+- **Un informe por mes** — El informe y sus ajustes tienen un id fijo por mes: dos cierres a la vez ya no duplican el informe ni los ajustes. Si hubiera informes repetidos de antes, al leer se queda el más reciente
+- **Ajustes reconocidos por su marca** — Una transacción tuya que se llame «Ajuste X - Cierre Y» ya no se toma por un ajuste de cierre
+- **Tema sin destello** — El tema oscuro se aplica antes de pintar; los quesitos del informe usan el color de la tarjeta en los dos temas y suman con aritmética exacta
+- **Proyecto** — Una sola configuración de Next y sin errores de tipos ocultos en la build
+- SemVer: 3.0.1 → 3.0.2 (PATCH)
 
 ### v3.0.1 — Tour de la cuenta compartida
 
