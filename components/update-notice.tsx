@@ -58,6 +58,7 @@ export function UpdateNotice() {
   if (!newVersion) return null
   return (
     <div
+      data-keep-modal
       role="status"
       className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-center gap-3 border-t bg-card px-4 py-3 text-sm text-foreground shadow-lg"
       style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
