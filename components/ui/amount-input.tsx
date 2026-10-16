@@ -30,6 +30,8 @@ interface AmountInputProps extends Omit<React.ComponentProps<"input">, "value" |
   onValueChange: (value: number) => void
   /** Si es `true`, un valor de 0 se muestra como campo vacío (mejor UX al crear). */
   emptyWhenZero?: boolean
+  /** Admite el signo "-" (p. ej. el dinero real al cerrar un mes que acaba en negativo). */
+  allowNegative?: boolean
 }
 
 /**
@@ -37,7 +39,7 @@ interface AmountInputProps extends Omit<React.ComponentProps<"input">, "value" |
  * @description Campo de importe con validación de 2 decimales máximo.
  */
 export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
-  ({ value, onValueChange, emptyWhenZero = false, onBlur, onFocus, ...props }, ref) => {
+  ({ value, onValueChange, emptyWhenZero = false, allowNegative = false, onBlur, onFocus, ...props }, ref) => {
     const [draft, setDraft] = React.useState(() => formatAmountForInput(value, { emptyWhenZero }))
 
     // Resincroniza si el valor cambia desde fuera (p. ej. al abrir el modal con otra transacción).
@@ -50,7 +52,7 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const next = e.target.value
 
-      if (!isAmountDraft(next)) {
+      if (!isAmountDraft(next, { allowNegative })) {
         // RECHAZO. Si aquí solo hiciéramos `return`, el estado no cambiaría, React haría
         // bail-out y NO re-renderizaría, así que el carácter rechazado se quedaría pintado
         // en el DOM. Hay que revertir el valor a mano y recolocar el cursor.
@@ -85,7 +87,8 @@ export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
         {...props}
         ref={ref}
         type="text"
-        inputMode="decimal"
+        // En iOS el teclado decimal no tiene "-": con negativos se usa el de texto.
+        inputMode={allowNegative ? "text" : "decimal"}
         autoComplete="off"
         value={draft}
         onChange={handleChange}
