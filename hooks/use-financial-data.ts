@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Firestore } from "firebase/firestore"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
-import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
+import { LOCAL_SAVE_ERROR, loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
 import { ensureMinAppVersion, subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
 import { APP_VERSION, DATA_MIN_APP_VERSION, isOlderVersion } from "@/lib/app-version" // Compatibilidad de versiones.
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
@@ -188,7 +188,9 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
 
     const target = targetRef.current
     if (!target) {
-      saveData(next) // Modo local: localStorage.
+      // Modo local: localStorage. Si no se puede guardar, se avisa (antes solo iba a la consola).
+      const saved = saveData(next)
+      setSyncError((current) => (saved ? (current === LOCAL_SAVE_ERROR ? null : current) : LOCAL_SAVE_ERROR))
       return
     }
     // Modo nube: se cifra y se envía la diferencia, en cola para respetar el orden.

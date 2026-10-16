@@ -36,6 +36,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
+import { LocalStorageNotice } from "@/components/local-storage-notice"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
@@ -611,6 +612,9 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
+      {!cloudTarget && !isTourActive && <LocalStorageNotice />}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">

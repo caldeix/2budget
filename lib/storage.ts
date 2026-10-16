@@ -204,20 +204,26 @@ export function loadData(): AppData {
  * @description Guarda los datos de la aplicación en localStorage.
  *              Los datos se serializan a una cadena JSON antes de guardarse.
  * @param {AppData} data - El objeto `AppData` que se va a guardar.
- * @returns {void}
+ * @returns {boolean} Si se ha guardado (no se puede con el almacenamiento lleno o bloqueado).
  */
-export function saveData(data: AppData): void {
+export function saveData(data: AppData): boolean {
   // Asegura que la función solo se ejecute en el lado del cliente.
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return false
 
   try {
     // Serializa el objeto `AppData` a una cadena JSON y lo guarda en localStorage.
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    return true
   } catch (error) {
-    // Registra cualquier error que ocurra durante el proceso de guardado.
+    // Cuota llena o almacenamiento bloqueado (p. ej. modo privado): quien llama avisa al usuario.
     console.error("Error saving data:", error)
+    return false
   }
 }
+
+/** Mensaje cuando no se puede guardar en este navegador (modo local). */
+export const LOCAL_SAVE_ERROR =
+  "No se han podido guardar los cambios en este navegador (el almacenamiento está lleno o bloqueado, p. ej. en modo privado). Exporta tus datos desde Configuración para no perderlos."
 
 /**
  * @function serializeAppData
