@@ -21,6 +21,7 @@ import { clearIndexedDbPersistence, terminate } from "firebase/firestore"
 import type { FirebaseServices } from "@/lib/cloud/firebase"
 import { deleteUserProfile, leaveHousehold, setPendingEmail } from "@/lib/cloud/repository"
 import { clearVaultCache } from "@/lib/cloud/vault-cache"
+import { clearAllData } from "@/lib/storage"
 
 /** Mensajes en español para los códigos de error de Firebase más habituales. */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -144,8 +145,14 @@ async function clearLocalCloudCacheAndReload(services: FirebaseServices): Promis
   window.location.reload()
 }
 
-export async function signOut(services: FirebaseServices): Promise<void> {
+/**
+ * @function signOut
+ * @description Cierra la sesión y borra la caché de la nube de este dispositivo. Con
+ *              `clearLocalData`, borra también la copia del modo local (sin cifrar), si la había.
+ */
+export async function signOut(services: FirebaseServices, options: { clearLocalData?: boolean } = {}): Promise<void> {
   await firebaseSignOut(services.auth)
+  if (options.clearLocalData) clearAllData()
   await clearLocalCloudCacheAndReload(services)
 }
 

@@ -96,6 +96,10 @@ export interface HouseholdInfo {
   members: string[]
   roles: Record<string, MemberRole>
   memberEmails: Record<string, string>
+  /** Versión más antigua de la app que entiende los datos del hogar (ver `lib/app-version.ts`). */
+  minAppVersion?: string
+  /** Documentos que no se han podido leer (dañados): se saltan y se avisa. */
+  unreadable?: number
 }
 
 /** Duración de un código de invitación. */
@@ -414,19 +418,36 @@ export async function recoverWithCode(
  * @function createDecryptingCache
  * @description Descifra los documentos de un snapshot reutilizando los que no han cambiado
  *              (mismo `enc`): en cada cambio solo se descifra lo nuevo.
+ *
+ *              Cada documento se descifra por separado (3.1.0): uno dañado ya no impide abrir el
+ *              hogar, se salta y se cuenta en `unreadable`. Si no se puede leer NINGUNO, la clave no
+ *              es la buena y se lanza el error, como antes. Saltarlos es seguro: la sincronización y
+ *              el archivado solo tocan los documentos que han leído.
  */
 function createDecryptingCache<T>(dek: CryptoKey, contextFor: (id: string) => string) {
   let cache = new Map<string, { enc: string; value: T }>()
-  return async (snap: QuerySnapshot): Promise<T[]> => {
+  return async (snap: QuerySnapshot): Promise<{ values: T[]; unreadable: number }> => {
     const next = new Map<string, { enc: string; value: T }>()
+    let unreadable = 0
+    let firstError: unknown = null
     for (const d of snap.docs) {
       const raw = d.data()
       const cached = cache.get(d.id)
-      const value = cached && cached.enc === raw.enc ? cached.value : await decryptJson<T>(dek, raw.enc, contextFor(d.id))
-      next.set(d.id, { enc: raw.enc, value })
+      if (cached && cached.enc === raw.enc) {
+        next.set(d.id, cached)
+        continue
+      }
+      try {
+        next.set(d.id, { enc: raw.enc, value: await decryptJson<T>(dek, raw.enc, contextFor(d.id)) })
+      } catch (error) {
+        unreadable += 1
+        firstError ??= error
+        console.error(`Unreadable document ${d.id}:`, error)
+      }
     }
+    if (unreadable > 0 && next.size === 0) throw firstError
     cache = next
-    return [...next.values()].map((entry) => entry.value)
+    return { values: [...next.values()].map((entry) => entry.value), unreadable }
   }
 }
 
@@ -444,8 +465,23 @@ async function readHouseholdDoc(
   return {
     config: { ...defaultConfig, ...(payload.config ?? {}) },
     version: typeof payload.version === "number" ? payload.version : DATA_VERSION,
-    info: { members: raw.members ?? [], roles: raw.roles ?? {}, memberEmails: raw.memberEmails ?? {} },
+    info: {
+      members: raw.members ?? [],
+      roles: raw.roles ?? {},
+      memberEmails: raw.memberEmails ?? {},
+      ...(typeof raw.minAppVersion === "string" && { minAppVersion: raw.minAppVersion }),
+    },
   }
+}
+
+/**
+ * @function ensureMinAppVersion
+ * @description Sube la versión mínima del hogar a la que necesitan sus datos, si estaba por debajo
+ *              (ver `lib/app-version.ts`). Un campo en claro del hogar: así una app más antigua sabe
+ *              que no puede seguir sin descifrar nada.
+ */
+export async function ensureMinAppVersion(db: Firestore, hid: string, required: string): Promise<void> {
+  await updateDoc(householdRef(db, hid), { minAppVersion: required })
 }
 
 /**
@@ -482,7 +518,10 @@ export function subscribeHousehold(
     const merged = dedupeAppData(fromStored(live, storedReports))
     const transactions = merged.transactions.map(normalizeTransaction).sort(byCreatedAtDesc)
     const reports = merged.reports.map(normalizeReport).sort(byCreatedAtDesc)
-    onData({ transactions, reports, config: household.config, version: household.version }, household.info)
+    onData(
+      { transactions, reports, config: household.config, version: household.version },
+      { ...household.info, ...(unreadable.transactions + unreadable.reports > 0 && { unreadable: unreadable.transactions + unreadable.reports }) },
+    )
 
     // Una vez por apertura, con datos del servidor: archiva los meses cerrados pendientes.
     if (!hasArchived && liveFromServer && reportsFromServer) {
@@ -506,6 +545,8 @@ export function subscribeHousehold(
     queue = queue.then(work).catch(handleError)
   }
 
+  // Documentos que no se han podido descifrar (dañados), por colección.
+  const unreadable = { transactions: 0, reports: 0 }
   const decryptTransactions = createDecryptingCache<Transaction>(dek, context.transaction)
   const decryptReports = createDecryptingCache<StoredReport>(dek, context.report)
 
@@ -528,7 +569,9 @@ export function subscribeHousehold(
       transactionsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          live = await decryptTransactions(snap)
+          const result = await decryptTransactions(snap)
+          live = result.values
+          unreadable.transactions = result.unreadable
           liveFromServer = !snap.metadata.fromCache
           emit()
         }),
@@ -538,7 +581,9 @@ export function subscribeHousehold(
       reportsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          storedReports = await decryptReports(snap)
+          const result = await decryptReports(snap)
+          storedReports = result.values
+          unreadable.reports = result.unreadable
           reportsFromServer = !snap.metadata.fromCache
           archivedMonthsByHousehold.set(hid, archivedMonthsOf(storedReports))
           emit()

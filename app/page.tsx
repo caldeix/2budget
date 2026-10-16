@@ -8,8 +8,10 @@ import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
 import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear } from "@/lib/utils"
 import {
+  downloadAppData,
   getLastSeenMonth,
   hasAccountPromptBeenShown,
+  hasAppData,
   hasSeenTourOnDevice,
   markAccountPromptShown,
   markTourSeenOnDevice,
@@ -19,6 +21,8 @@ import {
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment, isContribution, isPayable } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
+import { laterSharedClosings } from "@/lib/shared-account"
+import { isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
 import { lastMonths, monthlyEvolution } from "@/lib/evolution"
@@ -35,6 +39,10 @@ import { SettingsModal } from "@/components/settings-modal"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
+import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
+import { LocalStorageNotice } from "@/components/local-storage-notice"
+import { FlashMessage, type Flash } from "@/components/flash-message"
+import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal, type CopyAmounts } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
 import { AccountModal } from "@/components/account-modal"
@@ -102,6 +110,7 @@ export default function HomePage() {
     replaceAllData,
     householdInfo,
     syncError,
+    loadError,
   } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
   const needsAuth = session.enabled && (!session.user || !session.emailVerified)
@@ -154,6 +163,9 @@ export default function HomePage() {
   const [isPaidReconcileOpen, setIsPaidReconcileOpen] = useState(false)
   const [reconcileExpenses, setReconcileExpenses] = useState<Transaction[]>([])
   const [reconcileLabel, setReconcileLabel] = useState<{ monthName: string; year: number }>({ monthName: "", year: 0 })
+  // Avisos breves (copiar fijos, importar), en lugar de `alert()`.
+  const [flash, setFlash] = useState<Flash | null>(null)
+  const closeFlash = useCallback(() => setFlash(null), [])
 
   const [transactionsToShow, setTransactionsToShow] = useState(5)
 
@@ -308,7 +320,10 @@ export default function HomePage() {
     )
 
     if (toCopy.length === 0) {
-      alert(`No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`)
+      setFlash({
+        text: `No hay gastos fijos, ingresos ni aportaciones en ${sourceMonthName} ${sourceYear} para copiar.`,
+        tone: "error",
+      })
       return
     }
 
@@ -355,7 +370,7 @@ export default function HomePage() {
       contributionCount > 0
         ? `${expenseCount} gastos fijos, ${incomeCount} ingresos y ${contributionCount} aportaciones`
         : `${expenseCount} gastos fijos y ${incomeCount} ingresos`
-    alert(`${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`)
+    setFlash({ text: `${copied} copiados a ${getMonthName(selectedMonth - 1)} ${selectedYear}`, tone: "success" })
   }, [transactionsToCopy, selectedMonth, selectedYear, addTransaction])
 
   const handleOpenReportModalForCurrentMonth = () => {
@@ -385,9 +400,20 @@ export default function HomePage() {
     >,
     adjustmentTransactionsToCreate: Omit<Transaction, "id" | "createdAt">[],
   ) => {
-    const existingReport = getExistingReport(reportDataFromModal.month, reportDataFromModal.year)
+    const { month, year } = reportDataFromModal
+    const existingReport = getExistingReport(month, year)
+    const previousSharedAdjustment = existingReport?.sharedAdjustment ?? 0
     createOrUpdateReport(reportDataFromModal, adjustmentTransactionsToCreate, existingReport?.id)
     setIsReportModalOpen(false)
+    // Si cambia el ajuste de la compartida, los cierres siguientes con compartida dejan de cuadrar.
+    const later = existingReport ? laterSharedClosings(data.reports, month, year) : []
+    if (later.length > 0 && !isZeroMoney(subtractMoney(reportDataFromModal.sharedAdjustment ?? 0, previousSharedAdjustment))) {
+      const next = later[0]
+      setFlash({
+        text: `Informe actualizado. Actualiza ahora el cierre de ${formatMonthYear(next.month, next.year)} para que la compartida vuelva a cuadrar.`,
+        tone: "warning",
+      })
+    }
   }
 
   const handleViewReport = (report: MonthlyReport) => {
@@ -395,13 +421,21 @@ export default function HomePage() {
   }
 
   // Importar sirve igual en local y en la nube: los datos pasan por `replaceAllData`.
+  // Antes de sustituir se descarga una copia de lo que había (si había algo), por si el archivo no era
+  // el que tocaba.
   const handleImportData = (content: string): boolean => {
     const imported = parseImportedData(content)
-    if (!imported) {
-      alert("Error al importar los datos. Verifica que el archivo sea válido.")
+    if (!imported.ok) {
+      setFlash({ text: imported.error, tone: "error" })
       return false
     }
-    replaceAllData(imported)
+    const hadData = hasAppData(data)
+    if (hadData) downloadAppData(data, "antes-de-importar")
+    replaceAllData(imported.data)
+    setFlash({
+      text: hadData ? "Datos importados. Se ha descargado una copia de los anteriores." : "Datos importados.",
+      tone: "success",
+    })
     return true
   }
 
@@ -561,6 +595,28 @@ export default function HomePage() {
     return <VaultUnlock session={session} vault={vault} onRecoveryCode={setRecoveryCodeToShow} />
   }
 
+  // No se ha podido abrir el hogar: no se enseñan datos de otro sitio ni se guarda nada.
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <div className="max-w-md space-y-4 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-600 mx-auto" />
+          <h1 className="text-2xl font-bold text-foreground">No se ha podido abrir tu hogar</h1>
+          <p className="text-muted-foreground">{loadError}</p>
+          <p className="text-sm text-muted-foreground">
+            Tus datos siguen en la nube; no se ha cambiado nada. Comprueba la conexión y vuelve a intentarlo.
+          </p>
+          <Button onClick={() => window.location.reload()}>Reintentar</Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Los datos del hogar necesitan una versión más nueva que esta (ver `lib/app-version.ts`).
+  if (householdInfo?.minAppVersion && isOlderVersion(APP_VERSION, householdInfo.minAppVersion)) {
+    return <UpdateRequired minVersion={householdInfo.minAppVersion} />
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -604,6 +660,24 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Documentos dañados que no se han podido leer: el resto funciona (ver `createDecryptingCache`). */}
+      {householdInfo?.unreadable ? (
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-4">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <p className="text-sm text-amber-600">
+              {householdInfo.unreadable === 1
+                ? "Hay un movimiento o informe que no se ha podido leer (está dañado)."
+                : `Hay ${householdInfo.unreadable} movimientos o informes que no se han podido leer (están dañados).`}{" "}
+              El resto de tus datos funciona con normalidad y no se ha borrado nada.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
+      {!cloudTarget && !isTourActive && <LocalStorageNotice />}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
@@ -892,6 +966,7 @@ export default function HomePage() {
           existingReport={getExistingReport(monthToCloseReport, yearToCloseReport)}
           singleMode={data.config.singleMode}
           allTransactions={data.transactions}
+          laterSharedReports={laterSharedClosings(data.reports, monthToCloseReport, yearToCloseReport)}
         />
       )}
 
@@ -985,6 +1060,8 @@ export default function HomePage() {
       />
 
       {tourSteps && <AppTour steps={tourSteps} onFinish={finishTour} onOpenChange={handleTourOpenChange} />}
+      <UpdateNotice />
+      <FlashMessage flash={flash} onClose={closeFlash} />
     </div>
   )
 }
