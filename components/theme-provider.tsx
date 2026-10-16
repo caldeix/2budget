@@ -44,7 +44,8 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
  * @returns {JSX.Element} El proveedor de contexto que envuelve a los hijos.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Estado para almacenar el tema actual. Se inicializa en 'light' como valor por defecto.
+  // Estado para almacenar el tema actual. Se inicializa en 'light' como valor por defecto; la clase
+  // `dark` ya la ha puesto antes de pintar el script del `<head>` (ver `app/layout.tsx`).
   const [theme, setTheme] = useState<Theme>("light")
 
   /**
