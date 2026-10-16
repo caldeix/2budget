@@ -42,6 +42,8 @@ import { AlertTriangle, CheckCircle, Plus, Minus } from "lucide-react" // Iconos
  * @property {boolean} [singleMode] - Modo individual: solo se pide el dinero real de la Persona 1.
  * @property {Transaction[]} [allTransactions] - Todas las transacciones: con ellas se calcula lo acumulado
  *           en la cuenta compartida hasta el mes que se cierra.
+ * @property {MonthlyReport[]} [laterSharedReports] - Cierres posteriores con compartida: si se cambia este,
+ *           hay que actualizarlos también (ver `laterSharedClosings`).
  */
 interface MonthlyReportModalProps {
   isOpen: boolean
@@ -58,6 +60,7 @@ interface MonthlyReportModalProps {
   existingReport?: MonthlyReport
   singleMode?: boolean
   allTransactions?: Transaction[]
+  laterSharedReports?: MonthlyReport[]
 }
 
 /**
@@ -79,6 +82,7 @@ export function MonthlyReportModal({
   existingReport,
   singleMode,
   allTransactions,
+  laterSharedReports = [],
 }: MonthlyReportModalProps) {
   // Estado para el dinero real disponible de la Persona 1.
   const [person1RealMoney, setPerson1RealMoney] = useState(0)
@@ -295,6 +299,23 @@ export function MonthlyReportModal({
                 <p className="text-sm text-amber-600 mt-1">
                   Ya existe un informe para este mes. Al continuar, se actualizará y sus transacciones de ajuste
                   se sustituirán por las nuevas.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Cierres encadenados: el saldo de la compartida arrastra los ajustes de este cierre */}
+        {existingReport && usesShared && laterSharedReports.length > 0 && (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+              <div>
+                <h3 className="font-medium text-amber-600">Hay cierres posteriores</h3>
+                <p className="text-sm text-amber-600 mt-1">
+                  El saldo de la compartida de los meses siguientes parte de este cierre. Si cambias el ajuste de la
+                  compartida, actualiza después, en orden, también{" "}
+                  {laterSharedReports.map((r) => formatMonthYear(r.month, r.year)).join(", ")}.
                 </p>
               </div>
             </div>

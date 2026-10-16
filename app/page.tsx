@@ -19,6 +19,8 @@ import {
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment, isContribution, isPayable } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
+import { laterSharedClosings } from "@/lib/shared-account"
+import { isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
 import { lastMonths, monthlyEvolution } from "@/lib/evolution"
@@ -396,9 +398,20 @@ export default function HomePage() {
     >,
     adjustmentTransactionsToCreate: Omit<Transaction, "id" | "createdAt">[],
   ) => {
-    const existingReport = getExistingReport(reportDataFromModal.month, reportDataFromModal.year)
+    const { month, year } = reportDataFromModal
+    const existingReport = getExistingReport(month, year)
+    const previousSharedAdjustment = existingReport?.sharedAdjustment ?? 0
     createOrUpdateReport(reportDataFromModal, adjustmentTransactionsToCreate, existingReport?.id)
     setIsReportModalOpen(false)
+    // Si cambia el ajuste de la compartida, los cierres siguientes con compartida dejan de cuadrar.
+    const later = existingReport ? laterSharedClosings(data.reports, month, year) : []
+    if (later.length > 0 && !isZeroMoney(subtractMoney(reportDataFromModal.sharedAdjustment ?? 0, previousSharedAdjustment))) {
+      const next = later[0]
+      setFlash({
+        text: `Informe actualizado. Actualiza ahora el cierre de ${formatMonthYear(next.month, next.year)} para que la compartida vuelva a cuadrar.`,
+        tone: "warning",
+      })
+    }
   }
 
   const handleViewReport = (report: MonthlyReport) => {
@@ -943,6 +956,7 @@ export default function HomePage() {
           existingReport={getExistingReport(monthToCloseReport, yearToCloseReport)}
           singleMode={data.config.singleMode}
           allTransactions={data.transactions}
+          laterSharedReports={laterSharedClosings(data.reports, monthToCloseReport, yearToCloseReport)}
         />
       )}
 
