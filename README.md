@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.0.2-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.0.3-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,17 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.0.3 — Seguridad
+
+- **Reglas del hogar más estrictas** — Un miembro solo puede cambiar los datos cifrados, su propio email o salir del hogar; ya no puede quitar al otro, cambiar los roles ni dejar el hogar sin miembros
+- **Invitaciones de un solo uso de verdad** — Unirse y gastar la invitación van en la misma escritura; caducan en 48 horas como mucho, y generar otro código invalida el anterior
+- **Solo datos cifrados en la nube** — Las reglas rechazan documentos que no sean el texto cifrado o que traigan campos inesperados
+- **Contraseña maestra más fuerte** — Las nuevas piden 12 caracteres y que no sean repetitivas; las actuales siguen valiendo
+- **Content-Security-Policy** — La web solo carga código y envía datos a Firebase y reCAPTCHA
+- **Dependencias** — Next 15.5.28 y fuera 32 paquetes y 39 componentes sin usar (avisos de seguridad de producción: de 21 a 7, ninguno crítico ni del navegador)
+- Requiere publicar las reglas nuevas de Firestore (`firebase deploy --only firestore:rules`)
+- SemVer: 3.0.2 → 3.0.3 (PATCH)
 
 ### v3.0.2 — Datos y cálculos más seguros
 
