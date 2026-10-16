@@ -32,6 +32,10 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
+      # Un error de tipos para el despliegue antes de compilar (la build también lo comprueba).
+      - name: Revisar tipos
+        run: npx tsc --noEmit
+
       - name: Compilar exportación estática
         run: npm run build
         # Configuración de Firebase (secrets del repositorio). Sin ella, la web funciona solo en local.
