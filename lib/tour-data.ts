@@ -4,6 +4,9 @@
  *              en el mes actual y en los dos anteriores (cerrados con su informe), para que todas
  *              las partes de la app tengan algo que enseñar. Solo viven en memoria mientras dura
  *              el tour: nunca se guardan (ver `useFinancialData`).
+ *              En pareja, el mes actual lleva además las aportaciones a la cuenta compartida (ya
+ *              enviadas: con una pendiente, la compartida de "Hoy" saldría en negativo y confundiría).
+ *              Los meses cerrados no las llevan: sus informes son los de siempre.
  */
 
 import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
@@ -21,13 +24,17 @@ interface Sample {
   name: string
   amount: number
   owner: Owner
-  /** Gasto ya pagado (en los meses cerrados, todos lo están). */
+  /** Gasto ya pagado o aportación ya enviada (en los meses cerrados, todos lo están). */
   paid?: boolean
+  /** Solo en el mes actual (las aportaciones: ver la cabecera). */
+  currentMonthOnly?: boolean
   nonComputable?: boolean
   categoryId?: string
 }
 
 const SAMPLES: Sample[] = [
+  { day: 1, type: "contribution", category: "contribution", name: "Aportación", amount: 1100, owner: "person1", paid: true, currentMonthOnly: true },
+  { day: 1, type: "contribution", category: "contribution", name: "Aportación", amount: 1000, owner: "person2", paid: true, currentMonthOnly: true },
   { day: 1, type: "income", category: "income", name: "Nómina", amount: 2100, owner: "person1", categoryId: "nomina" },
   { day: 1, type: "income", category: "income", name: "Nómina", amount: 1850, owner: "person2", categoryId: "nomina" },
   { day: 1, type: "expense", category: "fixed", name: "Alquiler", amount: 950, owner: "both", paid: true, categoryId: "casa" },
@@ -66,9 +73,14 @@ export function createTourData(now: Date, config: AppConfig): AppData {
 
   const make = (s: Sample, month: number, year: number, closed: boolean): Transaction | null => {
     if (single && s.owner === "person2") return null
+    // En modo individual no hay cuenta compartida; en pareja, las aportaciones solo en el mes actual.
+    if (s.type === "contribution" && (single || closed)) return null
+    if (s.currentMonthOnly && closed) return null
     const owner: Owner = single ? "person1" : s.owner
     const person1Percentage = owner === "person1" ? 100 : owner === "person2" ? 0 : 50
-    const name = s.type === "income" ? `${s.name} ${owner === "person1" ? config.person1Name : config.person2Name}` : s.name
+    // Ingresos y aportaciones llevan el nombre de su dueño ("Nómina Luis", "Aportación Laura").
+    const ownerName = owner === "person1" ? config.person1Name : config.person2Name
+    const name = s.type === "income" || s.type === "contribution" ? `${s.name} ${ownerName}` : s.name
     seq += 1
     return {
       id: `tour-${seq}`,
@@ -82,7 +94,7 @@ export function createTourData(now: Date, config: AppConfig): AppData {
       date: dateIn(month, year, s.day),
       createdAt: new Date(now.getTime() - seq * 60_000).toISOString(),
       nonComputable: Boolean(s.nonComputable),
-      paid: s.type === "expense" && (closed || Boolean(s.paid)),
+      paid: s.type !== "income" && (closed || Boolean(s.paid)),
       categoryId: s.categoryId,
     }
   }

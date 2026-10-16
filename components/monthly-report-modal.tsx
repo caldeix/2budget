@@ -358,7 +358,8 @@ export function MonthlyReportModal({
           )}
           <div
             className={`grid gap-4 ${
-              usesShared ? "grid-cols-1 sm:grid-cols-3" : showPerson2 ? "grid-cols-2" : "grid-cols-1"
+              // Con tres campos, alineados por abajo: la etiqueta de la compartida ocupa dos líneas.
+              usesShared ? "grid-cols-1 sm:grid-cols-3 sm:items-end" : showPerson2 ? "grid-cols-2" : "grid-cols-1"
             }`}
           >
             <div>
