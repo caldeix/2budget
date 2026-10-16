@@ -48,6 +48,31 @@ service cloud.firestore {
         && invite.expiresAt > request.time;
     }
 
+    // Lo que un miembro puede cambiar en el hogar (3.0.3). Antes bastaba con no añadir miembros,
+    // y un miembro podía quitar al otro, intercambiar roles o dejar el hogar sin nadie.
+    function isMemberUpdate() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let changed = after.diff(before).affectedKeys();
+      return signedIn()
+        && request.auth.uid in before.members
+        && (
+          // Los datos cifrados (configuración) y la versión mínima de la app.
+          changed.hasOnly(['enc', 'minAppVersion'])
+          // Su propio email.
+          || (changed.hasOnly(['memberEmails'])
+            && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid]))
+          // Salir: se quita a sí mismo, con su rol y su email; el otro miembro se queda.
+          || (changed.hasOnly(['members', 'roles', 'memberEmails'])
+            && before.members.size() == 2
+            && after.members == before.members.removeAll([request.auth.uid])
+            && after.roles.diff(before.roles).affectedKeys().hasOnly([request.auth.uid])
+            && !(request.auth.uid in after.roles)
+            && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid])
+            && !(request.auth.uid in after.memberEmails))
+        );
+    }
+
     // Perfil: solo su dueño.
     match /users/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
@@ -61,12 +86,9 @@ service cloud.firestore {
         && request.resource.data.members == [request.auth.uid]
         && request.resource.data.createdBy == request.auth.uid;
 
-      // Un miembro puede editarlo, pero no añadir miembros (solo salir o quitar).
+      // Un miembro solo cambia lo que permite `isMemberUpdate` (datos cifrados, su email o salir).
       // Un no miembro solo puede unirse con invitación.
-      allow update: if (signedIn()
-          && request.auth.uid in resource.data.members
-          && request.resource.data.members.hasOnly(resource.data.members))
-        || isValidJoin(hid);
+      allow update: if isMemberUpdate() || isValidJoin(hid);
 
       // Solo se borra cuando lo deja el último miembro.
       allow delete: if signedIn()
