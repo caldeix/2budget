@@ -45,7 +45,9 @@ service cloud.firestore {
         && after.roles[request.auth.uid] == 'person2'
         && after.memberEmails.diff(before.memberEmails).affectedKeys().hasOnly([request.auth.uid])
         && invite.householdId == hid
-        && invite.expiresAt > request.time;
+        && invite.expiresAt > request.time
+        // La invitación se gasta en la misma escritura (3.0.3): no se puede reutilizar.
+        && !existsAfter(/databases/$(database)/documents/invites/$(after.joinCode));
     }
 
     // Lo que un miembro puede cambiar en el hogar (3.0.3). Antes bastaba con no añadir miembros,
@@ -117,13 +119,16 @@ service cloud.firestore {
       }
     }
 
-    // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar.
+    // Invitaciones: se leen por código (sin poder listarlas) y las crea un miembro del hogar, con
+    // caducidad de 48 horas como mucho. Las borra un miembro, o quien se une en la misma escritura.
     match /invites/{code} {
       allow get: if signedIn();
       allow create: if signedIn()
         && request.resource.data.createdBy == request.auth.uid
-        && isMember(request.resource.data.householdId);
-      allow delete: if isMember(resource.data.householdId);
+        && isMember(request.resource.data.householdId)
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt < request.time + duration.value(49, 'h');
+      allow delete: if isMember(resource.data.householdId) || isMemberAfter(resource.data.householdId);
     }
   }
 }

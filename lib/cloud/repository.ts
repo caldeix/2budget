@@ -680,7 +680,9 @@ export async function createHousehold(
 
 /**
  * @function createInvite
- * @description Genera un código de invitación de un solo uso, válido 48 horas.
+ * @description Genera un código de invitación de un solo uso, válido 48 horas. Si se pasa el
+ *              código anterior (el que se estaba enseñando), se borra en la misma escritura: así
+ *              "Generar otro código" deja solo uno válido.
  *              El código tiene dos partes: el id del documento y un secreto con el que se
  *              envuelve la clave del hogar. El secreto NO se guarda en Firestore: solo lo tiene
  *              quien recibe el código, así que nadie más puede usar la invitación para leer los datos.
@@ -692,16 +694,20 @@ export async function createInvite(
   hid: string,
   uid: string,
   extractableDek: CryptoKey,
+  previousCode?: string,
 ): Promise<{ code: string; expiresAt: Date }> {
   const id = randomReadable(INVITE_ID_LENGTH)
   const secret = randomReadable(INVITE_SECRET_LENGTH)
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
-  await setDoc(inviteRef(db, id), {
+  const batch = writeBatch(db)
+  batch.set(inviteRef(db, id), {
     householdId: hid,
     createdBy: uid,
     expiresAt: Timestamp.fromDate(expiresAt),
     ...(await wrapDek(extractableDek, secret, INVITE_KDF_ITERATIONS)),
   })
+  if (previousCode) batch.delete(inviteRef(db, normalizeCode(previousCode).slice(0, INVITE_ID_LENGTH)))
+  await batch.commit()
   return { code: id + secret, expiresAt }
 }
 
@@ -742,30 +748,33 @@ export async function joinHousehold(
   }
 
   const householdId = data.householdId
+  // Su clave, envuelta con su contraseña maestra, y su código de recuperación.
+  const ownKey = await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS)
+  const recovery = await createRecovery(dek)
+  // La clave queda guardada en el dispositivo antes de unirse (como al crear un hogar).
+  await saveCachedDek(uid, householdId, await toNonExtractable(dek))
+
+  // Todo en una sola escritura (3.0.3): unirse, su clave, su perfil y gastar la invitación. Las
+  // reglas exigen que la invitación desaparezca en la misma escritura, así que no se puede reutilizar.
+  const batch = writeBatch(db)
+  batch.update(householdRef(db, householdId), {
+    members: arrayUnion(uid),
+    [`roles.${uid}`]: "person2",
+    [`memberEmails.${uid}`]: email,
+    joinCode: id,
+  })
+  batch.set(keyRef(db, householdId, uid), ownKey)
+  batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
+  batch.set(userRef(db, uid), { householdId, ...masterCheckFields() }, { merge: true })
+  batch.delete(inviteRef(db, id))
   try {
-    await updateDoc(householdRef(db, householdId), {
-      members: arrayUnion(uid),
-      [`roles.${uid}`]: "person2",
-      [`memberEmails.${uid}`]: email,
-      joinCode: id,
-    })
+    await batch.commit()
   } catch (error) {
     if ((error as { code?: string }).code === "permission-denied") {
       throw new HouseholdError("No puedes unirte a este hogar: ya tiene dos miembros o el código no es válido.")
     }
     throw error
   }
-
-  // Ya es miembro: su clave, guardada en el dispositivo y envuelta con su contraseña maestra;
-  // después se apunta su perfil al hogar y se gasta la invitación.
-  await saveCachedDek(uid, householdId, await toNonExtractable(dek))
-  const recovery = await createRecovery(dek)
-  const batch = writeBatch(db)
-  batch.set(keyRef(db, householdId, uid), await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS))
-  batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
-  batch.set(userRef(db, uid), { householdId, ...masterCheckFields() }, { merge: true })
-  batch.delete(inviteRef(db, id))
-  await batch.commit()
   return { householdId, recoveryCode: recovery.code }
 }
 
