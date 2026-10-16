@@ -10,6 +10,14 @@ const config: Config = {
   darkMode: ["class"],
   theme: {
     extend: {
+      // `text-primary` usa un dorado más oscuro en el tema claro (ver `--primary-text`); los fondos y
+      // bordes `primary` siguen con el dorado de siempre.
+      textColor: {
+        primary: {
+          DEFAULT: "hsl(var(--primary-text))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

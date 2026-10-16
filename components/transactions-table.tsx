@@ -939,7 +939,7 @@ export function TransactionsTable({
                       >
                         <Button
                           size="sm"
-                          className="flex-1 bg-amber-600 text-primary-foreground hover:bg-amber-700"
+                          className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
                           disabled={isClosingAdjustment(transaction) || isAmountHidden(transaction)}
                           tabIndex={openSwipeId === transaction.id ? 0 : -1}
                           onClick={() => {
