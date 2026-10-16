@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Firestore } from "firebase/firestore"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
-import { LOCAL_SAVE_ERROR, loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
+import { LOCAL_SAVE_ERROR, STORAGE_KEY, loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
 import { ensureMinAppVersion, subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
 import { APP_VERSION, DATA_MIN_APP_VERSION, isOlderVersion } from "@/lib/app-version" // Compatibilidad de versiones.
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
@@ -141,7 +141,16 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
       setData(local)
       setHouseholdInfo(null)
       setLoadedSource("local")
-      return
+      // Otra pestaña de este navegador ha guardado (3.1.1): se cargan sus datos. Antes cada pestaña
+      // guardaba su estado entero y la última pisaba los cambios de la otra.
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== null && event.key !== STORAGE_KEY) return
+        const fresh = loadData()
+        dataRef.current = fresh
+        setData(fresh)
+      }
+      window.addEventListener("storage", onStorage)
+      return () => window.removeEventListener("storage", onStorage)
     }
 
     // Modo nube: se espera al primer snapshot completo (y descifrado) del hogar.

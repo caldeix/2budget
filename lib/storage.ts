@@ -17,7 +17,7 @@ import { validateImportedData } from "@/lib/validate-data" // Comprobación de l
  * @constant {string} STORAGE_KEY
  * @description Clave utilizada para almacenar los datos de la aplicación en localStorage.
  */
-const STORAGE_KEY = "financial-manager-data"
+export const STORAGE_KEY = "financial-manager-data"
 
 /**
  * Versión del esquema de datos persistido.
