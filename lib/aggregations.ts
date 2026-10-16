@@ -52,14 +52,24 @@ export interface AggregateOptions {
 }
 
 /**
+ * Desde la 3.0.2 los ajustes de cierre se reconocen solo por la marca `closingAdjustment`. Por el
+ * nombre ("Ajuste X - Cierre Y") solo los creados antes, que pueden no llevar la marca: así una
+ * transacción del usuario que se llame igual ya no se toma por un ajuste (ni se borra al actualizar
+ * el informe de su mes).
+ */
+const NAME_RECOGNITION_UNTIL = "2026-10-17T00:00:00.000Z"
+
+/**
  * @function isClosingAdjustment
  * @description Transacción de ajuste creada al cerrar un mes (ver `monthly-report-modal`).
  *              Es un apunte contable: no se copia al mes siguiente, no queda pendiente de pagar
- *              y no se edita ni se borra a mano (la gestiona el informe). Las anteriores a la
- *              marca `closingAdjustment` se reconocen por el nombre que les da el cierre.
+ *              y no se edita ni se borra a mano (la gestiona el informe). Ver `NAME_RECOGNITION_UNTIL`
+ *              para los antiguos sin marca.
  */
 export function isClosingAdjustment(t: Transaction): boolean {
-  return Boolean(t.closingAdjustment) || /^Ajuste .+ - Cierre /.test(t.name)
+  if (t.closingAdjustment) return true
+  const isLegacy = !t.createdAt || t.createdAt < NAME_RECOGNITION_UNTIL
+  return isLegacy && /^Ajuste .+ - Cierre /.test(t.name)
 }
 
 /**
