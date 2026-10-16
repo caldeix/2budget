@@ -272,8 +272,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 </li>
                 <li>
                   En <strong>Balance individual</strong> se ve la <strong>cuenta</strong> de cada uno (lo que tiene en su
-                  banco), su <strong>total</strong> debajo (su cuenta más su parte en la compartida) y una fila{" "}
-                  <strong>Compartida</strong> con lo que hay y de quién es. Todo en «Hoy» y «Previsto».
+                  banco), su <strong>total previsto</strong> debajo (su cuenta más su parte en la compartida) y una
+                  fila <strong>Compartida</strong> con lo que hay y de quién es. Todo en «Hoy» y «Previsto». Pulsa el
+                  nombre de una fila para ver de dónde sale su cifra.
+                </li>
+                <li>
+                  Los <strong>Gastos</strong> de cada uno no incluyen las aportaciones: son un traspaso entre cuentas, no
+                  un gasto.
                 </li>
                 <li>
                   Lo que sobra en la compartida <strong>se queda ahí</strong> y se acumula: el Total acumulado también
@@ -283,6 +288,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 <li>
                   Ejemplo: cobráis 1000 € cada uno y enviáis 500 € cada uno; los gastos compartidos son 600 € a medias.
                   Cada cuenta tiene 500 €, la compartida 400 € (200 € de cada uno) y el total de cada uno es 700 €.
+                </li>
+                <li>
+                  Para repartir lo que sobra en la compartida, usa la fila <strong>Compartida</strong> (en el ejemplo,
+                  400 €: 200 € para cada uno), no la cuenta de cada uno: los 500 € de cada cuenta ya son de su dueño.
                 </li>
                 <li>Un mes sin aportaciones se calcula como siempre. En modo individual no hay cuenta compartida.</li>
               </ul>
@@ -313,6 +322,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 <li>
                   Si ya está cerrado, el botón pasa a «Actualizar mes actual»: los ajustes se recalculan y{" "}
                   <strong>sustituyen</strong> a los anteriores.
+                </li>
+                <li>
+                  El saldo de la compartida arrastra los cierres anteriores: si actualizas el del mes anterior con el
+                  actual ya cerrado, la app avisa de que actualices después también el actual.
                 </li>
                 <li>
                   Los ajustes de cierre no se editan ni se borran a mano (sus botones se ven desactivados): se cambian
