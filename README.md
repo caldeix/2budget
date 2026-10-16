@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.1.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.1.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,19 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.1.1 — Accesibilidad y mantenimiento
+
+- **Ventanas accesibles** — Los modales son diálogos de verdad: el foco entra, no se escapa con el tabulador y vuelve al cerrar; con dos abiertos, Escape cierra solo el de encima. Durante el tour, la app de detrás queda inactiva
+- **Botones con nombre** — Editar y borrar dicen qué transacción; en el móvil, además del gesto de deslizar, un botón «Más acciones»; el deslizador de reparto se lee como «Luis 60 %, Ana 40 %». Botones táctiles de 44 px
+- **Contraste** — Texto oscuro sobre los botones dorados y un dorado más oscuro como texto en el tema claro (de 2,2:1 a más de 4,5:1)
+- **iPhone** — La barra del sistema toma el color de cada tema, los modales no quedan tapados por las barras de Safari y el selector de categorías ya no hace zoom
+- **Cambios a la vez sin pisarse** — La configuración lleva revisión: si tu pareja la cambió antes (también sin conexión), solo se aplica encima lo que cambiaste tú, y la privacidad de cada uno no se pisa. Una transacción que tu pareja borró no reaparece al editarla, y la reconciliación de pagados solo envía lo que cambias
+- **Modo local** — Dos pestañas abiertas ya no se pisan: cada una recoge lo que guarda la otra
+- **Rendimiento** — El mes y el total acumulado se calculan solo cuando cambian los datos, y los meses archivados sin cambios no se vuelven a comparar en cada escritura
+- **Mantenimiento** — Ids con `crypto.randomUUID`, un solo nombre de mes, `page.tsx` y la tabla partidos en ficheros más pequeños, sin ESLint a medias ni el script `deploy` (el despliegue revisa tipos)
+- Requiere publicar las reglas nuevas de Firestore (`firebase deploy --only firestore:rules`); hasta actualizar, una versión anterior no puede cambiar la configuración del hogar
+- SemVer: 3.1.0 → 3.1.1 (PATCH)
 
 ### v3.1.0 — Avisos y robustez
 
