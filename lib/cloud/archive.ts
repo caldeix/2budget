@@ -121,9 +121,26 @@ export function toStored(data: AppData, archivedMonths: Set<string>): StoredData
   }
   const reports: StoredReport[] = data.reports.map((r) => {
     const month = reportMonth(r)
-    return archived.has(month) ? { ...r, archive: [...(byMonth.get(month) ?? [])].sort(byId) } : r
+    return archived.has(month) ? archivedReport(r, [...(byMonth.get(month) ?? [])].sort(byId)) : r
   })
   return { ...data, transactions, reports }
+}
+
+// Último archivo montado de cada informe (3.1.1). Cada cambio llama dos veces a `toStored` (antes y
+// después) y comparaba por contenido TODOS los meses archivados, cada vez más. Si el informe y sus
+// transacciones son los mismos objetos que la vez anterior, se devuelve el mismo archivo y la
+// comparación sale por referencia (ver `diffAppData`).
+const archivedReportCache = new WeakMap<MonthlyReport, { archive: Transaction[]; stored: StoredReport }>()
+
+/** El informe con sus transacciones dentro, reutilizando el de la vez anterior si nada cambió. */
+function archivedReport(report: MonthlyReport, archive: Transaction[]): StoredReport {
+  const cached = archivedReportCache.get(report)
+  if (cached && cached.archive.length === archive.length && cached.archive.every((t, i) => t === archive[i])) {
+    return cached.stored
+  }
+  const stored = { ...report, archive }
+  archivedReportCache.set(report, { archive, stored })
+  return stored
 }
 
 /**

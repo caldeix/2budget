@@ -177,7 +177,11 @@ export default function HomePage() {
   const [monthToCloseReport, setMonthToCloseReport] = useState(getCurrentMonth())
   const [yearToCloseReport, setYearToCloseReport] = useState(getCurrentYear())
 
-  const allTransactionsForSelectedMonth = getTransactionsForMonth(selectedMonth, selectedYear)
+  // Memorizado: un array nuevo en cada render anulaba el `useMemo` de `useCalculations`.
+  const allTransactionsForSelectedMonth = useMemo(
+    () => getTransactionsForMonth(selectedMonth, selectedYear),
+    [getTransactionsForMonth, selectedMonth, selectedYear],
+  )
 
   const hasFixedExpensesInCurrentMonth = allTransactionsForSelectedMonth.some(isFixedExpense)
   const hasIncomesInCurrentMonth = allTransactionsForSelectedMonth.some(isCopyableIncome)
@@ -232,7 +236,7 @@ export default function HomePage() {
   )
   // Solo el último informe se puede borrar (p. ej. si se cerró el mes sin querer).
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
-  const cumulativeBalances = calculateCumulativeBalances(data.transactions)
+  const cumulativeBalances = useMemo(() => calculateCumulativeBalances(data.transactions), [data.transactions])
   // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
   const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
