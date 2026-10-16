@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.0.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.1.1-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -51,6 +51,52 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.1.1 — Accesibilidad y mantenimiento
+
+- **Ventanas accesibles** — Los modales son diálogos de verdad: el foco entra, no se escapa con el tabulador y vuelve al cerrar; con dos abiertos, Escape cierra solo el de encima. Durante el tour, la app de detrás queda inactiva
+- **Botones con nombre** — Editar y borrar dicen qué transacción; en el móvil, además del gesto de deslizar, un botón «Más acciones»; el deslizador de reparto se lee como «Luis 60 %, Ana 40 %». Botones táctiles de 44 px
+- **Contraste** — Texto oscuro sobre los botones dorados y un dorado más oscuro como texto en el tema claro (de 2,2:1 a más de 4,5:1)
+- **iPhone** — La barra del sistema toma el color de cada tema, los modales no quedan tapados por las barras de Safari y el selector de categorías ya no hace zoom
+- **Cambios a la vez sin pisarse** — La configuración lleva revisión: si tu pareja la cambió antes (también sin conexión), solo se aplica encima lo que cambiaste tú, y la privacidad de cada uno no se pisa. Una transacción que tu pareja borró no reaparece al editarla, y la reconciliación de pagados solo envía lo que cambias
+- **Modo local** — Dos pestañas abiertas ya no se pisan: cada una recoge lo que guarda la otra
+- **Rendimiento** — El mes y el total acumulado se calculan solo cuando cambian los datos, y los meses archivados sin cambios no se vuelven a comparar en cada escritura
+- **Mantenimiento** — Ids con `crypto.randomUUID`, un solo nombre de mes, `page.tsx` y la tabla partidos en ficheros más pequeños, sin ESLint a medias ni el script `deploy` (el despliegue revisa tipos)
+- Requiere publicar las reglas nuevas de Firestore (`firebase deploy --only firestore:rules`); hasta actualizar, una versión anterior no puede cambiar la configuración del hogar
+- SemVer: 3.1.0 → 3.1.1 (PATCH)
+
+### v3.1.0 — Avisos y robustez
+
+- **Versión mínima** — El hogar guarda la versión más antigua que entiende sus datos: una app vieja abierta o en caché se bloquea con un aviso de actualizar en vez de calcular mal. Al volver a la app, si hay una versión nueva publicada, avisa para recargar
+- **Modo local más seguro** — Si el navegador no puede guardar (almacenamiento lleno o bloqueado), avisa; pide almacenamiento persistente y, en iPhone y iPad sin instalar, recuerda que Safari borra los datos tras 7 días sin abrir la web
+- **Errores al abrir el hogar** — Si el hogar no se puede abrir, la app ya no enseña ni guarda los datos de otro sitio: ofrece reintentar. Un documento dañado ya no bloquea todo el hogar: se salta y se avisa
+- **Pantalla de error propia** — Si algo falla, se puede exportar los datos y recargar; el último error se ve en Configuración. Los avisos ya no son ventanas del navegador
+- **Cierres encadenados** — Al actualizar un cierre con compartida, avisa de los cierres posteriores que hay que actualizar después
+- **Importar con control** — Un archivo con datos que la app no sabe leer (sin fecha, importe en texto…) se rechaza diciendo cuáles; antes de sustituir se descarga una copia de los datos actuales
+- **Balance individual más claro** — Al pulsar cada fila se ve de dónde sale su cifra (ingresos − gastos = total previsto; total − parte en la compartida = cuenta), y la Ayuda explica qué cifra repartir
+- **Copia local sin cifrar** — Al pasar a la nube sin subir los datos locales, o al cerrar sesión, se ofrece borrarlos de este dispositivo
+- SemVer: 3.0.3 → 3.1.0 (MINOR)
+
+### v3.0.3 — Seguridad
+
+- **Reglas del hogar más estrictas** — Un miembro solo puede cambiar los datos cifrados, su propio email o salir del hogar; ya no puede quitar al otro, cambiar los roles ni dejar el hogar sin miembros
+- **Invitaciones de un solo uso de verdad** — Unirse y gastar la invitación van en la misma escritura; caducan en 48 horas como mucho, y generar otro código invalida el anterior
+- **Solo datos cifrados en la nube** — Las reglas rechazan documentos que no sean el texto cifrado o que traigan campos inesperados
+- **Contraseña maestra más fuerte** — Las nuevas piden 12 caracteres y que no sean repetitivas; las actuales siguen valiendo
+- **Content-Security-Policy** — La web solo carga código y envía datos a Firebase y reCAPTCHA
+- **Dependencias** — Next 15.5.28 y fuera 32 paquetes y 39 componentes sin usar (avisos de seguridad de producción: de 21 a 7, ninguno crítico ni del navegador)
+- Requiere publicar las reglas nuevas de Firestore (`firebase deploy --only firestore:rules`)
+- SemVer: 3.0.2 → 3.0.3 (PATCH)
+
+### v3.0.2 — Datos y cálculos más seguros
+
+- **Cierre con dinero negativo** — El dinero real del cierre admite cifras negativas (una cuenta en descubierto); antes como mínimo se escribía 0 y se creaba un ajuste falso
+- **Nada se pierde al archivar** — Un gasto apuntado sin conexión en un mes que el otro ya cerró se une a ese mes en vez de borrarse al archivar
+- **Un informe por mes** — El informe y sus ajustes tienen un id fijo por mes: dos cierres a la vez ya no duplican el informe ni los ajustes. Si hubiera informes repetidos de antes, al leer se queda el más reciente
+- **Ajustes reconocidos por su marca** — Una transacción tuya que se llame «Ajuste X - Cierre Y» ya no se toma por un ajuste de cierre
+- **Tema sin destello** — El tema oscuro se aplica antes de pintar; los quesitos del informe usan el color de la tarjeta en los dos temas y suman con aritmética exacta
+- **Proyecto** — Una sola configuración de Next y sin errores de tipos ocultos en la build
+- SemVer: 3.0.1 → 3.0.2 (PATCH)
 
 ### v3.0.1 — Tour de la cuenta compartida
 

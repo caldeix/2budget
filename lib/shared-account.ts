@@ -17,7 +17,7 @@
  *              las cifras son exactamente las de siempre.
  */
 
-import type { Transaction } from "@/types"
+import type { MonthlyReport, Transaction } from "@/types"
 import { aggregateTransactions, isClosingAdjustment, isContribution, type AggregateOptions } from "@/lib/aggregations"
 import { fromCents, toCents } from "@/lib/money"
 
@@ -187,4 +187,23 @@ export function sharedBalanceUntil(
   }
   const { shared1, shared2 } = cumulativeSharedCents(byMonth.values())
   return { shared: fromCents(shared1 + shared2), sharedPerson1: fromCents(shared1), sharedPerson2: fromCents(shared2) }
+}
+
+/**
+ * @function laterSharedClosings
+ * @description Cierres posteriores a un mes que comparan el saldo de la compartida (3.1.0). Ese saldo
+ *              arrastra los ajustes de los cierres anteriores, así que si se actualiza el cierre de un
+ *              mes, el ajuste de la compartida de estos cierres deja de cuadrar y hay que
+ *              actualizarlos también, en orden. Las cuentas personales se cierran mes a mes y no
+ *              se ven afectadas.
+ * @param {MonthlyReport[]} reports - Todos los informes.
+ * @param {number} month - Mes que se actualiza (1-12).
+ * @param {number} year - Año.
+ * @returns {MonthlyReport[]} Los cierres posteriores con compartida, del más antiguo al más reciente.
+ */
+export function laterSharedClosings(reports: MonthlyReport[], month: number, year: number): MonthlyReport[] {
+  const index = year * 12 + month
+  return reports
+    .filter((r) => r.year * 12 + r.month > index && r.sharedRealMoney !== undefined)
+    .sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month))
 }

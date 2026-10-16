@@ -29,6 +29,7 @@ import {
   increment,
   getDocs,
   onSnapshot,
+  runTransaction,
   setDoc,
   Timestamp,
   updateDoc,
@@ -41,7 +42,8 @@ import {
 } from "firebase/firestore"
 import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
 import { DATA_VERSION, defaultConfig, normalizeReport, normalizeTransaction } from "@/lib/storage"
-import { diffAppData, isEmptyDiff, type AppDataDiff } from "@/lib/cloud/diff"
+import { diffAppData, isEmptyDiff, mergeConfigChanges, type AppDataDiff } from "@/lib/cloud/diff"
+import { dedupeAppData } from "@/lib/dedupe"
 import {
   archivedMonthsOf,
   fromStored,
@@ -95,6 +97,10 @@ export interface HouseholdInfo {
   members: string[]
   roles: Record<string, MemberRole>
   memberEmails: Record<string, string>
+  /** Versión más antigua de la app que entiende los datos del hogar (ver `lib/app-version.ts`). */
+  minAppVersion?: string
+  /** Documentos que no se han podido leer (dañados): se saltan y se avisa. */
+  unreadable?: number
 }
 
 /** Duración de un código de invitación. */
@@ -413,19 +419,36 @@ export async function recoverWithCode(
  * @function createDecryptingCache
  * @description Descifra los documentos de un snapshot reutilizando los que no han cambiado
  *              (mismo `enc`): en cada cambio solo se descifra lo nuevo.
+ *
+ *              Cada documento se descifra por separado (3.1.0): uno dañado ya no impide abrir el
+ *              hogar, se salta y se cuenta en `unreadable`. Si no se puede leer NINGUNO, la clave no
+ *              es la buena y se lanza el error, como antes. Saltarlos es seguro: la sincronización y
+ *              el archivado solo tocan los documentos que han leído.
  */
 function createDecryptingCache<T>(dek: CryptoKey, contextFor: (id: string) => string) {
   let cache = new Map<string, { enc: string; value: T }>()
-  return async (snap: QuerySnapshot): Promise<T[]> => {
+  return async (snap: QuerySnapshot): Promise<{ values: T[]; unreadable: number }> => {
     const next = new Map<string, { enc: string; value: T }>()
+    let unreadable = 0
+    let firstError: unknown = null
     for (const d of snap.docs) {
       const raw = d.data()
       const cached = cache.get(d.id)
-      const value = cached && cached.enc === raw.enc ? cached.value : await decryptJson<T>(dek, raw.enc, contextFor(d.id))
-      next.set(d.id, { enc: raw.enc, value })
+      if (cached && cached.enc === raw.enc) {
+        next.set(d.id, cached)
+        continue
+      }
+      try {
+        next.set(d.id, { enc: raw.enc, value: await decryptJson<T>(dek, raw.enc, contextFor(d.id)) })
+      } catch (error) {
+        unreadable += 1
+        firstError ??= error
+        console.error(`Unreadable document ${d.id}:`, error)
+      }
     }
+    if (unreadable > 0 && next.size === 0) throw firstError
     cache = next
-    return [...next.values()].map((entry) => entry.value)
+    return { values: [...next.values()].map((entry) => entry.value), unreadable }
   }
 }
 
@@ -437,14 +460,31 @@ async function readHouseholdDoc(
   dek: CryptoKey,
   hid: string,
   snap: DocumentSnapshot,
-): Promise<{ config: AppConfig; version: number; info: HouseholdInfo }> {
+): Promise<{ config: AppConfig; version: number; rev: string; info: HouseholdInfo }> {
   const raw = snap.data() ?? {}
   const payload = await decryptJson<{ config: AppConfig; version: number }>(dek, raw.enc, context.household(hid))
   return {
     config: { ...defaultConfig, ...(payload.config ?? {}) },
     version: typeof payload.version === "number" ? payload.version : DATA_VERSION,
-    info: { members: raw.members ?? [], roles: raw.roles ?? {}, memberEmails: raw.memberEmails ?? {} },
+    // Revisión de la configuración (3.1.1, ver `writeHouseholdConfig`); "" en hogares anteriores.
+    rev: typeof raw.rev === "string" ? raw.rev : "",
+    info: {
+      members: raw.members ?? [],
+      roles: raw.roles ?? {},
+      memberEmails: raw.memberEmails ?? {},
+      ...(typeof raw.minAppVersion === "string" && { minAppVersion: raw.minAppVersion }),
+    },
   }
+}
+
+/**
+ * @function ensureMinAppVersion
+ * @description Sube la versión mínima del hogar a la que necesitan sus datos, si estaba por debajo
+ *              (ver `lib/app-version.ts`). Un campo en claro del hogar: así una app más antigua sabe
+ *              que no puede seguir sin descifrar nada.
+ */
+export async function ensureMinAppVersion(db: Firestore, hid: string, required: string): Promise<void> {
+  await updateDoc(householdRef(db, hid), { minAppVersion: required })
 }
 
 /**
@@ -463,7 +503,7 @@ export function subscribeHousehold(
   onLost: () => void,
   onError: (error: Error) => void,
 ): Unsubscribe {
-  let household: { config: AppConfig; version: number; info: HouseholdInfo } | null = null
+  let household: { config: AppConfig; version: number; rev: string; info: HouseholdInfo } | null = null
   // Tal cual están en la nube: transacciones sueltas e informes (los cerrados, con su archivo).
   let live: Transaction[] | null = null
   let storedReports: StoredReport[] | null = null
@@ -477,10 +517,14 @@ export function subscribeHousehold(
 
   const emit = () => {
     if (!active || !household || !live || !storedReports) return
-    const merged = fromStored(live, storedReports)
+    // Un informe por mes y una transacción por id (ver `lib/dedupe.ts`).
+    const merged = dedupeAppData(fromStored(live, storedReports))
     const transactions = merged.transactions.map(normalizeTransaction).sort(byCreatedAtDesc)
     const reports = merged.reports.map(normalizeReport).sort(byCreatedAtDesc)
-    onData({ transactions, reports, config: household.config, version: household.version }, household.info)
+    onData(
+      { transactions, reports, config: household.config, version: household.version },
+      { ...household.info, ...(unreadable.transactions + unreadable.reports > 0 && { unreadable: unreadable.transactions + unreadable.reports }) },
+    )
 
     // Una vez por apertura, con datos del servidor: archiva los meses cerrados pendientes.
     if (!hasArchived && liveFromServer && reportsFromServer) {
@@ -504,6 +548,8 @@ export function subscribeHousehold(
     queue = queue.then(work).catch(handleError)
   }
 
+  // Documentos que no se han podido descifrar (dañados), por colección.
+  const unreadable = { transactions: 0, reports: 0 }
   const decryptTransactions = createDecryptingCache<Transaction>(dek, context.transaction)
   const decryptReports = createDecryptingCache<StoredReport>(dek, context.report)
 
@@ -517,6 +563,7 @@ export function subscribeHousehold(
         }
         enqueue(async () => {
           household = await readHouseholdDoc(dek, hid, snap)
+          householdRevByHid.set(hid, household.rev)
           emit()
         })
       },
@@ -526,7 +573,9 @@ export function subscribeHousehold(
       transactionsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          live = await decryptTransactions(snap)
+          const result = await decryptTransactions(snap)
+          live = result.values
+          unreadable.transactions = result.unreadable
           liveFromServer = !snap.metadata.fromCache
           emit()
         }),
@@ -536,7 +585,9 @@ export function subscribeHousehold(
       reportsCol(db, hid),
       (snap) =>
         enqueue(async () => {
-          storedReports = await decryptReports(snap)
+          const result = await decryptReports(snap)
+          storedReports = result.values
+          unreadable.reports = result.unreadable
           reportsFromServer = !snap.metadata.fromCache
           archivedMonthsByHousehold.set(hid, archivedMonthsOf(storedReports))
           emit()
@@ -552,18 +603,78 @@ export function subscribeHousehold(
 }
 
 /**
- * @function diffToOps
- * @description Convierte una diferencia en operaciones de escritura cifradas sobre el hogar.
+ * Revisión de la configuración de cada hogar que tiene este dispositivo (la del último snapshot, o
+ * la de su última escritura, que aún puede no haber llegado en un snapshot).
  */
-async function diffToOps(db: Firestore, hid: string, dek: CryptoKey, diff: AppDataDiff, next: AppData): Promise<BatchOp[]> {
+const householdRevByHid = new Map<string, string>()
+
+/** Revisión nueva de la configuración: cualquier valor distinto del anterior. */
+const newRev = () => crypto.randomUUID()
+
+/** Código de un error de Firestore (`permission-denied`, `not-found`...). */
+const errorCode = (error: unknown) => (error as { code?: string } | null)?.code
+
+/**
+ * @function writeHouseholdConfig
+ * @description Escribe la configuración del hogar (3.1.1). La configuración es un único documento
+ *              cifrado y antes ganaba el último en escribir: si la pareja cambiaba otra cosa a la
+ *              vez (o sin conexión), se perdía. Ahora cada escritura dice de qué revisión parte
+ *              (`prevRev`) y las reglas la rechazan si en el servidor ya hay otra. Entonces se
+ *              vuelve a leer y se aplican, en una transacción, solo los campos que cambió este
+ *              dispositivo (ver `mergeConfigChanges`).
+ */
+async function writeHouseholdConfig(
+  db: Firestore,
+  hid: string,
+  dek: CryptoKey,
+  prev: AppData,
+  next: AppData,
+): Promise<{ acknowledged: Promise<void> }> {
+  const version = next.version ?? DATA_VERSION
+  const enc = await encryptJson(dek, { config: next.config, version }, context.household(hid))
+  const rev = newRev()
+  const prevRev = householdRevByHid.get(hid) ?? ""
+  householdRevByHid.set(hid, rev)
+  const batch = writeBatch(db)
+  batch.update(householdRef(db, hid), { enc, rev, prevRev })
+  const acknowledged = batch.commit().catch(async (error) => {
+    if (errorCode(error) !== "permission-denied") throw error
+    // Otra revisión en el servidor: se vuelve a aplicar este cambio sobre ella.
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(householdRef(db, hid))
+      if (!snap.exists()) throw error
+      const server = await readHouseholdDoc(dek, hid, snap)
+      const config = mergeConfigChanges(server.config, prev.config, next.config)
+      const mergedEnc = await encryptJson(dek, { config, version }, context.household(hid))
+      const mergedRev = newRev()
+      householdRevByHid.set(hid, mergedRev)
+      tx.update(householdRef(db, hid), { enc: mergedEnc, rev: mergedRev, prevRev: server.rev })
+    })
+  })
+  return { acknowledged }
+}
+
+/**
+ * @function diffToOps
+ * @description Convierte una diferencia en operaciones de escritura cifradas sobre el hogar (la
+ *              configuración va aparte, ver `writeHouseholdConfig`). Las ediciones de transacciones
+ *              que ya existían van en `updates`, cada una en su propio lote (ver `writeChanges`).
+ */
+async function diffToOps(
+  db: Firestore,
+  hid: string,
+  dek: CryptoKey,
+  diff: AppDataDiff,
+): Promise<{ ops: BatchOp[]; updates: BatchOp[] }> {
   const ops: BatchOp[] = []
-  if (diff.householdChanged) {
-    const enc = await encryptJson(dek, { config: next.config, version: next.version ?? DATA_VERSION }, context.household(hid))
-    ops.push((batch) => batch.update(householdRef(db, hid), { enc }))
-  }
+  const updates: BatchOp[] = []
   for (const t of diff.transactionsToSet) {
     const enc = await encryptJson(dek, t, context.transaction(t.id))
     ops.push((batch) => batch.set(doc(transactionsCol(db, hid), t.id), { enc }))
+  }
+  for (const t of diff.transactionsToUpdate) {
+    const enc = await encryptJson(dek, t, context.transaction(t.id))
+    updates.push((batch) => batch.update(doc(transactionsCol(db, hid), t.id), { enc }))
   }
   for (const id of diff.transactionIdsToDelete) ops.push((batch) => batch.delete(doc(transactionsCol(db, hid), id)))
   for (const r of diff.reportsToSet) {
@@ -571,7 +682,7 @@ async function diffToOps(db: Firestore, hid: string, dek: CryptoKey, diff: AppDa
     ops.push((batch) => batch.set(doc(reportsCol(db, hid), r.id), { enc }))
   }
   for (const id of diff.reportIdsToDelete) ops.push((batch) => batch.delete(doc(reportsCol(db, hid), id)))
-  return ops
+  return { ops, updates }
 }
 
 /**
@@ -596,12 +707,21 @@ export async function writeChanges(
   const diff = diffAppData(storedPrev, storedNext)
   if (isEmptyDiff(diff)) return { acknowledged: Promise.resolve(), changed: false }
 
-  const ops = await diffToOps(db, hid, dek, diff, storedNext)
+  const { ops, updates } = await diffToOps(db, hid, dek, diff)
   const commits: Promise<void>[] = []
+  if (diff.householdChanged) commits.push((await writeHouseholdConfig(db, hid, dek, prev, next)).acknowledged)
   for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
     const batch = writeBatch(db)
     ops.slice(i, i + BATCH_LIMIT).forEach((op) => op(batch))
     commits.push(batch.commit())
+  }
+  // Cada edición en su lote: si la pareja borró esa transacción, solo falla esa (y no reaparece).
+  for (const op of updates) {
+    const batch = writeBatch(db)
+    op(batch)
+    commits.push(batch.commit().catch((error) => {
+      if (errorCode(error) !== "not-found") throw error
+    }))
   }
   return { acknowledged: Promise.all(commits).then(() => undefined), changed: true }
 }
@@ -678,7 +798,9 @@ export async function createHousehold(
 
 /**
  * @function createInvite
- * @description Genera un código de invitación de un solo uso, válido 48 horas.
+ * @description Genera un código de invitación de un solo uso, válido 48 horas. Si se pasa el
+ *              código anterior (el que se estaba enseñando), se borra en la misma escritura: así
+ *              "Generar otro código" deja solo uno válido.
  *              El código tiene dos partes: el id del documento y un secreto con el que se
  *              envuelve la clave del hogar. El secreto NO se guarda en Firestore: solo lo tiene
  *              quien recibe el código, así que nadie más puede usar la invitación para leer los datos.
@@ -690,16 +812,20 @@ export async function createInvite(
   hid: string,
   uid: string,
   extractableDek: CryptoKey,
+  previousCode?: string,
 ): Promise<{ code: string; expiresAt: Date }> {
   const id = randomReadable(INVITE_ID_LENGTH)
   const secret = randomReadable(INVITE_SECRET_LENGTH)
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
-  await setDoc(inviteRef(db, id), {
+  const batch = writeBatch(db)
+  batch.set(inviteRef(db, id), {
     householdId: hid,
     createdBy: uid,
     expiresAt: Timestamp.fromDate(expiresAt),
     ...(await wrapDek(extractableDek, secret, INVITE_KDF_ITERATIONS)),
   })
+  if (previousCode) batch.delete(inviteRef(db, normalizeCode(previousCode).slice(0, INVITE_ID_LENGTH)))
+  await batch.commit()
   return { code: id + secret, expiresAt }
 }
 
@@ -740,30 +866,33 @@ export async function joinHousehold(
   }
 
   const householdId = data.householdId
+  // Su clave, envuelta con su contraseña maestra, y su código de recuperación.
+  const ownKey = await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS)
+  const recovery = await createRecovery(dek)
+  // La clave queda guardada en el dispositivo antes de unirse (como al crear un hogar).
+  await saveCachedDek(uid, householdId, await toNonExtractable(dek))
+
+  // Todo en una sola escritura (3.0.3): unirse, su clave, su perfil y gastar la invitación. Las
+  // reglas exigen que la invitación desaparezca en la misma escritura, así que no se puede reutilizar.
+  const batch = writeBatch(db)
+  batch.update(householdRef(db, householdId), {
+    members: arrayUnion(uid),
+    [`roles.${uid}`]: "person2",
+    [`memberEmails.${uid}`]: email,
+    joinCode: id,
+  })
+  batch.set(keyRef(db, householdId, uid), ownKey)
+  batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
+  batch.set(userRef(db, uid), { householdId, ...masterCheckFields() }, { merge: true })
+  batch.delete(inviteRef(db, id))
   try {
-    await updateDoc(householdRef(db, householdId), {
-      members: arrayUnion(uid),
-      [`roles.${uid}`]: "person2",
-      [`memberEmails.${uid}`]: email,
-      joinCode: id,
-    })
+    await batch.commit()
   } catch (error) {
     if ((error as { code?: string }).code === "permission-denied") {
       throw new HouseholdError("No puedes unirte a este hogar: ya tiene dos miembros o el código no es válido.")
     }
     throw error
   }
-
-  // Ya es miembro: su clave, guardada en el dispositivo y envuelta con su contraseña maestra;
-  // después se apunta su perfil al hogar y se gasta la invitación.
-  await saveCachedDek(uid, householdId, await toNonExtractable(dek))
-  const recovery = await createRecovery(dek)
-  const batch = writeBatch(db)
-  batch.set(keyRef(db, householdId, uid), await wrapDek(dek, masterPassword, MASTER_KDF_ITERATIONS))
-  batch.set(recoveryRef(db, householdId, uid), recovery.wrapped)
-  batch.set(userRef(db, uid), { householdId, ...masterCheckFields() }, { merge: true })
-  batch.delete(inviteRef(db, id))
-  await batch.commit()
   return { householdId, recoveryCode: recovery.code }
 }
 

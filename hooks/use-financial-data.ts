@@ -14,13 +14,16 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Firestore } from "firebase/firestore"
 import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
-import { loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
-import { subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
+import { LOCAL_SAVE_ERROR, STORAGE_KEY, loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
+import { ensureMinAppVersion, subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
+import { APP_VERSION, DATA_MIN_APP_VERSION, isOlderVersion } from "@/lib/app-version" // Compatibilidad de versiones.
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
 import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
+import { adjustmentIdFor, reportIdFor } from "@/lib/dedupe" // Ids fijos por mes del informe y sus ajustes.
 import { normalizeName } from "@/lib/categories" // Nombres comparables (sin tildes ni mayúsculas).
+import { setDataSnapshot } from "@/lib/error-log" // Copia de los datos para la pantalla de error.
 
 /** Indica si la transacción es del mes y año dados. */
 function isInMonth(t: Transaction, month: number, year: number): boolean {
@@ -84,6 +87,12 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
   isDemoRef.current = demoData !== null
   const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
+  // Error al abrir el hogar ANTES de tener sus datos (3.1.0): en `data` quedarían los de otro sitio
+  // (los locales o los del hogar anterior), así que la app no los enseña ni deja guardar nada.
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadErrorRef = useRef<string | null>(null)
+  // Origen de los datos que hay ahora mismo en `data` ("local" o el id del hogar).
+  const dataSourceRef = useRef<string | null>(null)
 
   const db = cloud?.db ?? null
   const householdId = cloud?.householdId ?? null
@@ -111,16 +120,37 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
    */
   useEffect(() => {
     setSyncError(null)
+    setLoadError(null)
+    loadErrorRef.current = null
+
+    // Error de este hogar: bloquea si aún no hay datos suyos; si ya los hay, se avisa sin bloquear.
+    const reportError = (message: string) => {
+      setSyncError(message)
+      if (dataSourceRef.current !== householdId) {
+        loadErrorRef.current = message
+        setLoadError(message)
+      }
+    }
 
     if (!db || !householdId || !dek) {
       // Modo local: los datos de este navegador, como siempre.
       targetRef.current = null
       const local = loadData()
       dataRef.current = local
+      dataSourceRef.current = "local"
       setData(local)
       setHouseholdInfo(null)
       setLoadedSource("local")
-      return
+      // Otra pestaña de este navegador ha guardado (3.1.1): se cargan sus datos. Antes cada pestaña
+      // guardaba su estado entero y la última pisaba los cambios de la otra.
+      const onStorage = (event: StorageEvent) => {
+        if (event.key !== null && event.key !== STORAGE_KEY) return
+        const fresh = loadData()
+        dataRef.current = fresh
+        setData(fresh)
+      }
+      window.addEventListener("storage", onStorage)
+      return () => window.removeEventListener("storage", onStorage)
     }
 
     // Modo nube: se espera al primer snapshot completo (y descifrado) del hogar.
@@ -137,22 +167,37 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
           return
         }
         dataRef.current = cloudData
+        dataSourceRef.current = householdId
         setData(cloudData)
         setHouseholdInfo(info)
         setLoadedSource(householdId)
       },
       () => {
         setHouseholdInfo(null)
-        setSyncError("Ya no tienes acceso a este hogar. Sal del hogar desde tu cuenta para seguir.")
+        reportError("Ya no tienes acceso a este hogar. Sal del hogar desde tu cuenta para seguir.")
         setLoadedSource(householdId)
       },
       (error) => {
         console.error("Error syncing household:", error)
-        setSyncError(getErrorMessage(error))
+        reportError(getErrorMessage(error))
         setLoadedSource(householdId)
       },
     )
   }, [db, householdId, dek])
+
+  // Versión mínima del hogar (3.1.0): si está por debajo de la que necesitan los datos actuales, la
+  // sube (una vez por hogar). Una app que se ha quedado atrás no la toca: se bloquea en la página.
+  const minVersionCheckedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!db || !householdId || !householdInfo || minVersionCheckedRef.current === householdId) return
+    minVersionCheckedRef.current = householdId
+    const current = householdInfo.minAppVersion
+    if (isOlderVersion(APP_VERSION, DATA_MIN_APP_VERSION)) return
+    if (current && !isOlderVersion(current, DATA_MIN_APP_VERSION)) return
+    ensureMinAppVersion(db, householdId, DATA_MIN_APP_VERSION).catch((error) =>
+      console.error("Error updating the minimum app version:", error),
+    )
+  }, [db, householdId, householdInfo])
 
   /**
    * @function commit
@@ -164,6 +209,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
    */
   const commit = useCallback((compute: (prev: AppData) => AppData) => {
     if (isDemoRef.current) return // Tour: los datos son ficticios y nunca se guardan.
+    if (loadErrorRef.current) return // Hogar sin cargar: no se guarda nada (ver `loadError`).
     const prev = dataRef.current
     const next = compute(prev)
     if (next === prev) return
@@ -172,7 +218,9 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
 
     const target = targetRef.current
     if (!target) {
-      saveData(next) // Modo local: localStorage.
+      // Modo local: localStorage. Si no se puede guardar, se avisa (antes solo iba a la consola).
+      const saved = saveData(next)
+      setSyncError((current) => (saved ? (current === LOCAL_SAVE_ERROR ? null : current) : LOCAL_SAVE_ERROR))
       return
     }
     // Modo nube: se cifra y se envía la diferencia, en cola para respetar el orden.
@@ -203,6 +251,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         stashedSnapshotRef.current = null
         if (stashed && !changed) {
           dataRef.current = stashed.data
+          dataSourceRef.current = target.householdId
           setData(stashed.data)
           setHouseholdInfo(stashed.info)
         }
@@ -363,16 +412,17 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     ) => {
       commit((prevData) => {
         // 1. Crea nuevas transacciones de ajuste con IDs y fechas de creación.
+        // Ids fijos por mes y dueño (ver `lib/dedupe.ts`): dos cierres a la vez no duplican nada.
+        const { month, year } = reportBaseData
         const newAdjustmentTransactions: Transaction[] = adjustmentsToCreate.map((adj) => ({
           ...adj,
-          id: generateId(),
+          id: adjustmentIdFor(month, year, adj.owner),
           amount: roundMoney(adj.amount), // El ajuste es un valor derivado: se persiste ya redondeado.
           createdAt: new Date().toISOString(),
         }))
 
         // 2. Los ajustes de un cierre anterior de este mes se SUSTITUYEN por los nuevos (el modal
         //    los calcula sin ellos). Las nuevas van al principio, como las más recientes.
-        const { month, year } = reportBaseData
         const withoutOldAdjustments = prevData.transactions.filter(
           (t) => !(isClosingAdjustment(t) && isInMonth(t, month, year)),
         )
@@ -385,25 +435,29 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         //    Esto asegura que los ajustes recién añadidos se incluyan en los totales del informe.
         const finalCalculations = calculateReportTotals(finalReportTransactions)
 
+        // El informe del mes, si ya existe (aunque la pantalla no lo supiera): se actualiza, no se duplica.
+        const reportIdToUpdate =
+          existingReportId ?? prevData.reports.find((r) => r.month === month && r.year === year)?.id
+
         let finalReportsList: MonthlyReport[]
-        if (existingReportId) {
+        if (reportIdToUpdate) {
           // Si existe un ID de informe, actualiza el informe existente.
           const updatedReport: MonthlyReport = {
             ...reportBaseData,
             ...finalCalculations, // Usa los totales recién recalculados.
             transactions: finalReportTransactions, // Incluye todas las transacciones del mes.
-            id: existingReportId,
+            id: reportIdToUpdate,
             // Mantiene la fecha de creación original si el informe ya existía.
-            createdAt: prevData.reports.find((r) => r.id === existingReportId)?.createdAt || new Date().toISOString(),
+            createdAt: prevData.reports.find((r) => r.id === reportIdToUpdate)?.createdAt || new Date().toISOString(),
           }
-          finalReportsList = prevData.reports.map((r) => (r.id === existingReportId ? updatedReport : r))
+          finalReportsList = prevData.reports.map((r) => (r.id === reportIdToUpdate ? updatedReport : r))
         } else {
           // Si no hay ID, crea un nuevo informe.
           const newReport: MonthlyReport = {
             ...reportBaseData,
             ...finalCalculations, // Usa los totales recién recalculados.
             transactions: finalReportTransactions, // Incluye todas las transacciones del mes.
-            id: generateId(), // Genera un nuevo ID para el informe.
+            id: reportIdFor(month, year), // Id fijo por mes (ver `lib/dedupe.ts`).
             createdAt: new Date().toISOString(),
           }
           finalReportsList = [newReport, ...prevData.reports] // Añade el nuevo informe al principio.
@@ -518,6 +572,12 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     [commit],
   )
 
+  // Copia para la pantalla de error (ver `lib/error-log.ts`): los datos reales, nunca los del tour
+  // ni los de otro sitio mientras el hogar no se ha podido abrir.
+  useEffect(() => {
+    setDataSnapshot(loadError ? null : data)
+  }, [data, loadError])
+
   return {
     data: visibleData,
     isLoading,
@@ -534,5 +594,6 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     replaceAllData,
     householdInfo,
     syncError,
+    loadError,
   }
 }

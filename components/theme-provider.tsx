@@ -10,6 +10,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { applyThemeColor } from "@/lib/theme-colors"
 
 /**
  * @typedef {'light' | 'dark'} Theme
@@ -44,7 +45,8 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
  * @returns {JSX.Element} El proveedor de contexto que envuelve a los hijos.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Estado para almacenar el tema actual. Se inicializa en 'light' como valor por defecto.
+  // Estado para almacenar el tema actual. Se inicializa en 'light' como valor por defecto; la clase
+  // `dark` ya la ha puesto antes de pintar el script del `<head>` (ver `app/layout.tsx`).
   const [theme, setTheme] = useState<Theme>("light")
 
   /**
@@ -60,12 +62,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Si hay un tema guardado, lo usa.
       setTheme(stored)
       document.documentElement.classList.toggle("dark", stored === "dark")
+      applyThemeColor(stored === "dark")
     } else {
       // Si no hay tema guardado, detecta la preferencia del sistema.
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
       const initial = prefersDark ? "dark" : "light"
       setTheme(initial)
       document.documentElement.classList.toggle("dark", prefersDark)
+      applyThemeColor(prefersDark)
     }
   }, []) // Array de dependencias vacío: este efecto se ejecuta solo una vez al montar.
 
@@ -79,6 +83,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setTheme((prev) => {
       const next = prev === "dark" ? "light" : "dark" // Determina el siguiente tema.
       document.documentElement.classList.toggle("dark", next === "dark") // Añade/quita la clase 'dark'.
+      applyThemeColor(next === "dark") // Barra del sistema del mismo color.
       localStorage.setItem("theme", next) // Guarda la preferencia en localStorage.
       return next // Devuelve el nuevo tema para actualizar el estado.
     })

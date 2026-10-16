@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
 import { Switch } from "@/components/ui/switch" // Interruptor para el modo individual.
 import { downloadAppData } from "@/lib/storage" // Descarga del JSON de copia de seguridad.
+import { clearLastError, readLastError, type LoggedError } from "@/lib/error-log" // Último error de la app.
 import { Download, Upload, Trash2, AlertTriangle } from "lucide-react" // Iconos.
 
 /**
@@ -81,6 +82,8 @@ export function SettingsModal({
   const [isClearDataConfirmModalOpen, setIsClearDataConfirmModalOpen] = useState(false)
   // Ref para el input de tipo archivo, permitiendo activarlo programáticamente.
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Último error anotado en este navegador (ver `lib/error-log.ts`).
+  const [lastError, setLastError] = useState<LoggedError | null>(null)
 
   // Al abrir, los campos parten de la configuración actual (puede haber cambiado por una
   // importación o desde otro dispositivo del hogar).
@@ -91,6 +94,15 @@ export function SettingsModal({
     setSingleMode(Boolean(config.singleMode))
     setCategories(categoriesOf(config))
   }, [isOpen, config])
+
+  useEffect(() => {
+    if (isOpen) setLastError(readLastError())
+  }, [isOpen])
+
+  const handleClearLastError = () => {
+    clearLastError()
+    setLastError(null)
+  }
 
   /**
    * @function handleSaveConfig
@@ -300,6 +312,22 @@ export function SettingsModal({
               <li>• Eliminar datos borrará toda la información permanentemente</li>
             </ul>
           </div>
+
+          {/* Último error de la app en este navegador: ayuda a saber qué pasó si algo falla */}
+          {lastError && (
+            <div className="rounded-2xl border p-4 space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="font-medium text-foreground">Último error</h4>
+                <Button type="button" variant="ghost" size="sm" onClick={handleClearLastError}>
+                  Borrar
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {new Date(lastError.at).toLocaleString("es-ES")} · v{lastError.version}
+              </p>
+              <p className="text-sm text-foreground break-words">{lastError.message}</p>
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -314,8 +342,9 @@ export function SettingsModal({
           </p>
           <p className="text-sm text-muted-foreground">
             {isCloud
-              ? "Los datos están en el hogar de la nube: el cambio afecta a los dos miembros y a todos vuestros dispositivos. Si quieres conservar lo que hay ahora, exporta una copia antes."
-              : "Si quieres conservar lo que hay ahora, exporta una copia antes."}
+              ? "Los datos están en el hogar de la nube: el cambio afecta a los dos miembros y a todos vuestros dispositivos. "
+              : ""}
+            Antes de sustituir se descargará una copia de los datos actuales.
           </p>
           <div className="flex justify-center gap-3 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setPendingImport(null)}>

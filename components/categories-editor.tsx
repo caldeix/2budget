@@ -86,7 +86,8 @@ export function CategoriesEditor({ categories, onChange }: CategoriesEditorProps
           value={newKind}
           onChange={(e) => setNewKind(e.target.value as Category["kind"])}
           aria-label="Tipo de la nueva categoría"
-          className="h-9 px-2 border border-input rounded-md bg-input text-foreground text-sm"
+          // 16 px en el móvil: con letra más pequeña, Safari hace zoom al tocarlo.
+          className="h-9 px-2 border border-input rounded-md bg-input text-foreground text-base sm:text-sm"
         >
           <option value="expense">Gasto</option>
           <option value="income">Ingreso</option>

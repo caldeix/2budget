@@ -9,7 +9,7 @@
 
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { MIN_MASTER_PASSWORD_LENGTH } from "@/lib/cloud/crypto"
+import { MIN_MASTER_PASSWORD_DISTINCT, MIN_MASTER_PASSWORD_LENGTH } from "@/lib/cloud/crypto"
 import { KeyRound } from "lucide-react"
 
 /**
@@ -20,6 +20,9 @@ import { KeyRound } from "lucide-react"
 export function validateNewMasterPassword(password: string, repeat: string): string | null {
   if (password.length < MIN_MASTER_PASSWORD_LENGTH) {
     return `La contraseña maestra debe tener al menos ${MIN_MASTER_PASSWORD_LENGTH} caracteres.`
+  }
+  if (new Set(password).size < MIN_MASTER_PASSWORD_DISTINCT) {
+    return "La contraseña maestra es demasiado repetitiva: mezcla más letras, números o símbolos."
   }
   if (password !== repeat) return "Las contraseñas maestras no coinciden."
   return null

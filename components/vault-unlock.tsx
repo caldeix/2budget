@@ -15,7 +15,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import type { Vault } from "@/hooks/use-vault"
-import { getErrorMessage, signOut } from "@/lib/cloud/auth"
+import { getErrorMessage } from "@/lib/cloud/auth"
+import { SignOutButton } from "@/components/sign-out-button"
 import { leaveHousehold } from "@/lib/cloud/repository"
 import { clearVaultCache } from "@/lib/cloud/vault-cache"
 import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
@@ -182,13 +183,17 @@ export function VaultUnlock({ session, vault, onRecoveryCode }: VaultUnlockProps
             </div>
           )}
           {session.services && (
-            <button
-              type="button"
-              className="flex items-center gap-1 mx-auto text-muted-foreground hover:text-foreground"
-              onClick={() => session.services && void signOut(session.services)}
-            >
-              <LogOut className="h-3 w-3" /> Cerrar sesión
-            </button>
+            <SignOutButton services={session.services}>
+              {(start) => (
+                <button
+                  type="button"
+                  className="flex items-center gap-1 mx-auto text-muted-foreground hover:text-foreground"
+                  onClick={start}
+                >
+                  <LogOut className="h-3 w-3" /> Cerrar sesión
+                </button>
+              )}
+            </SignOutButton>
           )}
         </div>
       </div>

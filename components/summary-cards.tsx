@@ -11,7 +11,7 @@
 import { useRef, useState } from "react"
 import { cn, formatCurrency, formatMonthYear } from "@/lib/utils" // Utilidades para formatear moneda y fecha.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
-import { TrendingUp, TrendingDown, DollarSign, Users } from "lucide-react" // Iconos.
+import { TrendingUp, TrendingDown, DollarSign, Users, ChevronDown } from "lucide-react" // Iconos.
 import type { TodayFigures } from "@/hooks/use-calculations" // Cifras "a día de hoy".
 import type { AccountSplit } from "@/lib/shared-account" // Reparto entre la cuenta de cada uno y la compartida.
 
@@ -86,6 +86,16 @@ function TodaySpacer() {
   )
 }
 
+/** Una fila de cifras por persona (ver `PersonFigures`). */
+interface PersonRow {
+  name: string
+  today: number
+  expected: number
+  detail?: string
+  /** Líneas de "de dónde sale" la cifra prevista, que se abren al pulsar el nombre. */
+  breakdown?: string[]
+}
+
 /**
  * Margen de las filas de una tarjeta. Con "Hoy", las tarjetas sin la cabecera "Hoy / Previsto"
  * dejan su hueco en PC (16 px de margen + 20 px de cabecera) para alinear las filas.
@@ -96,18 +106,50 @@ const rowsMargin = (showToday: boolean) => (showToday ? "mt-4 md:mt-9" : "mt-4")
  * @function PersonFigures
  * @description Cifras por persona. Con `showToday`, dos columnas ("Hoy" y "Previsto");
  *              si no, una sola, como siempre. Cada fila puede llevar debajo una línea pequeña
- *              (`detail`), p. ej. el total de la persona o el reparto de la compartida.
+ *              (`detail`), p. ej. el total de la persona o el reparto de la compartida, y un
+ *              desglose (`breakdown`) que se abre al pulsar su nombre.
  */
 function PersonFigures({
   rows,
   showToday,
   colored = false,
 }: {
-  rows: { name: string; today: number; expected: number; detail?: string }[]
+  rows: PersonRow[]
   showToday: boolean
   colored?: boolean
 }) {
   const color = (value: number) => (colored ? balanceColor(value) : "text-foreground")
+  const [openRow, setOpenRow] = useState<number | null>(null)
+
+  // Nombre de la fila: con desglose, es un botón que lo abre y lo cierra.
+  const rowName = (row: PersonRow, i: number, suffix = "") =>
+    row.breakdown ? (
+      <button
+        type="button"
+        onClick={() => setOpenRow(openRow === i ? null : i)}
+        aria-expanded={openRow === i}
+        className="inline-flex items-center gap-1 text-left text-muted-foreground hover:text-foreground truncate"
+      >
+        {row.name}
+        {suffix}
+        <ChevronDown className={cn("h-3 w-3 shrink-0 transition-transform", openRow === i && "rotate-180")} />
+      </button>
+    ) : (
+      <span className="text-muted-foreground truncate">
+        {row.name}
+        {suffix}
+      </span>
+    )
+
+  const breakdown = (row: PersonRow, i: number, className = "") =>
+    openRow === i &&
+    row.breakdown && (
+      <div className={cn("rounded-xl bg-muted/60 px-3 py-2 text-xs text-muted-foreground space-y-0.5", className)}>
+        {row.breakdown.map((line, j) => (
+          <p key={j}>{line}</p>
+        ))}
+      </div>
+    )
 
   if (!showToday) {
     return (
@@ -115,10 +157,11 @@ function PersonFigures({
         {rows.map((row, i) => (
           <div key={i}>
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">{row.name}:</span>
+              {rowName(row, i, ":")}
               <span className={`font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
             </div>
             {row.detail && <p className="text-xs text-muted-foreground truncate">{row.detail}</p>}
+            {breakdown(row, i, "mt-1")}
           </div>
         ))}
       </div>
@@ -132,10 +175,11 @@ function PersonFigures({
       <span className="text-right text-xs text-muted-foreground">Previsto</span>
       {rows.map((row, i) => (
         <div key={i} className="contents">
-          <span className="text-muted-foreground truncate">{row.name}</span>
+          {rowName(row, i)}
           <span className={`text-right font-medium ${color(row.today)}`}>{formatCurrency(row.today)}</span>
           <span className={`text-right font-medium ${color(row.expected)}`}>{formatCurrency(row.expected)}</span>
           {row.detail && <span className="col-span-3 -mt-1 text-xs text-muted-foreground truncate">{row.detail}</span>}
+          {breakdown(row, i, "col-span-3")}
         </div>
       ))}
     </div>
@@ -179,31 +223,61 @@ export function SummaryCards({
   // Cuenta compartida (v3.0.0): cada persona muestra su cuenta (lo que tiene en su banco) con su
   // total debajo, y una tercera fila muestra la compartida y de quién es lo que hay en ella.
   const usesShared = Boolean(accounts?.usesShared)
-  const individualRows =
+  // Al pulsar cada fila se ve de dónde sale su cifra prevista (3.1.0): es fácil confundir la cuenta
+  // de cada uno, su total y la compartida (p. ej. repartir a medias la cuenta en vez de la compartida).
+  const money = formatCurrency
+  // Una cifra negativa que se resta va entre paréntesis: "− (-50 €)" y no "− -50 €".
+  const subtrahend = (value: number) => (value < 0 ? `(${money(value)})` : money(value))
+  const totalLine = (income: number, expenses: number, total: number) =>
+    `Ingresos ${money(income)} − gastos ${money(expenses)} = total previsto ${money(total)}`
+  const individualRows: PersonRow[] =
     usesShared && accounts
       ? [
           {
             name: person1Name,
             today: today.accounts.person1Account,
             expected: accounts.person1Account,
-            detail: `Total: ${formatCurrency(person1Balance)}`,
+            detail: `Total previsto: ${money(person1Balance)}`,
+            breakdown: [
+              totalLine(person1Income, person1Expenses, person1Balance),
+              `Total previsto ${money(person1Balance)} − su parte en la compartida ${subtrahend(accounts.sharedPerson1)} = cuenta ${money(accounts.person1Account)}`,
+            ],
           },
           {
             name: person2Name,
             today: today.accounts.person2Account,
             expected: accounts.person2Account,
-            detail: `Total: ${formatCurrency(person2Balance)}`,
+            detail: `Total previsto: ${money(person2Balance)}`,
+            breakdown: [
+              totalLine(person2Income, person2Expenses, person2Balance),
+              `Total previsto ${money(person2Balance)} − su parte en la compartida ${subtrahend(accounts.sharedPerson2)} = cuenta ${money(accounts.person2Account)}`,
+            ],
           },
           {
             name: "Compartida",
             today: today.accounts.shared,
             expected: accounts.shared,
-            detail: `${person1Name} ${formatCurrency(accounts.sharedPerson1)} · ${person2Name} ${formatCurrency(accounts.sharedPerson2)}`,
+            detail: `${person1Name} ${money(accounts.sharedPerson1)} · ${person2Name} ${money(accounts.sharedPerson2)}`,
+            breakdown: [
+              `Aportado: ${person1Name} ${money(accounts.contributed1)} · ${person2Name} ${money(accounts.contributed2)}`,
+              `Queda de cada uno, tras su parte de lo compartido: ${person1Name} ${money(accounts.sharedPerson1)} · ${person2Name} ${money(accounts.sharedPerson2)}`,
+              "Lo que sobra para repartir es esta fila, no la cuenta de cada uno.",
+            ],
           },
         ]
       : [
-          { name: person1Name, today: today.person1Balance, expected: person1Balance },
-          { name: person2Name, today: today.person2Balance, expected: person2Balance },
+          {
+            name: person1Name,
+            today: today.person1Balance,
+            expected: person1Balance,
+            breakdown: [totalLine(person1Income, person1Expenses, person1Balance)],
+          },
+          {
+            name: person2Name,
+            today: today.person2Balance,
+            expected: person2Balance,
+            breakdown: [totalLine(person2Income, person2Expenses, person2Balance)],
+          },
         ]
 
   // En móvil las tarjetas van en un carrusel horizontal: los puntos marcan la tarjeta visible.

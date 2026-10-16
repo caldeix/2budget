@@ -11,6 +11,7 @@
 import { useMemo } from "react"
 import { Label } from "@/components/ui/label" // Componente de etiqueta.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select" // Componentes de selección de Shadcn UI.
+import { getMonthName } from "@/lib/utils" // Nombre del mes.
 
 /**
  * @interface MonthYearSelectorProps
@@ -72,10 +73,8 @@ export function MonthYearSelector({
     // Crea un array de 1 a 12 para los números de mes.
     return Array.from({ length: 12 }, (_, i) => i + 1).map((monthNum) => ({
       value: monthNum,
-      // Formatea el número del mes a su nombre largo en español y lo convierte a mayúsculas.
-      label: new Intl.DateTimeFormat("es-ES", { month: "long" })
-        .format(new Date(currentYear, monthNum - 1))
-        .toUpperCase(),
+      // Nombre del mes en mayúsculas.
+      label: getMonthName(monthNum, "upper"),
     }))
   }, [currentYear]) // Dependencia: se ejecuta si `currentYear` cambia.
 

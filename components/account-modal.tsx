@@ -22,7 +22,8 @@ import { VerifyEmailPanel } from "@/components/verify-email-panel"
 import { HouseholdManager, HouseholdSetup } from "@/components/household-panel"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import type { HouseholdInfo } from "@/lib/cloud/repository"
-import { deleteAccount, getErrorMessage, requestEmailChange, signOut } from "@/lib/cloud/auth"
+import { deleteAccount, getErrorMessage, requestEmailChange } from "@/lib/cloud/auth"
+import { SignOutButton } from "@/components/sign-out-button"
 import { changeMasterPassword, regenerateRecoveryCode } from "@/lib/cloud/repository"
 import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
 import { KeyRound, LogOut, Mail, ShieldCheck, Trash2 } from "lucide-react"
@@ -347,15 +348,19 @@ function AccountSettings({
               </Button>
             </>
           )}
-          <Button
-            type="button"
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={() => void run(() => signOut(services))}
-            disabled={isBusy}
-          >
-            <LogOut className="h-4 w-4" /> Cerrar sesión
-          </Button>
+          <SignOutButton services={services} onError={(err) => setError(getErrorMessage(err))}>
+            {(start, isSigningOut) => (
+              <Button
+                type="button"
+                variant="outline"
+                className="flex items-center gap-2"
+                onClick={start}
+                disabled={isBusy || isSigningOut}
+              >
+                <LogOut className="h-4 w-4" /> Cerrar sesión
+              </Button>
+            )}
+          </SignOutButton>
           <Button
             type="button"
             variant="outline"

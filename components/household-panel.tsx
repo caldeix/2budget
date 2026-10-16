@@ -52,6 +52,8 @@ export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: H
   const hasLocalData = hasAppData(localData)
   const [choice, setChoice] = useState<"create" | "join" | null>(singleMode ? "create" : null)
   const [uploadLocal, setUploadLocal] = useState(true)
+  // Datos locales que NO se suben (3.1.0): se ofrece borrar esa copia sin cifrar al pasar a la nube.
+  const [deleteLocal, setDeleteLocal] = useState(false)
   const [code, setCode] = useState("")
   const [masterPassword, setMasterPassword] = useState("")
   const [masterRepeat, setMasterRepeat] = useState("")
@@ -78,11 +80,12 @@ export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: H
       if (choice === "create") {
         const initial = hasLocalData && uploadLocal ? localData : { ...emptyAppData, config: localData.config }
         const { recoveryCode } = await createHousehold(services.db, user.uid, user.email ?? "", initial, masterPassword)
-        // Solo cuando la subida ha terminado bien se vacía la copia local.
-        if (hasLocalData && uploadLocal) clearAllData()
+        // Solo cuando la subida ha terminado bien se vacía la copia local (o si se pidió borrarla).
+        if (hasLocalData && (uploadLocal || deleteLocal)) clearAllData()
         onRecoveryCode(recoveryCode)
       } else {
         const { recoveryCode } = await joinHousehold(services.db, code, user.uid, user.email ?? "", masterPassword)
+        if (hasLocalData && deleteLocal) clearAllData()
         onRecoveryCode(recoveryCode)
       }
     } catch (err) {
@@ -92,6 +95,21 @@ export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: H
   }
 
   const spaceName = singleMode ? "tu espacio" : "el hogar"
+
+  // Casilla para borrar la copia local que no se sube.
+  const deleteLocalCheckbox = (
+    <label className="flex items-start gap-2 text-sm text-foreground">
+      <input
+        type="checkbox"
+        checked={deleteLocal}
+        onChange={(e) => setDeleteLocal(e.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+      />
+      <span>
+        Borrar de este dispositivo los datos que no se suben: están sin cifrar. Exporta antes una copia si los quieres.
+      </span>
+    </label>
+  )
 
   return (
     <div className="space-y-6">
@@ -137,6 +155,7 @@ export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: H
               </span>
             </label>
           )}
+          {choice === "create" && hasLocalData && !uploadLocal && deleteLocalCheckbox}
 
           {choice === "join" && (
             <>
@@ -154,6 +173,7 @@ export function HouseholdSetup({ services, user, singleMode, onRecoveryCode }: H
                   </div>
                 </div>
               )}
+              {hasLocalData && deleteLocalCheckbox}
               <div>
                 <Label htmlFor="invite-code">Código de invitación</Label>
                 <Input
@@ -256,7 +276,8 @@ export function HouseholdManager({
     setIsBusy(true)
     try {
       const dek = await unlockExtractableDek(services.db, householdId, user.uid, inviteMasterPassword)
-      setInvite(await createInvite(services.db, householdId, user.uid, dek))
+      // El código anterior (si se estaba enseñando) se invalida al generar el nuevo.
+      setInvite(await createInvite(services.db, householdId, user.uid, dek, invite?.code))
       setInviteMasterPassword("")
       setCopied(false)
     } catch (err) {

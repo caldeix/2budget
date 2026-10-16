@@ -12,9 +12,10 @@
  *              normal: `fromStored` une los documentos sueltos con los archivos y `toStored` hace
  *              lo contrario al escribir.
  *
- *              - Un mes está ARCHIVADO si su informe en la nube tiene `archive`. Ese archivo es la
- *                verdad del mes: si quedara algún documento suelto suyo (migración a medias), se
- *                ignora y la siguiente migración lo borra.
+ *              - Un mes está ARCHIVADO si su informe en la nube tiene `archive`. Si aparece algún
+ *                documento suelto de ese mes (una migración a medias, o un cambio hecho sin conexión
+ *                que llega después de archivar), NO se pierde: se une al archivo (el suelto gana,
+ *                por ser posterior) y la siguiente migración lo mete dentro y borra el suelto.
  *              - Un mes es ARCHIVABLE si tiene informe y es anterior al mes en curso. Lo archiva
  *                `planArchiving` (al abrir la app); los cambios normales mantienen la disposición
  *                que ya hay en la nube y no archivan nada nuevo.
@@ -44,6 +45,31 @@ export const currentMonthKey = (now: Date): string =>
 const byId = (a: Transaction, b: Transaction) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
 
 /**
+ * @function mergeIntoArchive
+ * @description Une al archivo de un mes sus documentos sueltos: los que no estaban se añaden y los
+ *              que ya estaban se sustituyen por la versión suelta, que es la posterior (un cambio
+ *              hecho sin conexión que llega después de archivar). Ordenado por id.
+ */
+function mergeIntoArchive(archive: Transaction[], loose: Transaction[]): Transaction[] {
+  const merged = new Map(archive.map((t) => [t.id, t]))
+  for (const t of loose) merged.set(t.id, t)
+  return [...merged.values()].sort(byId)
+}
+
+/** Agrupa por mes las transacciones de los meses dados. */
+function groupByMonthIn(transactions: Transaction[], months: Set<string>): Map<string, Transaction[]> {
+  const byMonth = new Map<string, Transaction[]>()
+  for (const t of transactions) {
+    const month = transactionMonth(t)
+    if (!months.has(month)) continue
+    const list = byMonth.get(month) ?? []
+    list.push(t)
+    byMonth.set(month, list)
+  }
+  return byMonth
+}
+
+/**
  * @function archivedMonthsOf
  * @description Meses archivados en la nube (sus informes tienen `archive`).
  */
@@ -54,17 +80,19 @@ export function archivedMonthsOf(reports: StoredReport[]): Set<string> {
 /**
  * @function fromStored
  * @description Une lo leído de la nube en un `AppData` normal: las transacciones sueltas de los
- *              meses no archivados más las de los archivos, e informes sin el campo `archive`.
+ *              meses no archivados más las de los archivos (con los sueltos de su mes unidos, ver
+ *              `mergeIntoArchive`), e informes sin el campo `archive`.
  */
 export function fromStored(
   live: Transaction[],
   storedReports: StoredReport[],
 ): { transactions: Transaction[]; reports: MonthlyReport[] } {
   const archived = archivedMonthsOf(storedReports)
+  const looseInArchived = groupByMonthIn(live, archived)
   const transactions = live.filter((t) => !archived.has(transactionMonth(t)))
   const reports: MonthlyReport[] = []
   for (const { archive, ...report } of storedReports) {
-    if (archive) transactions.push(...archive)
+    if (archive) transactions.push(...mergeIntoArchive(archive, looseInArchived.get(reportMonth(report)) ?? []))
     reports.push(report)
   }
   return { transactions, reports }
@@ -93,9 +121,26 @@ export function toStored(data: AppData, archivedMonths: Set<string>): StoredData
   }
   const reports: StoredReport[] = data.reports.map((r) => {
     const month = reportMonth(r)
-    return archived.has(month) ? { ...r, archive: [...(byMonth.get(month) ?? [])].sort(byId) } : r
+    return archived.has(month) ? archivedReport(r, [...(byMonth.get(month) ?? [])].sort(byId)) : r
   })
   return { ...data, transactions, reports }
+}
+
+// Último archivo montado de cada informe (3.1.1). Cada cambio llama dos veces a `toStored` (antes y
+// después) y comparaba por contenido TODOS los meses archivados, cada vez más. Si el informe y sus
+// transacciones son los mismos objetos que la vez anterior, se devuelve el mismo archivo y la
+// comparación sale por referencia (ver `diffAppData`).
+const archivedReportCache = new WeakMap<MonthlyReport, { archive: Transaction[]; stored: StoredReport }>()
+
+/** El informe con sus transacciones dentro, reutilizando el de la vez anterior si nada cambió. */
+function archivedReport(report: MonthlyReport, archive: Transaction[]): StoredReport {
+  const cached = archivedReportCache.get(report)
+  if (cached && cached.archive.length === archive.length && cached.archive.every((t, i) => t === archive[i])) {
+    return cached.stored
+  }
+  const stored = { ...report, archive }
+  archivedReportCache.set(report, { archive, stored })
+  return stored
 }
 
 /**
@@ -112,17 +157,26 @@ export interface ArchivePlan {
 /**
  * @function planArchiving
  * @description Calcula cómo archivar los meses archivables (con informe y anteriores al mes en
- *              curso) a partir de lo que hay en la nube. También borra los documentos sueltos que
- *              hayan quedado de un mes ya archivado (migración a medias). Vacío si no hay nada.
+ *              curso) a partir de lo que hay en la nube. Los documentos sueltos de un mes ya
+ *              archivado (migración a medias o cambio sin conexión llegado tarde) se meten antes en
+ *              su archivo y solo después se borran: nunca se borra nada que no esté archivado.
+ *              Vacío si no hay nada.
  */
 export function planArchiving(live: Transaction[], storedReports: StoredReport[], now: Date): ArchivePlan {
   const current = currentMonthKey(now)
   const reportsToWrite: StoredReport[] = []
   const archived = archivedMonthsOf(storedReports)
+  const looseInArchived = groupByMonthIn(live, archived)
 
   for (const report of storedReports) {
     const month = reportMonth(report)
-    if (archived.has(month) || month >= current) continue
+    if (archived.has(month)) {
+      // Ya archivado: si tiene sueltos, se reescribe su archivo con ellos dentro.
+      const loose = looseInArchived.get(month)
+      if (loose && report.archive) reportsToWrite.push({ ...report, archive: mergeIntoArchive(report.archive, loose) })
+      continue
+    }
+    if (month >= current) continue
     const archive = live.filter((t) => transactionMonth(t) === month).sort(byId)
     reportsToWrite.push({ ...report, archive })
     archived.add(month)

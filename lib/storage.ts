@@ -10,12 +10,14 @@ import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
 import { DEFAULT_CATEGORIES } from "@/lib/categories" // Categorías iniciales.
 import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
 import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
+import { dedupeAppData } from "@/lib/dedupe" // Un informe por mes y una transacción por id.
+import { validateImportedData } from "@/lib/validate-data" // Comprobación de los archivos importados.
 
 /**
  * @constant {string} STORAGE_KEY
  * @description Clave utilizada para almacenar los datos de la aplicación en localStorage.
  */
-const STORAGE_KEY = "financial-manager-data"
+export const STORAGE_KEY = "financial-manager-data"
 
 /**
  * Versión del esquema de datos persistido.
@@ -167,7 +169,7 @@ export function loadData(): AppData {
      * en futuras versiones, los datos antiguos sigan siendo compatibles y tengan valores por defecto.
      * La configuración también se fusiona para mantener los nombres personalizados.
      */
-    const normalized: AppData = {
+    const normalized: AppData = dedupeAppData({
       ...defaultData, // Empieza con la estructura por defecto
       ...data, // Sobrescribe con los datos cargados
       version: DATA_VERSION,
@@ -175,7 +177,7 @@ export function loadData(): AppData {
       transactions: Array.isArray(data.transactions) ? data.transactions.map(normalizeTransaction) : [],
       reports: Array.isArray(data.reports) ? data.reports.map(normalizeReport) : [],
       config: { ...defaultConfig, ...data.config }, // Fusiona la configuración
-    }
+    })
 
     // Migración de un solo disparo: deja el localStorage ya limpio y evita repetir la
     // reescritura en cada arranque. La app es correcta aunque esto no llegue a ejecutarse,
@@ -203,20 +205,26 @@ export function loadData(): AppData {
  * @description Guarda los datos de la aplicación en localStorage.
  *              Los datos se serializan a una cadena JSON antes de guardarse.
  * @param {AppData} data - El objeto `AppData` que se va a guardar.
- * @returns {void}
+ * @returns {boolean} Si se ha guardado (no se puede con el almacenamiento lleno o bloqueado).
  */
-export function saveData(data: AppData): void {
+export function saveData(data: AppData): boolean {
   // Asegura que la función solo se ejecute en el lado del cliente.
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return false
 
   try {
     // Serializa el objeto `AppData` a una cadena JSON y lo guarda en localStorage.
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    return true
   } catch (error) {
-    // Registra cualquier error que ocurra durante el proceso de guardado.
+    // Cuota llena o almacenamiento bloqueado (p. ej. modo privado): quien llama avisa al usuario.
     console.error("Error saving data:", error)
+    return false
   }
 }
+
+/** Mensaje cuando no se puede guardar en este navegador (modo local). */
+export const LOCAL_SAVE_ERROR =
+  "No se han podido guardar los cambios en este navegador (el almacenamiento está lleno o bloqueado, p. ej. en modo privado). Exporta tus datos desde Configuración para no perderlos."
 
 /**
  * @function serializeAppData
@@ -233,9 +241,10 @@ export function serializeAppData(data: AppData): string {
  * @function downloadAppData
  * @description Descarga los datos como un archivo JSON en el navegador (copia de seguridad).
  * @param {AppData} data - Los datos a exportar.
+ * @param {string} [label] - Se añade al nombre del archivo (p. ej. "antes-de-importar").
  * @returns {void}
  */
-export function downloadAppData(data: AppData): void {
+export function downloadAppData(data: AppData, label?: string): void {
   // Crea un Blob (objeto de datos inmutables) con el contenido JSON.
   const blob = new Blob([serializeAppData(data)], { type: "application/json" })
   // Crea una URL para el Blob.
@@ -244,12 +253,15 @@ export function downloadAppData(data: AppData): void {
   const a = document.createElement("a")
   a.href = url
   // Define el nombre del archivo a descargar.
-  a.download = `financial-data-${new Date().toISOString().split("T")[0]}.json`
+  a.download = `financial-data-${label ? `${label}-` : ""}${new Date().toISOString().split("T")[0]}.json`
   document.body.appendChild(a) // Añade el elemento al DOM.
   a.click() // Simula un clic para iniciar la descarga.
   document.body.removeChild(a) // Elimina el elemento temporal.
   URL.revokeObjectURL(url) // Libera la URL del Blob para liberar memoria.
 }
+
+/** Resultado de leer un archivo importado. */
+export type ImportResult = { ok: true; data: AppData } | { ok: false; error: string }
 
 /**
  * @function parseImportedData
@@ -258,17 +270,20 @@ export function downloadAppData(data: AppData): void {
  *              migraciones de un solo uso que le falten (p. ej. la corrección de céntimos de v3).
  *              No guarda nada: quien llama decide dónde (localStorage o la nube).
  * @param {string} jsonString - La cadena JSON que contiene los datos a importar.
- * @returns {AppData | null} Los datos importados, o `null` si el archivo no es válido.
+ * @returns {ImportResult} Los datos importados, o por qué el archivo no es válido.
  */
-export function parseImportedData(jsonString: string): AppData | null {
+export function parseImportedData(jsonString: string): ImportResult {
+  let raw: unknown
   try {
-    // Intenta parsear la cadena JSON.
-    const raw = JSON.parse(jsonString)
+    raw = JSON.parse(jsonString)
+  } catch {
+    return { ok: false, error: "El archivo no es un JSON válido." }
+  }
+  // Un dato que la app no sabe leer rechaza el archivo entero (ver `validateImportedData`).
+  const problem = validateImportedData(raw)
+  if (problem) return { ok: false, error: problem }
 
-    // Validación básica: asegura que el JSON es un objeto y no nulo.
-    if (typeof raw !== "object" || raw === null) {
-      throw new Error("El archivo no contiene un objeto JSON válido")
-    }
+  try {
 
     /**
      * Hidratación/Fallback: Construye el objeto `AppData` importado.
@@ -276,28 +291,28 @@ export function parseImportedData(jsonString: string): AppData | null {
      * o no tiene el tipo correcto en el JSON importado, se usan arrays vacíos o la configuración por defecto.
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
-    const imported: AppData = {
+    const file = raw as { version?: unknown; transactions?: unknown; reports?: unknown; config?: unknown }
+    const imported: AppData = dedupeAppData({
       version: DATA_VERSION,
-      transactions: Array.isArray(raw.transactions) ? raw.transactions.map(normalizeTransaction) : [],
+      transactions: Array.isArray(file.transactions) ? (file.transactions as Transaction[]).map(normalizeTransaction) : [],
       // Los informes importados también se normalizan: pueden traer importes sin redondear.
-      reports: Array.isArray(raw.reports) ? raw.reports.map(normalizeReport) : [],
+      reports: Array.isArray(file.reports) ? (file.reports as MonthlyReport[]).map(normalizeReport) : [],
       config: {
         ...defaultConfig, // Empieza con la configuración por defecto
-        ...(typeof raw.config === "object" && raw.config !== null ? raw.config : {}), // Fusiona la configuración importada
+        ...(typeof file.config === "object" && file.config !== null ? file.config : {}), // Fusiona la configuración importada
       },
-    }
+    })
 
     // Un archivo de una versión anterior a v3 recibe la corrección de céntimos de los meses cerrados.
-    const fileVersion = typeof raw.version === "number" ? raw.version : 0
+    const fileVersion = typeof file.version === "number" ? file.version : 0
     if (fileVersion < 3) {
       imported.transactions = [...createRoundingAdjustmentsForClosedReports(imported), ...imported.transactions]
     }
 
-    return imported
+    return { ok: true, data: imported }
   } catch (error) {
-    // Si ocurre un error (ej. JSON inválido), registra el error y devuelve `null`.
     console.error("Error importing data:", error)
-    return null
+    return { ok: false, error: "No se ha podido leer el archivo." }
   }
 }
 
