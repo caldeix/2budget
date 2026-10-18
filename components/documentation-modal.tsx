@@ -522,6 +522,23 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 11. Presupuestos */}
+          <AccordionItem value="presupuestos">
+            <SectionTrigger>11. Presupuestos por categoría</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                En la tarjeta <strong>Presupuestos</strong> del lateral puedes poner un límite al mes a cada categoría de
+                gasto (por ejemplo, 400 € de supermercado). Es del hogar: cuentan todos los gastos de la categoría en el
+                mes que estás viendo, de los dos y compartidos, también los pendientes de pagar.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>La barra es verde por debajo del 80 %, ámbar hasta el límite y roja si te has pasado.</li>
+                <li>Al apuntar un gasto que lleva su categoría al 80 % o por encima del límite, la app te avisa.</li>
+                <li>Los límites se cambian en la ventana, con «Editar límites»; sin importe, la categoría no tiene presupuesto.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>
