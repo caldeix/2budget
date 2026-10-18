@@ -121,6 +121,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 para ver el año completo: ingresos, gastos y ahorro de cada mes, los totales del año y un selector de
                 año. Se calcula con las transacciones de cada mes, cerrado o no.
               </p>
+              <p>
+                En pareja, un segundo selector elige la <strong>cuenta</strong>: la tuya o la compartida (sin cuenta en la
+                nube, las de los dos). En la tuya, los ingresos son los tuyos y los gastos, los individuales más lo que
+                envías a la compartida; el ahorro de cada mes es la cifra de tu cuenta en el Balance individual. En la
+                compartida, entran las aportaciones y los ingresos compartidos y salen los gastos compartidos. La tarjeta
+                del lateral enseña la cuenta que elijas.
+              </p>
             </AccordionContent>
           </AccordionItem>
 

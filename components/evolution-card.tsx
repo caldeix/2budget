@@ -1,7 +1,8 @@
 /**
  * @file components/evolution-card.tsx
  * @description Tarjeta del lateral con la evolución de los últimos seis meses (barras de ingresos y
- *              gastos). Toda la tarjeta es un botón: abre el modal con el gráfico completo.
+ *              gastos). Toda la tarjeta es un botón: abre el modal con el gráfico completo. En pareja
+ *              (3.4.0) enseña la cuenta elegida en el modal (la tuya o la compartida).
  */
 
 "use client"
@@ -14,9 +15,11 @@ interface EvolutionCardProps {
   /** Los últimos meses (ver `lastMonths`). */
   points: MonthPoint[]
   onOpen: () => void
+  /** De quién es la serie (p. ej. «Mi cuenta»); sin él, todo el hogar. */
+  viewLabel?: string
 }
 
-export function EvolutionCard({ points, onOpen }: EvolutionCardProps) {
+export function EvolutionCard({ points, onOpen, viewLabel }: EvolutionCardProps) {
   return (
     <button
       type="button"
@@ -32,7 +35,9 @@ export function EvolutionCard({ points, onOpen }: EvolutionCardProps) {
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
       </span>
       <EvolutionChart points={points} compact />
-      <span className="block text-xs text-muted-foreground">Últimos 6 meses · pulsa para ver el detalle</span>
+      <span className="block text-xs text-muted-foreground">
+        {viewLabel ? `${viewLabel} · ` : ""}Últimos 6 meses · pulsa para ver el detalle
+      </span>
     </button>
   )
 }
