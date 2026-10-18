@@ -362,7 +362,7 @@ export default function HomePage() {
   }
 
   const handleClearData = () => {
-    replaceAllData({ transactions: [], reports: [], config: data.config })
+    replaceAllData({ transactions: [], reports: [], config: data.config, goals: [] })
   }
 
   const handleLoadMoreTransactions = useCallback(() => {

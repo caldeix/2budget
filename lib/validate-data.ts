@@ -40,6 +40,20 @@ function reportProblem(r: unknown): string | null {
   return null
 }
 
+const GOAL_OWNERS = new Set(["person1", "person2", "shared"])
+
+/** Qué le falta a una meta de ahorro (3.3.0), o `null` si se puede usar. */
+function goalProblem(g: unknown): string | null {
+  if (!isObject(g)) return "no es una meta"
+  if (typeof g.id !== "string" || !g.id) return "no tiene id"
+  if (typeof g.name !== "string" || !g.name.trim()) return "no tiene nombre"
+  if (typeof g.owner !== "string" || !GOAL_OWNERS.has(g.owner)) return "no tiene de quién es"
+  if (!isAmount(g.allocated) || (g.allocated as number) < 0) return "no tiene un importe asignado válido"
+  if (g.target !== undefined && !isAmount(g.target)) return "tiene un objetivo no numérico"
+  if (typeof g.createdAt !== "string") return "no tiene fecha de creación"
+  return null
+}
+
 /** Nombre para enseñar en el mensaje. */
 function label(item: unknown, fallback: string): string {
   if (isObject(item) && typeof item.name === "string" && item.name) return `"${item.name}"`
@@ -58,6 +72,7 @@ export function validateImportedData(raw: unknown): string | null {
   if (raw.transactions !== undefined && !Array.isArray(raw.transactions)) return "Las transacciones del archivo no son una lista."
   if (raw.reports !== undefined && !Array.isArray(raw.reports)) return "Los informes del archivo no son una lista."
   if (raw.config !== undefined && !isObject(raw.config)) return "La configuración del archivo no es válida."
+  if (raw.goals !== undefined && !Array.isArray(raw.goals)) return "Las metas del archivo no son una lista."
   if (raw.transactions === undefined && raw.reports === undefined) return "El archivo no contiene transacciones ni informes."
 
   const problems: string[] = []
@@ -70,6 +85,11 @@ export function validateImportedData(raw: unknown): string | null {
   reports.forEach((r, i) => {
     const problem = reportProblem(r)
     if (problem) problems.push(`el informe ${label(r, `nº ${i + 1}`)} ${problem}`)
+  })
+  const goals = (raw.goals as unknown[] | undefined) ?? []
+  goals.forEach((g, i) => {
+    const problem = goalProblem(g)
+    if (problem) problems.push(`la meta ${label(g, `nº ${i + 1}`)} ${problem}`)
   })
   if (problems.length === 0) return null
 
