@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.5.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.6.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -39,6 +39,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Cuenta compartida** — Las aportaciones que cada uno envía a la cuenta de los dos son un tipo propio (un traspaso, no un gasto). Lo compartido sale de la compartida y lo individual de la cuenta de cada uno: el resumen, el total acumulado y el cierre de mes separan la cuenta de cada persona y la compartida, y el cierre pide su saldo en el banco
+- **Resumen anual** — Totales, personas, categorías y meses de un año, para Excel o PDF
 - **Presupuestos** — Límite al mes por categoría con aviso al acercarse
 - **Metas de ahorro** — Reparte lo ahorrado de los meses cerrados en metas personales y compartidas
 - **Entrar con Google** — Además de email y contraseña; se puede unir a una cuenta existente sin perder el hogar
@@ -54,6 +55,13 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.6.0 — Resumen anual
+
+- **Un año de un vistazo** — En la tarjeta Informes, el botón «Año» abre el resumen de un año: ingresos, gastos y ahorro, cada persona (con su parte de lo compartido y lo enviado a la compartida), gastos e ingresos por categoría y cada mes
+- **Exportar** — «Excel (CSV)» lo descarga para Excel (punto y coma, coma decimal y tildes correctas) e «Imprimir o PDF» lo abre solo para imprimirlo o guardarlo en PDF; si el navegador no deja abrir la ventana, se descarga como página
+- Paso del tour y sección de la Ayuda
+- SemVer: 3.5.0 → 3.6.0 (MINOR)
 
 ### v3.5.0 — Presupuestos por categoría
 

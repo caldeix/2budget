@@ -84,6 +84,11 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       title: "Todos los informes",
       text: "Abre la lista completa, con un filtro por año.",
     },
+    {
+      target: "annual-summary",
+      title: "Resumen anual",
+      text: "Todo un año de un vistazo: totales, por persona, por categoría y por mes. Se puede descargar para Excel o imprimir y guardar en PDF (por ejemplo, para la renta).",
+    },
     // ---- Lista
     {
       target: "month-nav",
