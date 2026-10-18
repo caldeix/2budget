@@ -42,6 +42,7 @@ import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
+import { IosInstallNotice } from "@/components/ios-install-notice"
 import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
@@ -605,6 +606,8 @@ export default function HomePage() {
 
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
       {!cloudTarget && !isTourActive && <LocalStorageNotice />}
+      {/* Con cuenta: cómo instalarla en iPhone (Safari no lo ofrece solo). */}
+      {cloudTarget && !isTourActive && <IosInstallNotice />}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">

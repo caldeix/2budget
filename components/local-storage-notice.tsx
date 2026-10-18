@@ -13,22 +13,9 @@
 
 import { useEffect, useState } from "react"
 import { Smartphone, X } from "lucide-react"
+import { isAppleMobile, isInstalled } from "@/lib/device"
 
 const DISMISSED_KEY = "2budget:ios-local-notice-dismissed"
-
-/** iPhone o iPad (los iPad recientes se presentan como Mac con pantalla táctil). */
-function isAppleMobile(): boolean {
-  const ua = navigator.userAgent
-  return /iPhone|iPad|iPod/.test(ua) || (ua.includes("Macintosh") && navigator.maxTouchPoints > 1)
-}
-
-/** La web está abierta como app instalada (pantalla de inicio). */
-function isInstalled(): boolean {
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
-  )
-}
 
 /**
  * @function LocalStorageNotice
