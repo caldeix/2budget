@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.6.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.7.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -40,7 +40,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Cuenta compartida** — Las aportaciones que cada uno envía a la cuenta de los dos son un tipo propio (un traspaso, no un gasto). Lo compartido sale de la compartida y lo individual de la cuenta de cada uno: el resumen, el total acumulado y el cierre de mes separan la cuenta de cada persona y la compartida, y el cierre pide su saldo en el banco
 - **Resumen anual** — Totales, personas, categorías y meses de un año, para Excel o PDF
-- **Presupuestos** — Límite al mes por categoría con aviso al acercarse
+- **Presupuestos** — Límite al mes por categoría, tuyos y compartidos, con aviso al acercarse
 - **Metas de ahorro** — Reparte lo ahorrado de los meses cerrados en metas personales y compartidas
 - **Entrar con Google** — Además de email y contraseña; se puede unir a una cuenta existente sin perder el hogar
 - **Copia de gastos fijos, ingresos y aportaciones** — Duplica automáticamente los gastos fijos, los ingresos y las aportaciones a la compartida del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
@@ -55,6 +55,14 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.7.0 — Presupuestos por cuenta
+
+- **Los tuyos y los compartidos** — En pareja, los presupuestos son de cada persona (cuentan sus gastos individuales) o compartidos (cuentan los gastos «Ambos» enteros). La parte de cada uno en un gasto compartido no cuenta en su presupuesto personal: ya cuenta en el compartido
+- **Cada uno ve los suyos y los compartidos** — Pestañas en la ventana; la tarjeta del lateral indica de qué cuenta es cada uno. En modo individual, solo los tuyos, con todos los gastos
+- **Aviso al apuntar** — Usa el presupuesto de la cuenta del gasto
+- **Sin perder nada** — Los presupuestos de la 3.5.0 pasan a compartidos (en modo individual, a tuyos); si los dos editáis a la vez cuentas distintas, no se pisan
+- SemVer: 3.6.0 → 3.7.0 (MINOR)
 
 ### v3.6.0 — Resumen anual
 
