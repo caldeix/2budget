@@ -22,7 +22,7 @@ import { VerifyEmailPanel } from "@/components/verify-email-panel"
 import { HouseholdManager, HouseholdSetup } from "@/components/household-panel"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import type { HouseholdInfo } from "@/lib/cloud/repository"
-import { deleteAccount, getErrorMessage, requestEmailChange } from "@/lib/cloud/auth"
+import { deleteAccount, getErrorMessage, hasGoogle, hasPassword, linkGoogle, requestEmailChange, unlinkGoogle } from "@/lib/cloud/auth"
 import { SignOutButton } from "@/components/sign-out-button"
 import { changeMasterPassword, regenerateRecoveryCode } from "@/lib/cloud/repository"
 import { MasterPasswordFields, validateNewMasterPassword } from "@/components/master-password-fields"
@@ -125,8 +125,14 @@ function AccountSettings({
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
+  // Vincular o desvincular Google cambia el mismo objeto `User`: este contador vuelve a pintar.
+  const [, setProvidersVersion] = useState(0)
 
   if (!services || !user) return null
+  // Métodos de acceso de la cuenta (3.2.0). Sin contraseña (solo Google), las acciones que la piden
+  // se confirman con la ventana de Google y el email no se cambia aquí (es el de Google).
+  const withPassword = hasPassword(user)
+  const withGoogle = hasGoogle(user)
 
   const openPanel = (next: "none" | "email" | "master" | "recovery" | "delete") => {
     setPanel(next)
@@ -188,6 +194,20 @@ function AccountSettings({
     })
   }
 
+  const handleLinkGoogle = () =>
+    void run(async () => {
+      await linkGoogle(user)
+      setProvidersVersion((v) => v + 1)
+      setInfo("Google vinculado: ya puedes entrar con tu cuenta de Google.")
+    })
+
+  const handleUnlinkGoogle = () =>
+    void run(async () => {
+      await unlinkGoogle(user)
+      setProvidersVersion((v) => v + 1)
+      setInfo("Google desvinculado: entra con tu email y contraseña.")
+    })
+
   const handleDelete = (e: React.FormEvent) => {
     e.preventDefault()
     void run(() => deleteAccount(services, user, password, householdId))
@@ -203,6 +223,30 @@ function AccountSettings({
             Cambio pendiente de confirmar en {pendingEmail}. Hasta entonces se entra con el email actual.
           </p>
         )}
+      </div>
+
+      <div className="rounded-xl border px-3 py-2 text-sm space-y-2">
+        <p className="font-medium text-foreground">Formas de entrar</p>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">Email y contraseña</span>
+          <span className="text-foreground">{withPassword ? "Sí" : "No (solo Google)"}</span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">Google</span>
+          {withGoogle ? (
+            withPassword ? (
+              <Button type="button" variant="outline" size="sm" onClick={handleUnlinkGoogle} disabled={isBusy}>
+                Desvincular
+              </Button>
+            ) : (
+              <span className="text-foreground">Sí</span>
+            )
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={handleLinkGoogle} disabled={isBusy}>
+              Vincular con Google
+            </Button>
+          )}
+        </div>
       </div>
 
       {info && <p className="text-sm text-green-600">{info}</p>}
@@ -309,17 +353,21 @@ function AccountSettings({
             Se borrará tu cuenta y saldrás del hogar. Si eres el único miembro, también se borran todos los datos del
             hogar. Esta acción no se puede deshacer.
           </p>
-          <div>
-            <Label htmlFor="delete-password">Contraseña actual</Label>
-            <Input
-              id="delete-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          {withPassword ? (
+            <div>
+              <Label htmlFor="delete-password">Contraseña actual</Label>
+              <Input
+                id="delete-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Para confirmarlo se abrirá la ventana de Google.</p>
+          )}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => openPanel("none")} disabled={isBusy}>
               Cancelar
@@ -335,9 +383,12 @@ function AccountSettings({
 
       {panel === "none" && (
         <div className="grid grid-cols-1 gap-3">
-          <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("email")}>
-            <Mail className="h-4 w-4" /> Cambiar email
-          </Button>
+          {/* Solo con contraseña: en una cuenta que solo entra con Google, el email es el de Google. */}
+          {withPassword && (
+            <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("email")}>
+              <Mail className="h-4 w-4" /> Cambiar email
+            </Button>
+          )}
           {householdId && (
             <>
               <Button type="button" variant="outline" className="flex items-center gap-2" onClick={() => openPanel("master")}>
