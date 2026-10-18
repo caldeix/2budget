@@ -529,8 +529,14 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 En la tarjeta <strong>Presupuestos</strong> del lateral puedes poner un límite al mes a cada categoría de
-                gasto (por ejemplo, 400 € de supermercado). Es del hogar: cuentan todos los gastos de la categoría en el
-                mes que estás viendo, de los dos y compartidos, también los pendientes de pagar.
+                gasto (por ejemplo, 400 € de supermercado) en el mes que estás viendo, también con los gastos pendientes
+                de pagar.
+              </p>
+              <p>
+                En pareja hay dos tipos: <strong>los tuyos</strong>, que cuentan tus gastos individuales (los 100 % tuyos), y
+                los <strong>compartidos</strong>, que cuentan los gastos «Ambos» enteros. Tu parte de un gasto compartido no
+                cuenta en tus presupuestos: ya cuenta en el compartido. Cada uno ve los suyos y los compartidos. En modo
+                individual solo están los tuyos y cuentan todos los gastos.
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>La barra es verde por debajo del 80 %, ámbar hasta el límite y roja si te has pasado.</li>
