@@ -7,7 +7,7 @@ import { useCloudSession } from "@/hooks/use-cloud-session"
 import { useVault } from "@/hooks/use-vault"
 import { useCalculations } from "@/hooks/use-calculations"
 import { useCopyPreviousMonth } from "@/hooks/use-copy-previous-month"
-import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, getMonthName } from "@/lib/utils"
+import { getCurrentMonth, getCurrentYear, formatMonthYear, calculateCumulativeBalances, getPreviousMonthYear, getMonthName, formatCurrency } from "@/lib/utils"
 import {
   downloadAppData,
   getLastSeenMonth,
@@ -23,13 +23,15 @@ import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment, isPayable } from "@/lib/aggregations"
 import { isHiddenFromViewer, type Person } from "@/lib/privacy"
 import { laterSharedClosings } from "@/lib/shared-account"
-import { isZeroMoney, subtractMoney } from "@/lib/money"
+import { addMoney, isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
 import { evolutionViewsFor, lastMonths, monthlyEvolution, type EvolutionView } from "@/lib/evolution"
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
+import { BudgetsCard, BudgetsModal } from "@/components/budgets"
+import { budgetCrossing, budgetStatuses, countsForBudget } from "@/lib/budgets"
 import { summarizeGoals } from "@/lib/goals"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -126,6 +128,7 @@ export default function HomePage() {
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
   const [isGoalsOpen, setIsGoalsOpen] = useState(false)
+  const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -270,6 +273,11 @@ export default function HomePage() {
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
     [data.transactions, data.reports, data.goals],
   )
+  // Presupuestos por categoría del mes que se está viendo (3.5.0, ver `lib/budgets.ts`).
+  const budgetStatusList = useMemo(
+    () => budgetStatuses(allTransactionsForSelectedMonth, data.config),
+    [allTransactionsForSelectedMonth, data.config],
+  )
   // El mes terminado sin informe más reciente, para el recordatorio de cierre.
   const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
@@ -313,6 +321,7 @@ export default function HomePage() {
 
   const handleAddOrUpdateTransaction = (transactionData: TransactionFormData) => {
     const editedId = editingTransaction?.id
+    warnIfBudgetCrossed(transactionData, editedId)
     if (editingTransaction) {
       updateTransaction(editingTransaction.id, transactionData)
       setEditingTransaction(null)
@@ -332,6 +341,30 @@ export default function HomePage() {
         normalizeName(t.name) === target,
     ).length
     if (count > 0) setCategorySpread({ name: name.trim(), type, categoryId, count })
+  }
+
+  /**
+   * Aviso al guardar un gasto que lleva su categoría al 80 % de su presupuesto o por encima (3.5.0):
+   * se compara lo gastado en ese mes antes y después del cambio.
+   */
+  const warnIfBudgetCrossed = (transactionData: TransactionFormData, editedId?: string) => {
+    const { type, categoryId, amount, date } = transactionData
+    const limit = categoryId ? data.config.budgets?.[categoryId] : undefined
+    if (type !== "expense" || !categoryId || !limit || isTourActive) return
+    const monthKey = date.slice(0, 7)
+    const ofCategory = data.transactions.filter(
+      (t) => t.date.startsWith(monthKey) && countsForBudget(t) && t.categoryId === categoryId,
+    )
+    const before = addMoney(...ofCategory.map((t) => t.amount))
+    const after = addMoney(...ofCategory.filter((t) => t.id !== editedId).map((t) => t.amount), amount)
+    const crossed = budgetCrossing(limit, before, after)
+    if (!crossed) return
+    const name = categoryNameOf(data.config, { categoryId })
+    setFlash(
+      crossed === "over"
+        ? { text: `${name}: te has pasado del presupuesto este mes (${formatCurrency(after)} de ${formatCurrency(limit)}).`, tone: "error" }
+        : { text: `${name}: llevas ${formatCurrency(after)} de ${formatCurrency(limit)} este mes.`, tone: "warning" },
+    )
   }
 
   const handleEditTransaction = (transaction: Transaction) => {
@@ -518,6 +551,7 @@ export default function HomePage() {
     isReportsListOpen ||
     isEvolutionOpen ||
     isGoalsOpen ||
+    isBudgetsOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -721,6 +755,13 @@ export default function HomePage() {
               viewLabel={evolutionViews.length > 1 ? evolutionViews.find((v) => v.value === evolutionView)?.label : undefined}
             />
 
+            <BudgetsCard
+              statuses={budgetStatusList}
+              month={selectedMonth}
+              year={selectedYear}
+              onOpen={() => setIsBudgetsOpen(true)}
+            />
+
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -918,6 +959,16 @@ export default function HomePage() {
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
         onMoveToGoal={moveToGoal}
+      />
+
+      <BudgetsModal
+        isOpen={isBudgetsOpen}
+        onClose={() => setIsBudgetsOpen(false)}
+        config={data.config}
+        monthTransactions={allTransactionsForSelectedMonth}
+        month={selectedMonth}
+        year={selectedYear}
+        onSave={(budgets) => updateConfig({ ...data.config, budgets })}
       />
 
       <EvolutionModal
