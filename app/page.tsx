@@ -45,6 +45,7 @@ import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
 import { IosInstallNotice } from "@/components/ios-install-notice"
+import { ClosingReminder } from "@/components/closing-reminder"
 import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
@@ -269,6 +270,8 @@ export default function HomePage() {
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
     [data.transactions, data.reports, data.goals],
   )
+  // El mes terminado sin informe más reciente, para el recordatorio de cierre.
+  const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
@@ -344,6 +347,13 @@ export default function HomePage() {
   const handleOpenReportModalForCurrentMonth = () => {
     setMonthToCloseReport(actualCurrentMonth)
     setYearToCloseReport(actualCurrentYear)
+    setIsReportModalOpen(true)
+  }
+
+  // Recordatorio de cierre (3.4.1): abre el cierre del mes terminado sin informe más reciente.
+  const handleOpenReportModalForMonth = (month: number, year: number) => {
+    setMonthToCloseReport(month)
+    setYearToCloseReport(year)
     setIsReportModalOpen(true)
   }
 
@@ -650,6 +660,16 @@ export default function HomePage() {
           </div>
         </div>
       ) : null}
+
+      {/* Mes terminado sin cerrar: no cuenta para las metas (3.4.1). */}
+      {!isTourActive && latestUnclosed && (
+        <ClosingReminder
+          month={latestUnclosed.month}
+          year={latestUnclosed.year}
+          olderCount={goalsSummary.unclosedMonths.length - 1}
+          onCloseMonth={() => handleOpenReportModalForMonth(latestUnclosed.month, latestUnclosed.year)}
+        />
+      )}
 
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
       {!cloudTarget && !isTourActive && <LocalStorageNotice />}
