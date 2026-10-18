@@ -26,7 +26,7 @@ import { laterSharedClosings } from "@/lib/shared-account"
 import { isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
-import { lastMonths, monthlyEvolution } from "@/lib/evolution"
+import { evolutionViewsFor, lastMonths, monthlyEvolution, type EvolutionView } from "@/lib/evolution"
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
@@ -228,7 +228,24 @@ export default function HomePage() {
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = useMemo(() => calculateCumulativeBalances(data.transactions), [data.transactions])
   // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
-  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
+  // Mi rol en el hogar (persona 1 o 2); `null` sin hogar en la nube.
+  const viewerRole: Person | null = (session.user && householdInfo?.roles[session.user.uid]) || null
+  // Evolución por cuenta (3.4.0): en pareja, la de quien mira o la compartida (ver `evolutionViewsFor`).
+  const evolutionViews = useMemo(
+    () =>
+      evolutionViewsFor({
+        viewer: viewerRole,
+        singleMode: Boolean(data.config.singleMode),
+        usesShared: cumulativeBalances.accounts.usesShared,
+        person1Name: data.config.person1Name,
+        person2Name: data.config.person2Name,
+      }),
+    [viewerRole, data.config.singleMode, data.config.person1Name, data.config.person2Name, cumulativeBalances.accounts.usesShared],
+  )
+  const [evolutionViewChoice, setEvolutionViewChoice] = useState<EvolutionView | null>(null)
+  const evolutionView =
+    evolutionViews.find((v) => v.value === evolutionViewChoice)?.value ?? evolutionViews[0].value
+  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions, evolutionView), [data.transactions, evolutionView])
   // Metas de ahorro (3.3.0): se calculan sobre los meses terminados y cerrados (ver `lib/goals.ts`).
   const goalsSummary = useMemo(
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
@@ -237,8 +254,7 @@ export default function HomePage() {
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
-  // Privacidad en pareja: mi rol en el hogar y si mi pareja me oculta sus transacciones individuales.
-  const viewerRole: Person | null = (session.user && householdInfo?.roles[session.user.uid]) || null
+  // Privacidad en pareja: si mi pareja me oculta sus transacciones individuales (mi rol, arriba).
   const isAmountHidden = useCallback(
     (t: Transaction) => isHiddenFromViewer(t, viewerRole, data.config),
     [viewerRole, data.config],
@@ -866,6 +882,9 @@ export default function HomePage() {
         isOpen={isEvolutionOpen}
         onClose={() => setIsEvolutionOpen(false)}
         points={evolutionPoints}
+        views={evolutionViews}
+        view={evolutionView}
+        onViewChange={setEvolutionViewChoice}
         currentYear={actualCurrentYear}
       />
 

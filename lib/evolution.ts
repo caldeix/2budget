@@ -41,6 +41,26 @@ const emptyPoint = (month: number, year: number): MonthPoint => ({
 })
 
 /**
+ * @function evolutionViewsFor
+ * @description Vistas que ve quien mira (D-17): en modo individual, todo; en pareja con cuenta, la
+ *              suya y la compartida (si se usa); en este navegador sin cuenta (sin saber quién mira),
+ *              las de los dos y la compartida.
+ */
+export function evolutionViewsFor(options: {
+  viewer: "person1" | "person2" | null
+  singleMode: boolean
+  usesShared: boolean
+  person1Name: string
+  person2Name: string
+}): { value: EvolutionView; label: string }[] {
+  const { viewer, singleMode, usesShared, person1Name, person2Name } = options
+  if (singleMode) return [{ value: "household", label: "Todo" }]
+  const shared = usesShared ? [{ value: "shared" as const, label: "Compartida" }] : []
+  if (viewer) return [{ value: viewer, label: "Mi cuenta" }, ...shared]
+  return [{ value: "person1", label: person1Name }, { value: "person2", label: person2Name }, ...shared]
+}
+
+/**
  * @function monthlyEvolution
  * @description Un punto por cada mes con transacciones, del más antiguo al más reciente.
  * @param {Transaction[]} transactions - Todas las transacciones.
