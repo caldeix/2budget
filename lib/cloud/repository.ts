@@ -40,8 +40,8 @@ import {
   type Unsubscribe,
   type WriteBatch,
 } from "firebase/firestore"
-import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
-import { DATA_VERSION, defaultConfig, normalizeReport, normalizeTransaction } from "@/lib/storage"
+import type { AppConfig, AppData, Goal, MonthlyReport, Transaction } from "@/types"
+import { DATA_VERSION, defaultConfig, normalizeGoal, normalizeReport, normalizeTransaction } from "@/lib/storage"
 import { diffAppData, isEmptyDiff, mergeConfigChanges, type AppDataDiff } from "@/lib/cloud/diff"
 import { dedupeAppData } from "@/lib/dedupe"
 import {
@@ -130,6 +130,8 @@ const userRef = (db: Firestore, uid: string) => doc(db, "users", uid)
 const householdRef = (db: Firestore, hid: string) => doc(db, "households", hid)
 const transactionsCol = (db: Firestore, hid: string) => collection(db, "households", hid, "transactions")
 const reportsCol = (db: Firestore, hid: string) => collection(db, "households", hid, "reports")
+// Metas de ahorro (3.3.0): un documento cifrado por meta, como las transacciones.
+const goalsCol = (db: Firestore, hid: string) => collection(db, "households", hid, "goals")
 const keyRef = (db: Firestore, hid: string, uid: string) => doc(db, "households", hid, "keys", uid)
 const recoveryRef = (db: Firestore, hid: string, uid: string) => doc(db, "households", hid, "recovery", uid)
 const inviteRef = (db: Firestore, id: string) => doc(db, "invites", id)
@@ -139,6 +141,7 @@ const context = {
   household: (hid: string) => `household:${hid}`,
   transaction: (id: string) => `transaction:${id}`,
   report: (id: string) => `report:${id}`,
+  goal: (id: string) => `goal:${id}`,
 }
 
 type BatchOp = (batch: WriteBatch) => void
@@ -507,6 +510,7 @@ export function subscribeHousehold(
   // Tal cual están en la nube: transacciones sueltas e informes (los cerrados, con su archivo).
   let live: Transaction[] | null = null
   let storedReports: StoredReport[] | null = null
+  let goals: Goal[] | null = null
   // Si lo último recibido viene del servidor (no de la caché): solo entonces se archiva.
   let liveFromServer = false
   let reportsFromServer = false
@@ -516,14 +520,14 @@ export function subscribeHousehold(
   let queue = Promise.resolve()
 
   const emit = () => {
-    if (!active || !household || !live || !storedReports) return
+    if (!active || !household || !live || !storedReports || !goals) return
     // Un informe por mes y una transacción por id (ver `lib/dedupe.ts`).
     const merged = dedupeAppData(fromStored(live, storedReports))
     const transactions = merged.transactions.map(normalizeTransaction).sort(byCreatedAtDesc)
     const reports = merged.reports.map(normalizeReport).sort(byCreatedAtDesc)
     onData(
-      { transactions, reports, config: household.config, version: household.version },
-      { ...household.info, ...(unreadable.transactions + unreadable.reports > 0 && { unreadable: unreadable.transactions + unreadable.reports }) },
+      { transactions, reports, config: household.config, version: household.version, goals: goals.map(normalizeGoal) },
+      { ...household.info, ...(unreadable.transactions + unreadable.reports + unreadable.goals > 0 && { unreadable: unreadable.transactions + unreadable.reports + unreadable.goals }) },
     )
 
     // Una vez por apertura, con datos del servidor: archiva los meses cerrados pendientes.
@@ -549,9 +553,10 @@ export function subscribeHousehold(
   }
 
   // Documentos que no se han podido descifrar (dañados), por colección.
-  const unreadable = { transactions: 0, reports: 0 }
+  const unreadable = { transactions: 0, reports: 0, goals: 0 }
   const decryptTransactions = createDecryptingCache<Transaction>(dek, context.transaction)
   const decryptReports = createDecryptingCache<StoredReport>(dek, context.report)
+  const decryptGoals = createDecryptingCache<Goal>(dek, context.goal)
 
   const unsubscribers = [
     onSnapshot(
@@ -593,6 +598,27 @@ export function subscribeHousehold(
           emit()
         }),
       handleError,
+    ),
+    onSnapshot(
+      goalsCol(db, hid),
+      (snap) =>
+        enqueue(async () => {
+          const result = await decryptGoals(snap)
+          goals = result.values
+          unreadable.goals = result.unreadable
+          emit()
+        }),
+      (error: Error & { code?: string }) => {
+        // Con las reglas anteriores a la 3.3.0 no se pueden leer las metas: sin metas, pero el hogar
+        // sigue funcionando (no es que se haya perdido el acceso).
+        if (error.code === "permission-denied") {
+          console.error("Goals are not readable (are the 3.3.0 Firestore rules published?):", error)
+          enqueue(async () => {
+            goals = []
+            emit()
+          })
+        } else handleError(error)
+      },
     ),
   ]
 
@@ -682,6 +708,11 @@ async function diffToOps(
     ops.push((batch) => batch.set(doc(reportsCol(db, hid), r.id), { enc }))
   }
   for (const id of diff.reportIdsToDelete) ops.push((batch) => batch.delete(doc(reportsCol(db, hid), id)))
+  for (const g of diff.goalsToSet) {
+    const enc = await encryptJson(dek, g, context.goal(g.id))
+    ops.push((batch) => batch.set(doc(goalsCol(db, hid), g.id), { enc }))
+  }
+  for (const id of diff.goalIdsToDelete) ops.push((batch) => batch.delete(doc(goalsCol(db, hid), id)))
   return { ops, updates }
 }
 
@@ -923,9 +954,14 @@ export async function leaveHousehold(db: Firestore, hid: string, uid: string): P
   if (snap.exists()) {
     // Último miembro: primero los datos y su clave (las reglas comprueban que aún es miembro)
     // y luego el hogar.
-    const [transactions, reports] = await Promise.all([getDocs(transactionsCol(db, hid)), getDocs(reportsCol(db, hid))])
+    const [transactions, reports, goalDocs] = await Promise.all([
+      getDocs(transactionsCol(db, hid)),
+      getDocs(reportsCol(db, hid)),
+      // Sin las reglas de la 3.3.0 no se pueden leer: no hay metas que borrar.
+      getDocs(goalsCol(db, hid)).catch(() => null),
+    ])
     await commitInChunks(db, [
-      ...[...transactions.docs, ...reports.docs].map((d) => (batch: WriteBatch) => batch.delete(d.ref)),
+      ...[...transactions.docs, ...reports.docs, ...(goalDocs?.docs ?? [])].map((d) => (batch: WriteBatch) => batch.delete(d.ref)),
       (batch: WriteBatch) => batch.delete(keyRef(db, hid, uid)),
       (batch: WriteBatch) => batch.delete(recoveryRef(db, hid, uid)),
     ])

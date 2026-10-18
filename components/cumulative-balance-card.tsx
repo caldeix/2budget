@@ -14,7 +14,7 @@ import type React from "react"
 import { formatCurrency } from "@/lib/utils" // Utilidad para formatear moneda.
 import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Persona 2 en modo individual.
 import type { AccountSplit } from "@/lib/shared-account" // Reparto entre cuentas.
-import { Wallet, User, Landmark } from "lucide-react" // Iconos de cartera, usuario y cuenta compartida.
+import { Wallet, User, Landmark, ChevronRight } from "lucide-react" // Iconos de cartera, usuario y cuenta compartida.
 
 /**
  * @interface CumulativeBalanceCardProps
@@ -26,6 +26,7 @@ import { Wallet, User, Landmark } from "lucide-react" // Iconos de cartera, usua
  * @property {string} person2Name - Nombre de la Persona 2.
  * @property {boolean} [singleMode] - Modo individual: solo se muestra el total si la Persona 2 no tiene saldo.
  * @property {AccountSplit} [accounts] - Reparto acumulado entre cuentas (si se ha usado la compartida).
+ * @property {() => void} onOpen - Abre las metas de ahorro (3.3.0): toda la tarjeta se puede pulsar.
  */
 interface CumulativeBalanceCardProps {
   totalBalance: number
@@ -35,6 +36,7 @@ interface CumulativeBalanceCardProps {
   person2Name: string
   singleMode?: boolean
   accounts?: AccountSplit
+  onOpen: () => void
 }
 
 /** Color de un saldo: verde si es positivo o cero, rojo si es negativo. */
@@ -45,15 +47,16 @@ const balanceColor = (value: number) => (value >= 0 ? "text-green-600" : "text-r
  * @description Una fila de la tarjeta: icono, nombre, saldo y, si la hay, una línea pequeña debajo.
  */
 function BalanceRow({ icon, label, value, detail }: { icon: React.ReactNode; label: string; value: number; detail?: string }) {
+  // Solo `span`: va dentro del botón de la tarjeta.
   return (
-    <div className="bg-muted rounded-xl p-3 flex items-center gap-3">
-      <div className="p-2 bg-primary/10 rounded-lg">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={`text-lg font-semibold ${balanceColor(value)}`}>{formatCurrency(value)}</p>
-        {detail && <p className="text-xs text-muted-foreground truncate">{detail}</p>}
-      </div>
-    </div>
+    <span className="bg-muted rounded-xl p-3 flex items-center gap-3">
+      <span className="p-2 bg-primary/10 rounded-lg">{icon}</span>
+      <span className="min-w-0 block">
+        <span className="block text-sm text-muted-foreground">{label}</span>
+        <span className={`block text-lg font-semibold ${balanceColor(value)}`}>{formatCurrency(value)}</span>
+        {detail && <span className="block text-xs text-muted-foreground truncate">{detail}</span>}
+      </span>
+    </span>
   )
 }
 
@@ -72,6 +75,7 @@ export function CumulativeBalanceCard({
   person2Name,
   singleMode,
   accounts,
+  onOpen,
 }: CumulativeBalanceCardProps) {
   // Sin saldo de la Persona 2, el de la Persona 1 coincide con el total: basta con mostrar el total.
   const showPeople = shouldShowPerson2(singleMode, person2TotalBalance)
@@ -80,14 +84,22 @@ export function CumulativeBalanceCard({
   const userIcon = <User className="h-5 w-5 text-primary" />
 
   return (
-    <div data-tour="cumulative" className="bg-card rounded-2xl shadow-lg border p-6 space-y-4">
+    <button
+      type="button"
+      onClick={onOpen}
+      data-tour="cumulative"
+      className="w-full text-left bg-card rounded-2xl shadow-lg border p-6 space-y-4 hover:bg-muted/40 transition-colors"
+    >
       {/* Título de la tarjeta con icono de cartera. */}
-      <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-        <Wallet className="h-5 w-5" />
-        Total Acumulado
-      </h3>
+      <span className="flex items-center justify-between">
+        <span className="text-lg font-semibold text-foreground flex items-center gap-2">
+          <Wallet className="h-5 w-5" />
+          Total Acumulado
+        </span>
+        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+      </span>
       {/* Contenedor de los balances individuales, con espacio vertical entre ellos. */}
-      <div className="space-y-4">
+      <span className="flex flex-col gap-4">
         <BalanceRow icon={<Wallet className="h-5 w-5 text-primary" />} label="Total" value={totalBalance} />
         {showPeople &&
           (usesShared && accounts ? (
@@ -117,7 +129,8 @@ export function CumulativeBalanceCard({
               <BalanceRow icon={userIcon} label={person2Name} value={person2TotalBalance} />
             </>
           ))}
-      </div>
-    </div>
+      </span>
+      <span className="block text-xs text-muted-foreground">Metas de ahorro · pulsa para verlas</span>
+    </button>
   )
 }

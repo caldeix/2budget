@@ -122,6 +122,12 @@ service cloud.firestore {
         allow create, update: if isMember(hid) && isEncryptedDoc();
       }
 
+      // Metas de ahorro (3.3.0): cifradas como las transacciones.
+      match /goals/{goalId} {
+        allow read, delete: if isMember(hid);
+        allow create, update: if isMember(hid) && isEncryptedDoc();
+      }
+
       // Clave del hogar envuelta con la contraseña maestra de cada miembro: solo la suya.
       match /keys/{memberId} {
         allow read: if request.auth.uid == memberId && isMember(hid);

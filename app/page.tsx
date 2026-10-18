@@ -26,9 +26,11 @@ import { laterSharedClosings } from "@/lib/shared-account"
 import { isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
 import { CategorySpreadModal } from "@/components/category-spread-modal"
-import { lastMonths, monthlyEvolution } from "@/lib/evolution"
+import { evolutionViewsFor, lastMonths, monthlyEvolution, type EvolutionView } from "@/lib/evolution"
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
+import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
+import { summarizeGoals } from "@/lib/goals"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -42,6 +44,7 @@ import { CumulativeBalanceCard } from "@/components/cumulative-balance-card"
 import { DocumentationModal } from "@/components/documentation-modal"
 import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
+import { IosInstallNotice } from "@/components/ios-install-notice"
 import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
@@ -62,6 +65,8 @@ import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
 import { FileText, Calendar, Heart, AlertTriangle, List } from "lucide-react"
 
+// Vista de la Evolución elegida en este dispositivo (3.4.0).
+const EVOLUTION_VIEW_KEY = "2budget:evolution-view"
 // En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
 const RECENT_REPORTS = 3
 
@@ -97,12 +102,17 @@ export default function HomePage() {
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    moveToGoal,
     householdInfo,
     syncError,
     loadError,
   } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
-  const needsAuth = session.enabled && (!session.user || !session.emailVerified)
+  // Una entrada con Google pendiente de decidir (¿ya tienes cuenta?) sigue en la pantalla de acceso.
+  const needsAuth = session.enabled && (!session.user || !session.emailVerified || session.googleLink !== null)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
   const isLoading =
     !session.ready || needsAuth || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading
@@ -114,6 +124,7 @@ export default function HomePage() {
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
+  const [isGoalsOpen, setIsGoalsOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -219,12 +230,49 @@ export default function HomePage() {
   const latestReportId = sortReportsDesc(data.reports)[0]?.id ?? null
   const cumulativeBalances = useMemo(() => calculateCumulativeBalances(data.transactions), [data.transactions])
   // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
-  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
+  // Mi rol en el hogar (persona 1 o 2); `null` sin hogar en la nube.
+  const viewerRole: Person | null = (session.user && householdInfo?.roles[session.user.uid]) || null
+  // Evolución por cuenta (3.4.0): en pareja, la de quien mira o la compartida (ver `evolutionViewsFor`).
+  const evolutionViews = useMemo(
+    () =>
+      evolutionViewsFor({
+        viewer: viewerRole,
+        singleMode: Boolean(data.config.singleMode),
+        usesShared: cumulativeBalances.accounts.usesShared,
+        person1Name: data.config.person1Name,
+        person2Name: data.config.person2Name,
+      }),
+    [viewerRole, data.config.singleMode, data.config.person1Name, data.config.person2Name, cumulativeBalances.accounts.usesShared],
+  )
+  // La vista elegida se recuerda en este dispositivo y la sigue también la tarjeta del lateral (D-16).
+  const [evolutionViewChoice, setEvolutionViewChoice] = useState<EvolutionView | null>(null)
+  useEffect(() => {
+    try {
+      setEvolutionViewChoice(localStorage.getItem(EVOLUTION_VIEW_KEY) as EvolutionView | null)
+    } catch {
+      // Sin almacenamiento: la primera vista.
+    }
+  }, [])
+  const chooseEvolutionView = useCallback((view: EvolutionView) => {
+    setEvolutionViewChoice(view)
+    try {
+      localStorage.setItem(EVOLUTION_VIEW_KEY, view)
+    } catch {
+      // Sin almacenamiento, se elige de nuevo la próxima vez.
+    }
+  }, [])
+  const evolutionView =
+    evolutionViews.find((v) => v.value === evolutionViewChoice)?.value ?? evolutionViews[0].value
+  const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions, evolutionView), [data.transactions, evolutionView])
+  // Metas de ahorro (3.3.0): se calculan sobre los meses terminados y cerrados (ver `lib/goals.ts`).
+  const goalsSummary = useMemo(
+    () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
+    [data.transactions, data.reports, data.goals],
+  )
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
-  // Privacidad en pareja: mi rol en el hogar y si mi pareja me oculta sus transacciones individuales.
-  const viewerRole: Person | null = (session.user && householdInfo?.roles[session.user.uid]) || null
+  // Privacidad en pareja: si mi pareja me oculta sus transacciones individuales (mi rol, arriba).
   const isAmountHidden = useCallback(
     (t: Transaction) => isHiddenFromViewer(t, viewerRole, data.config),
     [viewerRole, data.config],
@@ -360,7 +408,7 @@ export default function HomePage() {
   }
 
   const handleClearData = () => {
-    replaceAllData({ transactions: [], reports: [], config: data.config })
+    replaceAllData({ transactions: [], reports: [], config: data.config, goals: [] })
   }
 
   const handleLoadMoreTransactions = useCallback(() => {
@@ -459,6 +507,7 @@ export default function HomePage() {
     selectedReport !== null ||
     isReportsListOpen ||
     isEvolutionOpen ||
+    isGoalsOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -604,6 +653,8 @@ export default function HomePage() {
 
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
       {!cloudTarget && !isTourActive && <LocalStorageNotice />}
+      {/* Con cuenta: cómo instalarla en iPhone (Safari no lo ofrece solo). */}
+      {cloudTarget && !isTourActive && <IosInstallNotice />}
 
       {/* Abajo, margen para que el footer fijo no tape el final de la página. */}
       <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8 pb-24">
@@ -641,9 +692,14 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
               accounts={cumulativeBalances.accounts}
+              onOpen={() => setIsGoalsOpen(true)}
             />
 
-            <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
+            <EvolutionCard
+              points={recentEvolution}
+              onOpen={() => setIsEvolutionOpen(true)}
+              viewLabel={evolutionViews.length > 1 ? evolutionViews.find((v) => v.value === evolutionView)?.label : undefined}
+            />
 
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
@@ -827,10 +883,30 @@ export default function HomePage() {
         />
       )}
 
+      <GoalsModal
+        isOpen={isGoalsOpen}
+        onClose={() => setIsGoalsOpen(false)}
+        summary={goalsSummary}
+        tabs={goalTabsFor({
+          viewer: viewerRole,
+          singleMode: Boolean(data.config.singleMode),
+          usesShared: goalsSummary.usesShared,
+          person1Name: data.config.person1Name,
+          person2Name: data.config.person2Name,
+        })}
+        onAddGoal={addGoal}
+        onUpdateGoal={updateGoal}
+        onDeleteGoal={deleteGoal}
+        onMoveToGoal={moveToGoal}
+      />
+
       <EvolutionModal
         isOpen={isEvolutionOpen}
         onClose={() => setIsEvolutionOpen(false)}
         points={evolutionPoints}
+        views={evolutionViews}
+        view={evolutionView}
+        onViewChange={chooseEvolutionView}
         currentYear={actualCurrentYear}
       />
 

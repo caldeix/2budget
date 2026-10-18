@@ -56,9 +56,18 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
         : "La suma de todos los meses desde el principio: lo ahorrado en total, en la cuenta de cada uno y en la compartida (lo que sobra en ella se queda ahí). No cuenta los gastos no computables.",
     },
     {
+      target: "cumulative",
+      title: "Metas de ahorro",
+      text: singleMode
+        ? "Pulsa el Total acumulado para repartir lo ahorrado en metas (un viaje, el coche...). Solo se reparte el dinero de los meses terminados y cerrados; lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero."
+        : "Pulsa el Total acumulado para repartir lo ahorrado en metas: las tuyas, sobre tu cuenta, y las compartidas, sobre la compartida. Solo se reparte el dinero de los meses terminados y cerrados; lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero.",
+    },
+    {
       target: "evolution",
       title: "Evolución",
-      text: "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes y un selector de año.",
+      text: singleMode
+        ? "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes y un selector de año."
+        : "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes, un selector de año y otro de cuenta: la tuya o la compartida.",
     },
     {
       target: "reports",
