@@ -72,7 +72,9 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
     {
       target: "budgets",
       title: "Presupuestos",
-      text: "Pon un límite al mes a las categorías que quieras vigilar y verás cuánto llevas del mes que estás viendo: verde, bien; ámbar, cerca del límite; rojo, pasado. Al apuntar un gasto que te acerca al límite, te avisa.",
+      text: singleMode
+        ? "Pon un límite al mes a las categorías que quieras vigilar y verás cuánto llevas del mes que estás viendo: verde, bien; ámbar, cerca del límite; rojo, pasado. Al apuntar un gasto que te acerca al límite, te avisa."
+        : "Pon un límite al mes a las categorías que quieras vigilar: los tuyos cuentan tus gastos individuales y los compartidos, los gastos «Ambos». Verde, bien; ámbar, cerca del límite; rojo, pasado. Al apuntar un gasto que te acerca al límite, te avisa.",
     },
     {
       target: "reports",
