@@ -9,7 +9,7 @@
  *              objeto creado en local, y eso no debe contar como cambio.
  */
 
-import type { AppConfig, AppData, MonthlyReport, Transaction } from "@/types"
+import type { AppConfig, AppData, Goal, MonthlyReport, Transaction } from "@/types"
 
 /**
  * @interface AppDataDiff
@@ -26,6 +26,9 @@ export interface AppDataDiff {
   transactionIdsToDelete: string[]
   reportsToSet: MonthlyReport[]
   reportIdsToDelete: string[]
+  /** Metas de ahorro nuevas o cambiadas (3.3.0). */
+  goalsToSet: Goal[]
+  goalIdsToDelete: string[]
   /** `true` si cambió la configuración o la versión del esquema (van en el documento del hogar). */
   householdChanged: boolean
 }
@@ -87,12 +90,15 @@ function diffById<T extends { id: string }>(
 export function diffAppData(prev: AppData, next: AppData): AppDataDiff {
   const transactions = diffById(prev.transactions, next.transactions)
   const reports = diffById(prev.reports, next.reports)
+  const goals = diffById(prev.goals ?? [], next.goals ?? [])
   return {
     transactionsToSet: transactions.toCreate,
     transactionsToUpdate: transactions.toUpdate,
     transactionIdsToDelete: transactions.idsToDelete,
     reportsToSet: reports.toSet,
     reportIdsToDelete: reports.idsToDelete,
+    goalsToSet: goals.toSet,
+    goalIdsToDelete: goals.idsToDelete,
     householdChanged: !isSameContent(prev.config, next.config) || prev.version !== next.version,
   }
 }
@@ -108,7 +114,9 @@ export function isEmptyDiff(diff: AppDataDiff): boolean {
     diff.transactionsToUpdate.length === 0 &&
     diff.transactionIdsToDelete.length === 0 &&
     diff.reportsToSet.length === 0 &&
-    diff.reportIdsToDelete.length === 0
+    diff.reportIdsToDelete.length === 0 &&
+    diff.goalsToSet.length === 0 &&
+    diff.goalIdsToDelete.length === 0
   )
 }
 

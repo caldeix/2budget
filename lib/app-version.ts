@@ -19,8 +19,11 @@ import pkg from "@/package.json"
 /** Versión de esta build (la de `package.json`). */
 export const APP_VERSION: string = pkg.version
 
-/** Versión más antigua de la app que entiende los datos actuales: la 3.0.0 trajo las aportaciones. */
-export const DATA_MIN_APP_VERSION = "3.0.0"
+/**
+ * Versión más antigua de la app que entiende los datos actuales: la 3.0.0 trajo las aportaciones y la
+ * 3.3.0 las metas de ahorro (una app anterior las perdería al exportar, importar o borrar los datos).
+ */
+export const DATA_MIN_APP_VERSION = "3.3.0"
 
 /** Compara dos versiones `x.y.z`: negativo si `a` es anterior, 0 si son iguales, positivo si es posterior. */
 export function compareVersions(a: string, b: string): number {
