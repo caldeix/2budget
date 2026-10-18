@@ -539,6 +539,27 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 12. Resumen anual */}
+          <AccordionItem value="resumen-anual">
+            <SectionTrigger>12. Resumen anual</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                En la tarjeta <strong>Informes</strong>, el botón <strong>Año</strong> abre el resumen de un año: ingresos,
+                gastos y ahorro, cada persona (con su parte de lo compartido y lo que envió a la compartida), los gastos
+                e ingresos por categoría y cada mes. Los ajustes de cierre salen como su propia fila.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Excel (CSV)</strong> descarga el resumen para abrirlo en Excel o en Hojas de cálculo.
+                </li>
+                <li>
+                  <strong>Imprimir o PDF</strong> abre el resumen solo, listo para imprimir o guardar como PDF desde el
+                  diálogo de impresión. Si el navegador no deja abrir la ventana, se descarga como página.
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>
