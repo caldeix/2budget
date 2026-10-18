@@ -1,8 +1,9 @@
 /**
  * @file components/budgets.tsx
  * @description Presupuestos por categoría (3.5.0): la tarjeta del lateral con los más ajustados del mes
- *              que se está viendo y la ventana con todos y con los límites para editarlos. Los cálculos
- *              están en `lib/budgets.ts`.
+ *              que se está viendo y la ventana con todos y con los límites para editarlos. Desde la 3.7.0,
+ *              por cuenta: los tuyos y los compartidos (ver `budgetTabsFor`). Los cálculos están en
+ *              `lib/budgets.ts`.
  */
 
 "use client"
@@ -10,7 +11,7 @@
 import { useEffect, useState } from "react"
 import { ChevronRight, PiggyBank } from "lucide-react"
 import type { AppConfig } from "@/types"
-import { budgetStatuses, type BudgetLevel, type BudgetStatus } from "@/lib/budgets"
+import { budgetsOf, budgetStatuses, type BudgetLevel, type BudgetOwner, type BudgetStatus } from "@/lib/budgets"
 import { categoriesOf } from "@/lib/categories"
 import { cn, formatCurrency, formatMonthYear } from "@/lib/utils"
 import { Modal } from "@/components/ui/modal"
@@ -30,12 +31,15 @@ const leftText = (s: BudgetStatus) =>
   s.left >= 0 ? `Quedan ${formatCurrency(s.left)}` : `Te has pasado ${formatCurrency(-s.left)}`
 
 /** Una línea de presupuesto: categoría, gastado de límite y barra. */
-function BudgetLine({ status, detailed = false }: { status: BudgetStatus; detailed?: boolean }) {
+function BudgetLine({ status, detailed = false, tag }: { status: BudgetStatus; detailed?: boolean; tag?: string }) {
   const pct = Math.min(100, Math.round(status.ratio * 100))
   return (
     <span className="block space-y-1">
       <span className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="font-medium text-foreground truncate">{status.category.name}</span>
+        <span className="font-medium text-foreground truncate">
+          {status.category.name}
+          {tag && <span className="font-normal text-muted-foreground"> · {tag}</span>}
+        </span>
         <span className="tabular-nums text-muted-foreground whitespace-nowrap">
           {formatCurrency(status.spent)} de {formatCurrency(status.limit)}
         </span>
@@ -72,7 +76,27 @@ const CARD_LIMIT = 4
  * @description Tarjeta del lateral: los presupuestos más ajustados del mes que se está viendo. Toda
  *              la tarjeta es un botón que abre la ventana con todos.
  */
-export function BudgetsCard({ statuses, month, year, onOpen }: { statuses: BudgetStatus[]; month: number; year: number; onOpen: () => void }) {
+/** Un presupuesto de la tarjeta, con la cuenta a la que pertenece (en pareja se indica). */
+export interface BudgetEntry {
+  owner: BudgetOwner
+  label: string
+  status: BudgetStatus
+}
+
+export function BudgetsCard({
+  entries,
+  showOwner,
+  month,
+  year,
+  onOpen,
+}: {
+  entries: BudgetEntry[]
+  /** En pareja, cada línea dice de qué cuenta es. */
+  showOwner: boolean
+  month: number
+  year: number
+  onOpen: () => void
+}) {
   return (
     <button
       type="button"
@@ -87,19 +111,19 @@ export function BudgetsCard({ statuses, month, year, onOpen }: { statuses: Budge
         </span>
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
       </span>
-      {statuses.length === 0 ? (
+      {entries.length === 0 ? (
         <span className="block text-sm text-muted-foreground">
           Pon un límite al mes a las categorías que quieras vigilar (supermercado, ocio...) y verás cuánto llevas.
         </span>
       ) : (
         <span className="flex flex-col gap-3">
-          {statuses.slice(0, CARD_LIMIT).map((s) => (
-            <BudgetLine key={s.category.id} status={s} />
+          {entries.slice(0, CARD_LIMIT).map((e) => (
+            <BudgetLine key={`${e.owner}-${e.status.category.id}`} status={e.status} tag={showOwner ? e.label : undefined} />
           ))}
         </span>
       )}
       <span className="block text-xs text-muted-foreground">
-        {formatMonthYear(month, year)} · {statuses.length === 0 ? "pulsa para crearlos" : "pulsa para ver todos"}
+        {formatMonthYear(month, year)} · {entries.length === 0 ? "pulsa para crearlos" : "pulsa para ver todos"}
       </span>
     </button>
   )
@@ -107,8 +131,8 @@ export function BudgetsCard({ statuses, month, year, onOpen }: { statuses: Budge
 
 /**
  * @function BudgetsModal
- * @description Todos los presupuestos del mes y, en «Editar límites», un importe por categoría de gasto
- *              (vacío = sin presupuesto).
+ * @description Todos los presupuestos del mes de una cuenta (pestañas: los tuyos y los compartidos) y,
+ *              en «Editar límites», un importe por categoría de gasto (vacío = sin presupuesto).
  */
 export function BudgetsModal({
   isOpen,
@@ -117,6 +141,7 @@ export function BudgetsModal({
   monthTransactions,
   month,
   year,
+  tabs,
   onSave,
 }: {
   isOpen: boolean
@@ -125,35 +150,61 @@ export function BudgetsModal({
   monthTransactions: Transaction[]
   month: number
   year: number
-  onSave: (budgets: Record<string, number>) => void
+  tabs: { owner: BudgetOwner; label: string }[]
+  onSave: (owner: BudgetOwner, budgets: Record<string, number>) => void
 }) {
-  const statuses = budgetStatuses(monthTransactions, config)
+  const [owner, setOwner] = useState<BudgetOwner>(tabs[0]?.owner ?? "person1")
+  const active = tabs.some((t) => t.owner === owner) ? owner : (tabs[0]?.owner ?? "person1")
+  const statuses = budgetStatuses(monthTransactions, config, active)
   const expenseCategories = categoriesOf(config).filter((c) => c.kind === "expense")
   const [isEditing, setIsEditing] = useState(false)
   const [limits, setLimits] = useState<Record<string, number>>({})
 
-  // Al abrir, sin editar y con los límites actuales.
+  // Al abrir o cambiar de cuenta, sin editar (salvo que no haya ninguno) y con los límites actuales.
   useEffect(() => {
     if (!isOpen) return
     setIsEditing(statuses.length === 0)
-    setLimits({ ...(config.budgets ?? {}) })
-  }, [isOpen])
+    setLimits({ ...budgetsOf(config, active) })
+  }, [isOpen, active])
 
   const save = () => {
     // Solo los límites positivos de categorías que existen.
     const clean = Object.fromEntries(
       expenseCategories.filter((c) => (limits[c.id] ?? 0) > 0).map((c) => [c.id, limits[c.id]]),
     )
-    onSave(clean)
+    onSave(active, clean)
     setIsEditing(false)
   }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Presupuestos" size="lg">
       <div className="p-6 space-y-5">
+        {tabs.length > 1 && (
+          <div role="tablist" aria-label="Cuenta" className="flex flex-wrap gap-2">
+            {tabs.map((tab) => (
+              <button
+                key={tab.owner}
+                type="button"
+                role="tab"
+                aria-selected={tab.owner === active}
+                onClick={() => setOwner(tab.owner)}
+                className={cn(
+                  "rounded-full border px-4 py-1.5 text-sm",
+                  tab.owner === active ? "border-foreground bg-foreground text-background" : "hover:bg-muted",
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="text-sm text-muted-foreground">
-          Un límite al mes por categoría para todo el hogar: cuentan todos los gastos de la categoría en{" "}
-          {formatMonthYear(month, year).toLowerCase()}, también los pendientes de pagar.
+          {config.singleMode
+            ? "Un límite al mes por categoría: cuentan todos los gastos de la categoría"
+            : active === "shared"
+              ? "Un límite al mes por categoría para los gastos compartidos (los «Ambos», enteros)"
+              : "Un límite al mes por categoría para los gastos individuales (los 100 % de esta persona; su parte de los compartidos cuenta en los compartidos)"}{" "}
+          en {formatMonthYear(month, year).toLowerCase()}, también los pendientes de pagar.
         </p>
 
         {isEditing ? (

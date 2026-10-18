@@ -136,7 +136,7 @@ export function mergeConfigChanges(server: AppConfig, prev: AppConfig, next: App
   const before: Record<string, unknown> = { ...prev }
   const after: Record<string, unknown> = { ...next }
   for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
-    if (key === "hideIndividualFromPartner") continue
+    if (key === "hideIndividualFromPartner" || key === "budgetsByOwner") continue
     if (!isSameContent(before[key], after[key])) {
       if (after[key] === undefined) delete merged[key]
       else merged[key] = after[key]
@@ -153,5 +153,16 @@ export function mergeConfigChanges(server: AppConfig, prev: AppConfig, next: App
     }
   }
   if (privacyChanged) merged.hideIndividualFromPartner = privacy
+  // Presupuestos por cuenta (3.7.0): cada uno cambia los suyos y los compartidos; por cuenta, para que
+  // dos cambios a la vez en cuentas distintas no se pisen.
+  const budgets = { ...server.budgetsByOwner }
+  let budgetsChanged = false
+  for (const owner of ["person1", "person2", "shared"] as const) {
+    if (!isSameContent(prev.budgetsByOwner?.[owner], next.budgetsByOwner?.[owner])) {
+      budgets[owner] = next.budgetsByOwner?.[owner]
+      budgetsChanged = true
+    }
+  }
+  if (budgetsChanged) merged.budgetsByOwner = budgets
   return merged as unknown as AppConfig
 }

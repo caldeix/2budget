@@ -32,7 +32,16 @@ import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
 import { BudgetsCard, BudgetsModal } from "@/components/budgets"
 import { AnnualSummaryModal } from "@/components/annual-summary-modal"
-import { budgetCrossing, budgetStatuses, countsForBudget } from "@/lib/budgets"
+import {
+  belongsToBudget,
+  budgetCrossing,
+  budgetOwnerOf,
+  budgetsOf,
+  budgetStatuses,
+  budgetTabsFor,
+  countsForBudget,
+  withBudgets,
+} from "@/lib/budgets"
 import { summarizeGoals } from "@/lib/goals"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -275,10 +284,30 @@ export default function HomePage() {
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
     [data.transactions, data.reports, data.goals],
   )
-  // Presupuestos por categoría del mes que se está viendo (3.5.0, ver `lib/budgets.ts`).
-  const budgetStatusList = useMemo(
-    () => budgetStatuses(allTransactionsForSelectedMonth, data.config),
-    [allTransactionsForSelectedMonth, data.config],
+  // Presupuestos por categoría del mes que se está viendo (3.5.0), por cuenta (3.7.0): los míos y los
+  // compartidos (ver `budgetTabsFor`). La tarjeta junta los de todas, del más ajustado al menos.
+  const budgetTabs = useMemo(
+    () =>
+      budgetTabsFor({
+        viewer: viewerRole,
+        singleMode: Boolean(data.config.singleMode),
+        person1Name: data.config.person1Name,
+        person2Name: data.config.person2Name,
+      }),
+    [viewerRole, data.config.singleMode, data.config.person1Name, data.config.person2Name],
+  )
+  const budgetEntries = useMemo(
+    () =>
+      budgetTabs
+        .flatMap((tab) =>
+          budgetStatuses(allTransactionsForSelectedMonth, data.config, tab.owner).map((status) => ({
+            owner: tab.owner,
+            label: tab.owner === "shared" ? "Compartido" : tab.label === "Mis presupuestos" ? "Mío" : tab.label,
+            status,
+          })),
+        )
+        .sort((a, b) => b.status.ratio - a.status.ratio),
+    [budgetTabs, allTransactionsForSelectedMonth, data.config],
   )
   // El mes terminado sin informe más reciente, para el recordatorio de cierre.
   const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
@@ -351,17 +380,25 @@ export default function HomePage() {
    */
   const warnIfBudgetCrossed = (transactionData: TransactionFormData, editedId?: string) => {
     const { type, categoryId, amount, date } = transactionData
-    const limit = categoryId ? data.config.budgets?.[categoryId] : undefined
-    if (type !== "expense" || !categoryId || !limit || isTourActive) return
+    const singleMode = Boolean(data.config.singleMode)
+    // El presupuesto de la cuenta del gasto (3.7.0): el de su dueño o el compartido. Solo se avisa de los
+    // que ve quien apunta (los suyos y los compartidos), no de los de la pareja.
+    const owner = budgetOwnerOf(transactionData, singleMode)
+    const limit = categoryId ? budgetsOf(data.config, owner)[categoryId] : undefined
+    if (type !== "expense" || !categoryId || !limit || isTourActive || !budgetTabs.some((t) => t.owner === owner)) return
     const monthKey = date.slice(0, 7)
     const ofCategory = data.transactions.filter(
-      (t) => t.date.startsWith(monthKey) && countsForBudget(t) && t.categoryId === categoryId,
+      (t) =>
+        t.date.startsWith(monthKey) &&
+        countsForBudget(t) &&
+        t.categoryId === categoryId &&
+        belongsToBudget(t, owner, singleMode),
     )
     const before = addMoney(...ofCategory.map((t) => t.amount))
     const after = addMoney(...ofCategory.filter((t) => t.id !== editedId).map((t) => t.amount), amount)
     const crossed = budgetCrossing(limit, before, after)
     if (!crossed) return
-    const name = categoryNameOf(data.config, { categoryId })
+    const name = `${categoryNameOf(data.config, { categoryId })}${owner === "shared" && !singleMode ? " (compartido)" : ""}`
     setFlash(
       crossed === "over"
         ? { text: `${name}: te has pasado del presupuesto este mes (${formatCurrency(after)} de ${formatCurrency(limit)}).`, tone: "error" }
@@ -759,7 +796,8 @@ export default function HomePage() {
             />
 
             <BudgetsCard
-              statuses={budgetStatusList}
+              entries={budgetEntries}
+              showOwner={budgetTabs.length > 1}
               month={selectedMonth}
               year={selectedYear}
               onOpen={() => setIsBudgetsOpen(true)}
@@ -993,7 +1031,8 @@ export default function HomePage() {
         monthTransactions={allTransactionsForSelectedMonth}
         month={selectedMonth}
         year={selectedYear}
-        onSave={(budgets) => updateConfig({ ...data.config, budgets })}
+        tabs={budgetTabs}
+        onSave={(owner, limits) => updateConfig(withBudgets(data.config, owner, limits))}
       />
 
       <EvolutionModal

@@ -129,10 +129,15 @@ export interface AppConfig {
    */
   categories?: { id: string; name: string; kind: "expense" | "income" }[]
   /**
-   * Presupuesto mensual por categoría de gasto (3.5.0): id de la categoría → límite en euros.
-   * Es del hogar: cuenta todos los gastos de la categoría en el mes. Ver `lib/budgets.ts`.
+   * Presupuestos de la 3.5.0, del hogar (id de la categoría → límite en euros). Desde la 3.7.0 se leen
+   * como compartidos (en modo individual, como tuyos) y al guardar pasan a `budgetsByOwner`.
    */
   budgets?: Record<string, number>
+  /**
+   * Presupuesto mensual por categoría de gasto y por cuenta (3.7.0): los de cada persona cuentan sus
+   * gastos individuales y los compartidos, los gastos «Ambos». Ver `lib/budgets.ts`.
+   */
+  budgetsByOwner?: Partial<Record<"person1" | "person2" | "shared", Record<string, number>>>
 }
 
 /**
