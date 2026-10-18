@@ -65,6 +65,8 @@ import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
 import { FileText, Calendar, Heart, AlertTriangle, List } from "lucide-react"
 
+// Vista de la Evolución elegida en este dispositivo (3.4.0).
+const EVOLUTION_VIEW_KEY = "2budget:evolution-view"
 // En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
 const RECENT_REPORTS = 3
 
@@ -242,7 +244,23 @@ export default function HomePage() {
       }),
     [viewerRole, data.config.singleMode, data.config.person1Name, data.config.person2Name, cumulativeBalances.accounts.usesShared],
   )
+  // La vista elegida se recuerda en este dispositivo y la sigue también la tarjeta del lateral (D-16).
   const [evolutionViewChoice, setEvolutionViewChoice] = useState<EvolutionView | null>(null)
+  useEffect(() => {
+    try {
+      setEvolutionViewChoice(localStorage.getItem(EVOLUTION_VIEW_KEY) as EvolutionView | null)
+    } catch {
+      // Sin almacenamiento: la primera vista.
+    }
+  }, [])
+  const chooseEvolutionView = useCallback((view: EvolutionView) => {
+    setEvolutionViewChoice(view)
+    try {
+      localStorage.setItem(EVOLUTION_VIEW_KEY, view)
+    } catch {
+      // Sin almacenamiento, se elige de nuevo la próxima vez.
+    }
+  }, [])
   const evolutionView =
     evolutionViews.find((v) => v.value === evolutionViewChoice)?.value ?? evolutionViews[0].value
   const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions, evolutionView), [data.transactions, evolutionView])
@@ -677,7 +695,11 @@ export default function HomePage() {
               onOpen={() => setIsGoalsOpen(true)}
             />
 
-            <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
+            <EvolutionCard
+              points={recentEvolution}
+              onOpen={() => setIsEvolutionOpen(true)}
+              viewLabel={evolutionViews.length > 1 ? evolutionViews.find((v) => v.value === evolutionView)?.label : undefined}
+            />
 
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
@@ -884,7 +906,7 @@ export default function HomePage() {
         points={evolutionPoints}
         views={evolutionViews}
         view={evolutionView}
-        onViewChange={setEvolutionViewChoice}
+        onViewChange={chooseEvolutionView}
         currentYear={actualCurrentYear}
       />
 
