@@ -29,6 +29,8 @@ import { CategorySpreadModal } from "@/components/category-spread-modal"
 import { lastMonths, monthlyEvolution } from "@/lib/evolution"
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
+import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
+import { summarizeGoals } from "@/lib/goals"
 
 import { SummaryCards } from "@/components/summary-cards"
 import { TransactionsTable } from "@/components/transactions-table"
@@ -98,6 +100,10 @@ export default function HomePage() {
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    moveToGoal,
     householdInfo,
     syncError,
     loadError,
@@ -116,6 +122,7 @@ export default function HomePage() {
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
+  const [isGoalsOpen, setIsGoalsOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -222,6 +229,11 @@ export default function HomePage() {
   const cumulativeBalances = useMemo(() => calculateCumulativeBalances(data.transactions), [data.transactions])
   // Evolución mensual (ingresos, gastos y ahorro por mes) para la tarjeta del lateral y su modal.
   const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions), [data.transactions])
+  // Metas de ahorro (3.3.0): se calculan sobre los meses terminados y cerrados (ver `lib/goals.ts`).
+  const goalsSummary = useMemo(
+    () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
+    [data.transactions, data.reports, data.goals],
+  )
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
   const hasMoreTransactions = transactionsToShow < allTransactionsForSelectedMonth.length
 
@@ -362,7 +374,7 @@ export default function HomePage() {
   }
 
   const handleClearData = () => {
-    replaceAllData({ transactions: [], reports: [], config: data.config })
+    replaceAllData({ transactions: [], reports: [], config: data.config, goals: [] })
   }
 
   const handleLoadMoreTransactions = useCallback(() => {
@@ -461,6 +473,7 @@ export default function HomePage() {
     selectedReport !== null ||
     isReportsListOpen ||
     isEvolutionOpen ||
+    isGoalsOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -645,6 +658,7 @@ export default function HomePage() {
               person2Name={data.config.person2Name}
               singleMode={data.config.singleMode}
               accounts={cumulativeBalances.accounts}
+              onOpen={() => setIsGoalsOpen(true)}
             />
 
             <EvolutionCard points={recentEvolution} onOpen={() => setIsEvolutionOpen(true)} />
@@ -830,6 +844,23 @@ export default function HomePage() {
           laterSharedReports={laterSharedClosings(data.reports, monthToCloseReport, yearToCloseReport)}
         />
       )}
+
+      <GoalsModal
+        isOpen={isGoalsOpen}
+        onClose={() => setIsGoalsOpen(false)}
+        summary={goalsSummary}
+        tabs={goalTabsFor({
+          viewer: viewerRole,
+          singleMode: Boolean(data.config.singleMode),
+          usesShared: goalsSummary.usesShared,
+          person1Name: data.config.person1Name,
+          person2Name: data.config.person2Name,
+        })}
+        onAddGoal={addGoal}
+        onUpdateGoal={updateGoal}
+        onDeleteGoal={deleteGoal}
+        onMoveToGoal={moveToGoal}
+      />
 
       <EvolutionModal
         isOpen={isEvolutionOpen}

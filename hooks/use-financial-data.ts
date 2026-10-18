@@ -13,13 +13,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import type { Firestore } from "firebase/firestore"
-import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData } from "@/types"
+import type { AppData, Transaction, MonthlyReport, AppConfig, TransactionFormData, Goal, GoalOwner } from "@/types"
 import { LOCAL_SAVE_ERROR, STORAGE_KEY, loadData, saveData } from "@/lib/storage" // Funciones para interactuar con localStorage.
 import { ensureMinAppVersion, subscribeHousehold, writeChanges, type HouseholdInfo } from "@/lib/cloud/repository" // Sincronización con Firestore.
 import { APP_VERSION, DATA_MIN_APP_VERSION, isOlderVersion } from "@/lib/app-version" // Compatibilidad de versiones.
 import { getErrorMessage } from "@/lib/cloud/auth" // Mensajes de error en español.
 import { generateId, calculateReportTotals, parseLocalDate, resolvePaidDate } from "@/lib/utils" // Utilidades para generar IDs, calcular totales, parsear fechas locales y refechar pagos.
-import { roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales.
+import { addMoney, roundMoney } from "@/lib/money" // Redondeo canónico a 2 decimales y suma exacta.
 import { isClosingAdjustment } from "@/lib/aggregations" // Ajustes de cierre de mes.
 import { adjustmentIdFor, reportIdFor } from "@/lib/dedupe" // Ids fijos por mes del informe y sus ajustes.
 import { normalizeName } from "@/lib/categories" // Nombres comparables (sin tildes ni mayúsculas).
@@ -572,6 +572,75 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     [commit],
   )
 
+  // --- Metas de ahorro (3.3.0, ver `lib/goals.ts`) -------------------------------------------
+  // Lo único que se guarda de una meta es su nombre, objetivo y lo asignado; lo demás se calcula.
+  // El límite de lo que se puede asignar (lo sin asignar) lo comprueba la ventana de metas.
+
+  const updateGoals = useCallback(
+    (change: (goals: Goal[]) => Goal[]) => commit((prevData) => ({ ...prevData, goals: change(prevData.goals ?? []) })),
+    [commit],
+  )
+
+  /** Crea una meta vacía (sin dinero asignado). */
+  const addGoal = useCallback(
+    (name: string, owner: GoalOwner, target?: number) => {
+      const now = new Date().toISOString()
+      updateGoals((goals) => [
+        ...goals,
+        {
+          id: generateId(),
+          name: name.trim(),
+          owner,
+          allocated: 0,
+          ...(target && target > 0 && { target: roundMoney(target) }),
+          lastFundedAt: now,
+          createdAt: now,
+        },
+      ])
+    },
+    [updateGoals],
+  )
+
+  /** Cambia el nombre o el objetivo (sin objetivo: `undefined`). */
+  const updateGoal = useCallback(
+    (id: string, changes: { name: string; target?: number }) =>
+      updateGoals((goals) =>
+        goals.map((g) => {
+          if (g.id !== id) return g
+          const { target: _target, ...rest } = g
+          return {
+            ...rest,
+            name: changes.name.trim(),
+            ...(changes.target && changes.target > 0 && { target: roundMoney(changes.target) }),
+          }
+        }),
+      ),
+    [updateGoals],
+  )
+
+  /** Borra una meta: su dinero vuelve a «Sin asignar». */
+  const deleteGoal = useCallback((id: string) => updateGoals((goals) => goals.filter((g) => g.id !== id)), [updateGoals])
+
+  /**
+   * Mueve dinero entre «Sin asignar» y una meta: positivo, a la meta (y pasa a ser la más reciente,
+   * la primera en bajar si un mes va en negativo); negativo, de vuelta a «Sin asignar».
+   */
+  const moveToGoal = useCallback(
+    (id: string, amount: number) =>
+      updateGoals((goals) =>
+        goals.map((g) =>
+          g.id !== id
+            ? g
+            : {
+                ...g,
+                allocated: Math.max(0, addMoney(g.allocated, amount)),
+                ...(amount > 0 && { lastFundedAt: new Date().toISOString() }),
+              },
+        ),
+      ),
+    [updateGoals],
+  )
+
   // Copia para la pantalla de error (ver `lib/error-log.ts`): los datos reales, nunca los del tour
   // ni los de otro sitio mientras el hogar no se ha podido abrir.
   useEffect(() => {
@@ -592,6 +661,10 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     getTransactionsForMonth,
     getExistingReport,
     replaceAllData,
+    addGoal,
+    updateGoal,
+    deleteGoal,
+    moveToGoal,
     householdInfo,
     syncError,
     loadError,

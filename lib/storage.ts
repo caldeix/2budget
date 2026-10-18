@@ -6,7 +6,7 @@
  *              Utiliza JSON para serializar y deserializar los datos.
  */
 
-import type { AppData, AppConfig, MonthlyReport, Transaction } from "@/types"
+import type { AppData, AppConfig, Goal, MonthlyReport, Transaction } from "@/types"
 import { DEFAULT_CATEGORIES } from "@/lib/categories" // Categorías iniciales.
 import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización monetaria.
 import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
@@ -49,6 +49,7 @@ const defaultData: AppData = {
   transactions: [],
   reports: [],
   config: defaultConfig,
+  goals: [],
 }
 
 /**
@@ -144,6 +145,23 @@ export function normalizeReport(r: MonthlyReport): MonthlyReport {
 }
 
 /**
+ * @function normalizeGoal
+ * @description Importes de una meta a 2 decimales y sin objetivo si no es positivo (3.3.0).
+ */
+export function normalizeGoal(g: Goal): Goal {
+  const target = typeof g.target === "number" && g.target > 0 ? roundMoney(g.target) : undefined
+  return {
+    id: g.id,
+    name: g.name.trim(),
+    owner: g.owner,
+    allocated: Math.max(0, roundMoney(g.allocated)),
+    ...(target !== undefined && { target }),
+    lastFundedAt: g.lastFundedAt || g.createdAt,
+    createdAt: g.createdAt,
+  }
+}
+
+/**
  * @function loadData
  * @description Carga los datos de la aplicación desde localStorage.
  *              Si no hay datos guardados o hay un error, devuelve los datos por defecto.
@@ -177,6 +195,7 @@ export function loadData(): AppData {
       transactions: Array.isArray(data.transactions) ? data.transactions.map(normalizeTransaction) : [],
       reports: Array.isArray(data.reports) ? data.reports.map(normalizeReport) : [],
       config: { ...defaultConfig, ...data.config }, // Fusiona la configuración
+      goals: Array.isArray(data.goals) ? data.goals.map(normalizeGoal) : [],
     })
 
     // Migración de un solo disparo: deja el localStorage ya limpio y evita repetir la
@@ -291,7 +310,7 @@ export function parseImportedData(jsonString: string): ImportResult {
      * o no tiene el tipo correcto en el JSON importado, se usan arrays vacíos o la configuración por defecto.
      * Esto previene errores si el archivo importado está incompleto o mal formado.
      */
-    const file = raw as { version?: unknown; transactions?: unknown; reports?: unknown; config?: unknown }
+    const file = raw as { version?: unknown; transactions?: unknown; reports?: unknown; config?: unknown; goals?: unknown }
     const imported: AppData = dedupeAppData({
       version: DATA_VERSION,
       transactions: Array.isArray(file.transactions) ? (file.transactions as Transaction[]).map(normalizeTransaction) : [],
@@ -301,6 +320,8 @@ export function parseImportedData(jsonString: string): ImportResult {
         ...defaultConfig, // Empieza con la configuración por defecto
         ...(typeof file.config === "object" && file.config !== null ? file.config : {}), // Fusiona la configuración importada
       },
+      // Un archivo anterior a la 3.3.0 no trae metas.
+      goals: Array.isArray(file.goals) ? (file.goals as Goal[]).map(normalizeGoal) : [],
     })
 
     // Un archivo de una versión anterior a v3 recibe la corrección de céntimos de los meses cerrados.
@@ -323,7 +344,7 @@ export function parseImportedData(jsonString: string): ImportResult {
  * @returns {boolean} `true` si hay algo que conservar.
  */
 export function hasAppData(data: AppData): boolean {
-  return data.transactions.length > 0 || data.reports.length > 0
+  return data.transactions.length > 0 || data.reports.length > 0 || (data.goals?.length ?? 0) > 0
 }
 
 /**

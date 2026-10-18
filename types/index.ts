@@ -137,10 +137,33 @@ export interface AppConfig {
  * @property {MonthlyReport[]} reports - Array de todos los informes mensuales.
  * @property {AppConfig} config - Objeto de configuración de la aplicación.
  */
+/** De quién es una meta de ahorro: de una persona (su cuenta) o de la cuenta compartida. */
+export type GoalOwner = "person1" | "person2" | "shared"
+
+/**
+ * @interface Goal
+ * @description Meta de ahorro (3.3.0, ver `lib/goals.ts`). El dinero asignado sale del ahorrado en los
+ *              meses terminados y cerrados de su cuenta; lo que no se asigna queda «Sin asignar».
+ */
+export interface Goal {
+  id: string
+  name: string
+  owner: GoalOwner
+  /** Dinero asignado a la meta, en euros. */
+  allocated: number
+  /** Importe objetivo opcional (para la barra de progreso). */
+  target?: number
+  /** Última vez que se le añadió dinero (ISO): si un mes va en negativo, baja primero la más reciente. */
+  lastFundedAt: string
+  createdAt: string
+}
+
 export interface AppData {
   transactions: Transaction[]
   reports: MonthlyReport[]
   config: AppConfig
+  /** Metas de ahorro (3.3.0). Opcional: los datos y archivos anteriores no las tienen. */
+  goals?: Goal[]
   /**
    * Versión del esquema persistido. Opcional para que los JSON exportados antes de
    * introducirla sigan siendo válidos al importarlos.

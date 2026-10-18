@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.2.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.3.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -39,6 +39,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Marcar como pagado** — Marca cada gasto (incluidos los no computables) como pagado o pendiente. Al marcarlo, su fecha se actualiza al día real del pago: hoy si el gasto es del mes en curso, o el último día de su mes si es de otro mes. El mes de un gasto nunca cambia. Al desmarcar, la fecha se mantiene. Al cambiar de mes, un aviso te pide reconciliar los pagos del mes anterior
 - **Informes mensuales** — Genera y archiva cierres de mes con ajustes personalizados
 - **Cuenta compartida** — Las aportaciones que cada uno envía a la cuenta de los dos son un tipo propio (un traspaso, no un gasto). Lo compartido sale de la compartida y lo individual de la cuenta de cada uno: el resumen, el total acumulado y el cierre de mes separan la cuenta de cada persona y la compartida, y el cierre pide su saldo en el banco
+- **Metas de ahorro** — Reparte lo ahorrado de los meses cerrados en metas personales y compartidas
 - **Entrar con Google** — Además de email y contraseña; se puede unir a una cuenta existente sin perder el hogar
 - **Copia de gastos fijos, ingresos y aportaciones** — Duplica automáticamente los gastos fijos, los ingresos y las aportaciones a la compartida del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
 - **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, Ingresos y Gastos juntos en una sola tarjeta y un único dinero real en el cierre de mes
@@ -52,6 +53,16 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.3.0 — Metas de ahorro
+
+- **Metas desde el Total acumulado** — Al pulsarlo se abren las metas: cada uno ve las suyas (sobre su cuenta) y las compartidas (sobre la compartida); en modo individual, solo las tuyas
+- **Solo dinero de meses cerrados** — Se reparte lo ahorrado en los meses terminados y con el informe cerrado; lo que no se asigna queda en «Sin asignar». El mes en curso no se puede repartir hasta que acaba
+- **Objetivo y progreso** — Cada meta tiene un objetivo opcional con barra de progreso; quitar dinero o borrarla lo devuelve a Sin asignar
+- **Mes en negativo** — Si el mes en curso va en negativo con lo ya pagado, primero se gasta lo sin asignar y luego baja la última meta a la que se añadió dinero. Se calcula: si el mes se recupera, vuelven a su cifra. También avisa de lo que bajarían con lo previsto
+- **Cifradas y sincronizadas** — Una colección nueva en la nube, cifrada como el resto; las versiones anteriores a la 3.3.0 piden actualizar
+- Requiere publicar las reglas nuevas de Firestore ANTES de la app (`firebase deploy --only firestore:rules`): son compatibles con la versión anterior
+- SemVer: 3.2.0 → 3.3.0 (MINOR)
 
 ### v3.2.0 — Entrar con Google
 
