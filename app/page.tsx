@@ -31,6 +31,7 @@ import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
 import { BudgetsCard, BudgetsModal } from "@/components/budgets"
+import { AnnualSummaryModal } from "@/components/annual-summary-modal"
 import { budgetCrossing, budgetStatuses, countsForBudget } from "@/lib/budgets"
 import { summarizeGoals } from "@/lib/goals"
 
@@ -66,7 +67,7 @@ import { createTourData } from "@/lib/tour-data"
 
 import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
-import { FileText, Calendar, Heart, AlertTriangle, List } from "lucide-react"
+import { FileText, Calendar, Heart, AlertTriangle, List, BarChart3 } from "lucide-react"
 
 // Vista de la Evolución elegida en este dispositivo (3.4.0).
 const EVOLUTION_VIEW_KEY = "2budget:evolution-view"
@@ -129,6 +130,7 @@ export default function HomePage() {
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
   const [isGoalsOpen, setIsGoalsOpen] = useState(false)
   const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
+  const [isAnnualSummaryOpen, setIsAnnualSummaryOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -552,6 +554,7 @@ export default function HomePage() {
     isEvolutionOpen ||
     isGoalsOpen ||
     isBudgetsOpen ||
+    isAnnualSummaryOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -785,6 +788,20 @@ export default function HomePage() {
                       <span className="lg:hidden">Todos</span>
                     </Button>
                   )}
+                  {data.transactions.length > 0 && (
+                    // Resumen del año (3.6.0); como «Todos», solo el icono en PC.
+                    <Button
+                      onClick={() => setIsAnnualSummaryOpen(true)}
+                      variant="outline"
+                      className="shrink-0 flex items-center gap-2 lg:px-3"
+                      title="Resumen anual"
+                      data-tour="annual-summary"
+                      aria-label="Resumen anual"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      <span className="lg:hidden">Año</span>
+                    </Button>
+                  )}
                   <Button
                     onClick={handleOpenReportModalForCurrentMonth}
                     variant="secondary"
@@ -959,6 +976,14 @@ export default function HomePage() {
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
         onMoveToGoal={moveToGoal}
+      />
+
+      <AnnualSummaryModal
+        isOpen={isAnnualSummaryOpen}
+        onClose={() => setIsAnnualSummaryOpen(false)}
+        transactions={data.transactions}
+        config={data.config}
+        currentYear={actualCurrentYear}
       />
 
       <BudgetsModal
