@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.3.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.4.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -53,6 +53,13 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.4.0 — Evolución por cuenta
+
+- **Selector de cuenta** — En pareja, la ventana de Evolución tiene, junto al año, un selector con «Mi cuenta» y «Compartida»: cada uno ve sus ingresos, gastos y ahorro, y los de la compartida, nunca los de la pareja (sin cuenta en la nube, las de los dos). En modo individual no cambia
+- **Cifras que cuadran** — El ahorro de cada mes de «Mi cuenta» es la cifra de tu cuenta en el Balance individual, y el de «Compartida», la de la fila Compartida
+- **Tarjeta del lateral** — Enseña la cuenta elegida en la ventana y se recuerda en el dispositivo
+- SemVer: 3.3.0 → 3.4.0 (MINOR)
 
 ### v3.3.0 — Metas de ahorro
 
