@@ -478,6 +478,39 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 10. Metas de ahorro */}
+          <AccordionItem value="metas">
+            <SectionTrigger>10. Metas de ahorro</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Pulsa el <strong>Total acumulado</strong> para abrir las metas: un viaje, el coche, un fondo para
+                imprevistos... Cada uno ve las suyas, que salen de su cuenta, y las <strong>compartidas</strong>, que salen
+                de la cuenta compartida. En modo individual solo están las tuyas.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Solo se reparte el dinero de los <strong>meses terminados y con el informe cerrado</strong>: octubre se
+                  puede repartir desde el 1 de noviembre, una vez cerrado. Lo que no asignas queda en{" "}
+                  <strong>Sin asignar</strong>.
+                </li>
+                <li>
+                  Cada meta tiene un objetivo opcional con su barra de progreso. Quitar dinero de una meta o borrarla lo
+                  devuelve a Sin asignar.
+                </li>
+                <li>
+                  Si el mes en curso va en <strong>negativo</strong> con lo ya pagado, primero se gasta lo sin asignar y
+                  luego baja la última meta a la que añadiste dinero, después la anterior. No se pierde nada: si el mes
+                  se recupera, las metas vuelven a su cifra. La ventana avisa también de lo que bajarían si se cumple lo
+                  previsto.
+                </li>
+                <li>
+                  Ejemplo: tienes 1000 € de meses cerrados, 400 € en «Viaje» y 350 € en «Coche» (la última a la que
+                  añadiste), y 250 € sin asignar. Si octubre va en −300 €, se gastan los 250 € y «Coche» baja a 300 €.
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>
