@@ -30,6 +30,8 @@ import { evolutionViewsFor, lastMonths, monthlyEvolution, type EvolutionView } f
 import { EvolutionCard } from "@/components/evolution-card"
 import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
+import { BudgetsCard, BudgetsModal } from "@/components/budgets"
+import { budgetStatuses } from "@/lib/budgets"
 import { summarizeGoals } from "@/lib/goals"
 
 import { SummaryCards } from "@/components/summary-cards"
@@ -126,6 +128,7 @@ export default function HomePage() {
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
   const [isGoalsOpen, setIsGoalsOpen] = useState(false)
+  const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -269,6 +272,11 @@ export default function HomePage() {
   const goalsSummary = useMemo(
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
     [data.transactions, data.reports, data.goals],
+  )
+  // Presupuestos por categoría del mes que se está viendo (3.5.0, ver `lib/budgets.ts`).
+  const budgetStatusList = useMemo(
+    () => budgetStatuses(allTransactionsForSelectedMonth, data.config),
+    [allTransactionsForSelectedMonth, data.config],
   )
   // El mes terminado sin informe más reciente, para el recordatorio de cierre.
   const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
@@ -518,6 +526,7 @@ export default function HomePage() {
     isReportsListOpen ||
     isEvolutionOpen ||
     isGoalsOpen ||
+    isBudgetsOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -721,6 +730,13 @@ export default function HomePage() {
               viewLabel={evolutionViews.length > 1 ? evolutionViews.find((v) => v.value === evolutionView)?.label : undefined}
             />
 
+            <BudgetsCard
+              statuses={budgetStatusList}
+              month={selectedMonth}
+              year={selectedYear}
+              onOpen={() => setIsBudgetsOpen(true)}
+            />
+
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -918,6 +934,16 @@ export default function HomePage() {
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
         onMoveToGoal={moveToGoal}
+      />
+
+      <BudgetsModal
+        isOpen={isBudgetsOpen}
+        onClose={() => setIsBudgetsOpen(false)}
+        config={data.config}
+        monthTransactions={allTransactionsForSelectedMonth}
+        month={selectedMonth}
+        year={selectedYear}
+        onSave={(budgets) => updateConfig({ ...data.config, budgets })}
       />
 
       <EvolutionModal
