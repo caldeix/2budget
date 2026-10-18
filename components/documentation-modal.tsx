@@ -397,6 +397,30 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 cambiar el email o eliminar la cuenta. Si olvidas la contraseña de la cuenta, recupérala desde la
                 pantalla de inicio de sesión.
               </p>
+              <Subtitle>Entrar con Google</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  En la pantalla de inicio de sesión, el botón <strong>Google</strong> entra con tu cuenta de Google. La
+                  primera vez se pregunta si ya tienes una cuenta de 2Budget: si es así, entra con tu email y contraseña
+                  y Google quedará unido a esa cuenta, con tu hogar y tus datos.
+                </li>
+                <li>
+                  También puedes unirlo desde Cuenta → «Vincular con Google», y quitarlo si tu cuenta tiene contraseña.
+                  La contraseña maestra se sigue pidiendo igual: Google solo sustituye a la contraseña de entrar.
+                </li>
+                <li>
+                  En el iPhone, con la app instalada, la ventana de Google a veces no vuelve a la app. Si te pasa, entra
+                  con tu email y contraseña (o vincula Google desde Safari o desde el ordenador).
+                </li>
+              </ul>
+              <Subtitle>Instalar la app</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>En Android y en el ordenador, Chrome ofrece «Instalar app» en la barra de direcciones o en su menú.</li>
+                <li>
+                  En iPhone y iPad no aparece ningún aviso: en Safari, pulsa Compartir (el cuadrado con la flecha hacia
+                  arriba) y luego «Añadir a pantalla de inicio».
+                </li>
+              </ul>
               <Subtitle>Hogar en la nube</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>

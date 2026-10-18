@@ -11,6 +11,7 @@ import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app"
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check"
 import {
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   getAuth,
   indexedDBLocalPersistence,
   initializeAuth,
@@ -87,7 +88,11 @@ export function getFirebase(): FirebaseServices | null {
 
   const auth = alreadyInitialized
     ? getAuth(app)
-    : initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] })
+    : initializeAuth(app, {
+        persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+        // Necesario para la ventana de Google (3.2.0): `initializeAuth` no lo incluye por defecto.
+        popupRedirectResolver: browserPopupRedirectResolver,
+      })
   // Los emails de Firebase (restablecer contraseña, cambio de email) salen en español.
   auth.languageCode = "es"
 
