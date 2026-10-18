@@ -70,6 +70,11 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
         : "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes, un selector de año y otro de cuenta: la tuya o la compartida.",
     },
     {
+      target: "budgets",
+      title: "Presupuestos",
+      text: "Pon un límite al mes a las categorías que quieras vigilar y verás cuánto llevas del mes que estás viendo: verde, bien; ámbar, cerca del límite; rojo, pasado. Al apuntar un gasto que te acerca al límite, te avisa.",
+    },
+    {
       target: "reports",
       title: "Informes",
       text: "Aquí se ven los tres últimos informes. Cada uno guarda el resumen del mes, gráficos por persona, por tipo y por categoría, y los ajustes. Si cerraste un mes sin querer, desde el último informe puedes borrarlo.",

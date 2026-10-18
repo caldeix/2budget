@@ -128,6 +128,11 @@ export interface AppConfig {
    * Si falta, se usan las iniciales.
    */
   categories?: { id: string; name: string; kind: "expense" | "income" }[]
+  /**
+   * Presupuesto mensual por categoría de gasto (3.5.0): id de la categoría → límite en euros.
+   * Es del hogar: cuenta todos los gastos de la categoría en el mes. Ver `lib/budgets.ts`.
+   */
+  budgets?: Record<string, number>
 }
 
 /**
