@@ -18,6 +18,13 @@ import { getErrorMessage, resetPassword, signIn, signUp } from "@/lib/cloud/auth
 type AuthMode = "signIn" | "signUp" | "reset"
 
 /**
+ * Longitud mínima de la contraseña de la cuenta al crearla (3.1.2; antes, la de Firebase: 6). La misma
+ * que la política de contraseñas de Firebase, que la aplica también al restablecerla. La contraseña
+ * maestra, la que cifra los datos, va aparte (12).
+ */
+const ACCOUNT_PASSWORD_MIN = 8
+
+/**
  * @interface AuthFormProps
  * @property {Auth} auth - Instancia de Firebase Auth.
  */
@@ -47,6 +54,10 @@ export function AuthForm({ auth }: AuthFormProps) {
     setError(null)
     setInfo(null)
 
+    if (mode === "signUp" && password.length < ACCOUNT_PASSWORD_MIN) {
+      setError(`La contraseña debe tener al menos ${ACCOUNT_PASSWORD_MIN} caracteres.`)
+      return
+    }
     if (mode === "signUp" && password !== passwordRepeat) {
       setError("Las contraseñas no coinciden.")
       return
@@ -103,7 +114,8 @@ export function AuthForm({ auth }: AuthFormProps) {
             autoComplete={mode === "signUp" ? "new-password" : "current-password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            minLength={6}
+            // Solo al crear la cuenta: quien ya tiene una contraseña más corta debe poder entrar.
+            minLength={mode === "signUp" ? ACCOUNT_PASSWORD_MIN : undefined}
             required
           />
         </div>
@@ -118,7 +130,7 @@ export function AuthForm({ auth }: AuthFormProps) {
             autoComplete="new-password"
             value={passwordRepeat}
             onChange={(e) => setPasswordRepeat(e.target.value)}
-            minLength={6}
+            minLength={ACCOUNT_PASSWORD_MIN}
             required
           />
         </div>

@@ -4,8 +4,10 @@
  * - Solo atiende peticiones GET de la propia web (dentro de su ámbito, `/2budget/`). Firebase,
  *   reCAPTCHA y cualquier otro dominio van directos a la red, sin pasar por aquí.
  * - Los ficheros de `_next/static/` llevan un hash en el nombre y nunca cambian: primero la caché.
- * - Todo lo demás (la página, el manifiesto, los iconos): primero la red, para tener siempre la
- *   última versión publicada; la caché solo se usa sin conexión.
+ * - La página, el manifiesto y los iconos: primero la red, para tener siempre la última versión
+ *   publicada; la caché solo se usa sin conexión. Se guardan por su ruta, sin parámetros.
+ * - Nada más se guarda (3.1.2): antes cualquier GET entraba en la caché, con cualquier parámetro, y
+ *   crecía sin límite. El resto va a la red sin pasar por aquí.
  * - Cada versión de la app tiene su propia caché (`?v=` al registrarlo): al activarse una nueva,
  *   se borran las anteriores.
  */
@@ -55,6 +57,17 @@ self.addEventListener("activate", (event) => {
   )
 })
 
+/** Ficheros sueltos de la app que se guardan para abrir sin conexión (además de la página). */
+const APP_FILES = ["manifest.webmanifest", "favicon.ico", "icon1.png", "icon2.png", "apple-icon.png"]
+
+/** Clave de caché de una petición, o `null` si no se guarda: la página y los ficheros de la app. */
+function cacheKeyFor(request, url) {
+  if (request.mode === "navigate") return BASE
+  const file = url.pathname.slice(BASE.length)
+  if (APP_FILES.includes(file) || file.startsWith("icons/")) return url.pathname
+  return null
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request
   if (request.method !== "GET") return
@@ -64,34 +77,28 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith(`${BASE}_next/static/`)) {
     event.respondWith(
       caches.open(CACHE).then(async (cache) => {
-        const cached = await cache.match(request)
+        const cached = await cache.match(request, { ignoreSearch: true })
         if (cached) return cached
         const response = await fetch(request)
-        if (response.ok) cache.put(request, response.clone())
+        if (response.ok) cache.put(url.pathname, response.clone())
         return response
       }),
     )
     return
   }
 
+  const key = cacheKeyFor(request, url)
+  if (!key) return
+
   event.respondWith(
     fetch(request)
       .then((response) => {
         if (response.ok) {
           const copy = response.clone()
-          caches.open(CACHE).then((cache) => cache.put(request, copy))
+          caches.open(CACHE).then((cache) => cache.put(key, copy))
         }
         return response
       })
-      .catch(async () => {
-        const cached = await caches.match(request)
-        if (cached) return cached
-        // Sin conexión y sin esa página en caché: la portada (la app es una sola página).
-        if (request.mode === "navigate") {
-          const home = await caches.match(BASE)
-          if (home) return home
-        }
-        return Response.error()
-      }),
+      .catch(async () => (await caches.match(key)) ?? Response.error()),
   )
 })

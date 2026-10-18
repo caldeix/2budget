@@ -1,7 +1,8 @@
 /**
  * @file hooks/use-vault.ts
  * @description Desbloqueo del hogar cifrado en este dispositivo.
- *              - Si el dispositivo ya guarda la clave del hogar (IndexedDB), queda desbloqueado solo.
+ *              - Si el dispositivo ya guarda la clave del hogar (IndexedDB), queda desbloqueado solo,
+ *                durante 3 días desde que se escribió la contraseña maestra (ver `vault-cache.ts`).
  *              - Si no (dispositivo nuevo, tras cerrar sesión), hay que escribir la contraseña maestra.
  */
 
@@ -9,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import type { CloudSession } from "@/hooks/use-cloud-session"
-import { loadCachedDek } from "@/lib/cloud/vault-cache"
+import { forgetCachedDek, loadCachedDek, VAULT_CACHE_MS } from "@/lib/cloud/vault-cache"
 import { recoverWithCode, unlockHousehold } from "@/lib/cloud/repository"
 
 /**
@@ -40,7 +41,13 @@ export function useVault(session: CloudSession): Vault {
   const key = uid && householdId ? `${uid}:${householdId}` : null
 
   // La clave va asociada al usuario y hogar para los que se obtuvo: si cambian, no se reutiliza.
-  const [state, setState] = useState<{ key: string | null; status: VaultStatus; dek: CryptoKey | null }>({
+  // `expiresAt`: cuándo caduca la clave guardada (ms); al volver a la app pasada esa fecha, se bloquea.
+  const [state, setState] = useState<{
+    key: string | null
+    status: VaultStatus
+    dek: CryptoKey | null
+    expiresAt?: number
+  }>({
     key: null,
     status: "none",
     dek: null,
@@ -53,8 +60,13 @@ export function useVault(session: CloudSession): Vault {
     }
     let cancelled = false
     setState({ key, status: "checking", dek: null })
-    loadCachedDek(uid, householdId).then((dek) => {
-      if (!cancelled) setState({ key, status: dek ? "unlocked" : "locked", dek })
+    loadCachedDek(uid, householdId).then((cached) => {
+      if (cancelled) return
+      setState(
+        cached
+          ? { key, status: "unlocked", dek: cached.dek, expiresAt: cached.expiresAt }
+          : { key, status: "locked", dek: null },
+      )
     })
     return () => {
       cancelled = true
@@ -65,7 +77,7 @@ export function useVault(session: CloudSession): Vault {
     async (masterPassword: string) => {
       if (!db || !uid || !householdId || !key) return
       const dek = await unlockHousehold(db, householdId, uid, masterPassword)
-      setState({ key, status: "unlocked", dek })
+      setState({ key, status: "unlocked", dek, expiresAt: Date.now() + VAULT_CACHE_MS })
     },
     [db, uid, householdId, key],
   )
@@ -74,11 +86,26 @@ export function useVault(session: CloudSession): Vault {
     async (recoveryCode: string, newMasterPassword: string) => {
       if (!db || !uid || !householdId || !key) throw new Error("No hay ningún hogar que desbloquear.")
       const result = await recoverWithCode(db, householdId, uid, recoveryCode, newMasterPassword)
-      setState({ key, status: "unlocked", dek: result.dek })
+      setState({ key, status: "unlocked", dek: result.dek, expiresAt: Date.now() + VAULT_CACHE_MS })
       return result.recoveryCode
     },
     [db, uid, householdId, key],
   )
+
+  // Una app instalada puede quedarse abierta días: al volver a ella, si la clave ha caducado, se
+  // bloquea y se pide la contraseña maestra.
+  const expiresAt = state.expiresAt
+  useEffect(() => {
+    if (!expiresAt || !uid || !householdId || !key) return
+    const check = () => {
+      if (document.visibilityState !== "visible" || Date.now() < expiresAt) return
+      void forgetCachedDek(uid, householdId)
+      setState({ key, status: "locked", dek: null })
+    }
+    check()
+    document.addEventListener("visibilitychange", check)
+    return () => document.removeEventListener("visibilitychange", check)
+  }, [expiresAt, uid, householdId, key])
 
   // Mientras el efecto aún no ha corrido para la clave actual, se considera "comprobando".
   const current = state.key === key ? state : { key, status: key ? ("checking" as const) : ("none" as const), dek: null }
