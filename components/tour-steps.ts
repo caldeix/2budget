@@ -65,7 +65,9 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
     {
       target: "evolution",
       title: "Evolución",
-      text: "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes y un selector de año.",
+      text: singleMode
+        ? "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes y un selector de año."
+        : "Ingresos y gastos de los últimos seis meses de un vistazo. Pulsa la tarjeta para ver el año completo, con el ahorro de cada mes, un selector de año y otro de cuenta: la tuya o la compartida.",
     },
     {
       target: "reports",
