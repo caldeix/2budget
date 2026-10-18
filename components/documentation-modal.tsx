@@ -335,6 +335,10 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   actual ya cerrado, la app avisa de que actualices después también el actual.
                 </li>
                 <li>
+                  Si un mes ha terminado y está sin cerrar, un aviso arriba te lo recuerda con un botón para cerrarlo: hasta
+                  entonces su ahorro no cuenta en las metas.
+                </li>
+                <li>
                   Los ajustes de cierre no se editan ni se borran a mano (sus botones se ven desactivados): se cambian
                   actualizando el mes o borrando el informe.
                 </li>
