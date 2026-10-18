@@ -10,12 +10,13 @@
 
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { onAuthStateChanged, type User } from "firebase/auth"
 import { getFirebase, isCloudConfigured, type FirebaseServices } from "@/lib/cloud/firebase"
 import { refreshVerification } from "@/lib/cloud/auth"
 import { ensureUserProfile, recordVisit, subscribeUserProfile, type UserProfile } from "@/lib/cloud/repository"
 import { shouldRecordVisit } from "@/lib/cloud/usage"
+import { getGoogleLinkState, subscribeGoogleLink, type GoogleLinkState } from "@/lib/cloud/google-link"
 
 /**
  * @interface CloudSession
@@ -27,6 +28,8 @@ import { shouldRecordVisit } from "@/lib/cloud/usage"
  * @property {UserProfile | null} profile - Perfil del usuario.
  * @property {string | null} householdId - Hogar del usuario; `null` = modo local.
  * @property {FirebaseServices | null} services - Servicios de Firebase.
+ * @property {GoogleLinkState | null} googleLink - Entrada con Google pendiente de decidir (3.2.0):
+ *           mientras hay una, no se crea el perfil ni se abre la app (ver `lib/cloud/google-link.ts`).
  */
 export interface CloudSession {
   enabled: boolean
@@ -37,6 +40,7 @@ export interface CloudSession {
   profile: UserProfile | null
   householdId: string | null
   services: FirebaseServices | null
+  googleLink: GoogleLinkState | null
 }
 
 export function useCloudSession(): CloudSession {
@@ -48,6 +52,8 @@ export function useCloudSession(): CloudSession {
   // `user.reload()` actualiza el mismo objeto `User`: este contador fuerza el nuevo render.
   const [, setUserVersion] = useState(0)
   const emailVerified = user?.emailVerified ?? false
+  const googleLink = useSyncExternalStore(subscribeGoogleLink, getGoogleLinkState, () => null)
+  const isGoogleLinkPending = googleLink !== null
   // Usuario cuya visita de hoy ya se ha registrado en esta carga (evita repetir la escritura
   // mientras llega el snapshot con la fecha nueva).
   const visitRecordedFor = useRef<string | null>(null)
@@ -72,11 +78,13 @@ export function useCloudSession(): CloudSession {
   }, [user])
 
   // Perfil del usuario: se crea si no existe y se escucha para saber su hogar.
-  // Solo con el email verificado: antes, las reglas no dejan tocar la nube.
+  // Solo con el email verificado: antes, las reglas no dejan tocar la nube. Tampoco mientras se
+  // decide una entrada con Google: si Google acaba de crear el usuario y su dueño ya tenía cuenta,
+  // ese usuario se borra y no debe quedar ningún perfil suyo.
   useEffect(() => {
     setProfile(null)
     setProfileLoaded(false)
-    if (!services || !user || !emailVerified) return
+    if (!services || !user || !emailVerified || isGoogleLinkPending) return
 
     let cancelled = false
     let unsubscribe: (() => void) | null = null
@@ -124,16 +132,17 @@ export function useCloudSession(): CloudSession {
       cancelled = true
       unsubscribe?.()
     }
-  }, [services, user, emailVerified])
+  }, [services, user, emailVerified, isGoogleLinkPending])
 
   return {
     enabled: services !== null,
-    ready: authKnown && (!user || !emailVerified || profileLoaded),
+    ready: authKnown && (!user || !emailVerified || isGoogleLinkPending || profileLoaded),
     user,
     emailVerified,
     refreshUser,
     profile,
     householdId: emailVerified ? (profile?.householdId ?? null) : null,
     services,
+    googleLink,
   }
 }

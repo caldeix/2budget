@@ -102,7 +102,8 @@ export default function HomePage() {
     loadError,
   } = useFinancialDataContext(cloudTarget, tourData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
-  const needsAuth = session.enabled && (!session.user || !session.emailVerified)
+  // Una entrada con Google pendiente de decidir (¿ya tienes cuenta?) sigue en la pantalla de acceso.
+  const needsAuth = session.enabled && (!session.user || !session.emailVerified || session.googleLink !== null)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
   const isLoading =
     !session.ready || needsAuth || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading

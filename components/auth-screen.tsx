@@ -2,7 +2,8 @@
  * @file components/auth-screen.tsx
  * @description Pantalla de acceso a pantalla completa. La app exige una cuenta con el email
  *              verificado: sin sesión se muestra el formulario de entrar / crear cuenta, y con
- *              la cuenta sin verificar, el aviso para verificarla.
+ *              la cuenta sin verificar, el aviso para verificarla. Si una entrada con Google tiene
+ *              algo que decidir (¿ya tienes cuenta?, ¿su contraseña?), esa pregunta (3.2.0).
  *              Es un Client Component (`"use client"`) porque contiene formularios con estado.
  */
 
@@ -10,6 +11,7 @@
 
 import { AuthForm } from "@/components/auth-form"
 import { VerifyEmailPanel } from "@/components/verify-email-panel"
+import { GoogleLinkPrompt } from "@/components/google-link-prompt"
 import type { CloudSession } from "@/hooks/use-cloud-session"
 import { Heart } from "lucide-react"
 
@@ -32,7 +34,13 @@ export function AuthScreen({ session }: AuthScreenProps) {
       </h1>
 
       <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg border p-6">
-        {session.user ? <VerifyEmailPanel session={session} /> : <AuthForm auth={session.services.auth} />}
+        {session.googleLink && session.googleLink.stage !== "signing-in" ? (
+          <GoogleLinkPrompt auth={session.services.auth} state={session.googleLink} />
+        ) : session.user && !session.emailVerified ? (
+          <VerifyEmailPanel session={session} />
+        ) : (
+          <AuthForm auth={session.services.auth} />
+        )}
       </div>
     </div>
   )
