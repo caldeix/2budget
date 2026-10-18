@@ -1,14 +1,21 @@
 /**
  * @file lib/cloud/auth.ts
- * @description Operaciones de cuenta con Firebase Auth (email y contraseña) y la traducción
- *              de sus errores a mensajes en español para la interfaz.
+ * @description Operaciones de cuenta con Firebase Auth (email y contraseña, y Google desde la
+ *              3.2.0) y la traducción de sus errores a mensajes en español para la interfaz.
  */
 
 import {
   createUserWithEmailAndPassword,
   deleteUser,
   EmailAuthProvider,
+  getAdditionalUserInfo,
+  GoogleAuthProvider,
+  linkWithCredential,
+  linkWithPopup,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
+  signInWithPopup,
+  unlink,
   sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -17,11 +24,13 @@ import {
   type Auth,
   type User,
 } from "firebase/auth"
+import type { FirebaseError } from "firebase/app"
 import { clearIndexedDbPersistence, terminate } from "firebase/firestore"
 import type { FirebaseServices } from "@/lib/cloud/firebase"
 import { deleteUserProfile, leaveHousehold, setPendingEmail } from "@/lib/cloud/repository"
 import { clearVaultCache } from "@/lib/cloud/vault-cache"
 import { clearAllData } from "@/lib/storage"
+import { getGoogleLinkState, setGoogleLinkState } from "@/lib/cloud/google-link"
 
 /** Mensajes en español para los códigos de error de Firebase más habituales. */
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -42,6 +51,12 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   "auth/invalid-continue-uri": "La dirección de vuelta del enlace no es válida.",
   "auth/unauthorized-domain": "Este dominio no está autorizado en Firebase (Authentication → Configuración → Dominios autorizados).",
   "auth/user-token-expired": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+  "auth/popup-closed-by-user": "Has cerrado la ventana de Google antes de terminar.",
+  "auth/popup-blocked": "El navegador ha bloqueado la ventana de Google. Permite las ventanas emergentes para esta web y vuelve a probar.",
+  "auth/credential-already-in-use": "Esa cuenta de Google ya está unida a otra cuenta de 2Budget.",
+  "auth/provider-already-linked": "Tu cuenta ya tiene Google vinculado.",
+  "auth/no-such-provider": "Tu cuenta no tiene Google vinculado.",
+  "auth/user-mismatch": "Esa cuenta de Google no es la vinculada a tu cuenta de 2Budget.",
   "permission-denied": "No tienes permiso para hacer esto.",
   unavailable: "No hay conexión con el servidor. Vuelve a probar en un momento.",
 }
@@ -105,9 +120,14 @@ export function resetPassword(auth: Auth, email: string) {
 
 /**
  * @function reauthenticate
- * @description Firebase exige un login reciente para cambiar el email o borrar la cuenta.
+ * @description Firebase exige un login reciente para cambiar el email o borrar la cuenta. Con
+ *              contraseña, con ella; si la cuenta solo entra con Google, con la ventana de Google.
  */
 async function reauthenticate(user: User, password: string): Promise<void> {
+  if (!user.providerData.some((provider) => provider.providerId === "password")) {
+    await reauthenticateWithPopup(user, new GoogleAuthProvider())
+    return
+  }
   if (!user.email) throw new Error("La cuenta no tiene email.")
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password))
 }
@@ -127,6 +147,100 @@ export async function requestEmailChange(
   await reauthenticate(user, password)
   await verifyBeforeUpdateEmail(user, newEmail.trim(), { url: continueUrl() })
   await setPendingEmail(services.db, user.uid, newEmail.trim())
+}
+
+// --- Google (3.2.0) -------------------------------------------------------------------------
+
+const GOOGLE = "google.com"
+const PASSWORD = "password"
+
+/** Proveedor de Google; pide elegir cuenta cada vez (si no, entra con la última sin preguntar). */
+function googleProvider(): GoogleAuthProvider {
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({ prompt: "select_account" })
+  return provider
+}
+
+/** Si la cuenta puede entrar con ese método (`google.com` o `password`). */
+export const hasProvider = (user: User, providerId: string) =>
+  user.providerData.some((provider) => provider.providerId === providerId)
+export const hasGoogle = (user: User) => hasProvider(user, GOOGLE)
+export const hasPassword = (user: User) => hasProvider(user, PASSWORD)
+
+/**
+ * @function signInWithGoogle
+ * @description Entra con la ventana de Google. Si Google crea un usuario nuevo, queda pendiente de
+ *              la pregunta «¿Ya tienes una cuenta?» (ver `lib/cloud/google-link.ts`); si el email ya
+ *              tiene cuenta con contraseña y Firebase no las une solo, queda pendiente de esa
+ *              contraseña. Con un Gmail ya registrado y verificado, Firebase las une y entra directo.
+ */
+export async function signInWithGoogle(auth: Auth): Promise<void> {
+  // Antes de abrir la ventana: así la sesión no crea el perfil del usuario nuevo mientras tanto.
+  setGoogleLinkState({ stage: "signing-in" })
+  try {
+    const result = await signInWithPopup(auth, googleProvider())
+    const credential = GoogleAuthProvider.credentialFromResult(result)
+    if (getAdditionalUserInfo(result)?.isNewUser && credential) {
+      setGoogleLinkState({ stage: "ask", credential, googleEmail: result.user.email ?? "" })
+    } else {
+      setGoogleLinkState(null)
+    }
+  } catch (error) {
+    const firebaseError = error as FirebaseError
+    const email = (firebaseError.customData as { email?: string } | undefined)?.email
+    const credential = GoogleAuthProvider.credentialFromError(firebaseError)
+    if (firebaseError.code === "auth/account-exists-with-different-credential" && credential && email) {
+      setGoogleLinkState({ stage: "existing", credential, email })
+      return
+    }
+    setGoogleLinkState(null)
+    throw error
+  }
+}
+
+/** «No, es una cuenta nueva»: se queda la cuenta creada con Google y sigue como siempre. */
+export function keepNewGoogleAccount(): void {
+  setGoogleLinkState(null)
+}
+
+/**
+ * @function linkGoogleToExistingAccount
+ * @description Une la cuenta de Google pendiente a una cuenta de 2Budget que ya existe, entrando con
+ *              su email y contraseña. Si Google acababa de crear un usuario nuevo, antes se borra (no
+ *              tiene perfil ni hogar), para que no quede un usuario de más en Firebase.
+ */
+export async function linkGoogleToExistingAccount(auth: Auth, email: string, password: string): Promise<void> {
+  const pending = getGoogleLinkState()
+  if (!pending || pending.stage === "signing-in") throw new Error("No hay ninguna cuenta de Google que unir.")
+  if (pending.stage === "ask" && auth.currentUser && hasGoogle(auth.currentUser) && !hasPassword(auth.currentUser)) {
+    // Acaba de entrar con Google: cuenta como acceso reciente, así que se puede borrar sin más.
+    await deleteUser(auth.currentUser)
+  }
+  const { user } = await signInWithEmailAndPassword(auth, email.trim(), password)
+  try {
+    await linkWithCredential(user, pending.credential)
+  } catch (error) {
+    // Ya la tenía vinculada (p. ej. un segundo intento): no es un problema.
+    if ((error as { code?: string }).code !== "auth/provider-already-linked") throw error
+  }
+  setGoogleLinkState(null)
+}
+
+/** Volver atrás sin unir nada: se cierra la sesión del usuario de Google que hubiera. */
+export async function cancelGoogleLink(auth: Auth): Promise<void> {
+  setGoogleLinkState(null)
+  if (auth.currentUser) await firebaseSignOut(auth)
+}
+
+/** Vincula Google a la cuenta abierta (desde Cuenta). */
+export async function linkGoogle(user: User): Promise<void> {
+  await linkWithPopup(user, googleProvider())
+}
+
+/** Desvincula Google; solo si queda la contraseña para entrar. */
+export async function unlinkGoogle(user: User): Promise<void> {
+  if (!hasPassword(user)) throw new Error("Para quitar Google, la cuenta necesita una contraseña.")
+  await unlink(user, GOOGLE)
 }
 
 /**
