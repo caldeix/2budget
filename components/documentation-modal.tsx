@@ -426,13 +426,30 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   administrador de la app. Cada miembro del hogar tiene la suya.
                 </li>
                 <li>
-                  La contraseña maestra <strong>no se guarda en ningún sitio</strong>. Se pide una vez en cada dispositivo
-                  y una vez al mes, para que no se olvide.
+                  La contraseña maestra <strong>no se guarda en ningún sitio</strong>. Al escribirla, el dispositivo
+                  guarda la llave del hogar durante <strong>3 días</strong>; después la vuelve a pedir. También se pide
+                  una vez al mes, para que no se olvide.
                 </li>
                 <li>
                   Al crear el hogar o unirte se muestra un <strong>código de recuperación</strong>: guárdalo en un lugar
                   seguro. Con él puedes elegir una contraseña maestra nueva si la olvidas. Desde Cuenta puedes cambiar la
                   contraseña maestra o generar un código nuevo.
+                </li>
+              </ul>
+              <Subtitle>Seguridad: lo que conviene saber</Subtitle>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  Mientras la llave del hogar está guardada (hasta 3 días), quien tenga tu móvil u ordenador
+                  desbloqueado puede ver los datos. Lo que más protege es el bloqueo del propio dispositivo; en uno
+                  prestado o compartido, cierra sesión al terminar.
+                </li>
+                <li>
+                  La privacidad en pareja solo oculta importes en la pantalla: los datos están en los dispositivos de
+                  los dos y una exportación incluye los importes ocultos.
+                </li>
+                <li>
+                  Si un miembro sale del hogar, deja de poder leerlo, pero la llave del hogar no cambia: una copia de
+                  los datos cifrados que hubiera guardado antes seguiría pudiendo abrirla.
                 </li>
               </ul>
             </AccordionContent>
