@@ -625,6 +625,20 @@ export default function HomePage() {
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
+  // Acceso rápido (3.11.0): `?accion=nueva` (el atajo del icono instalado) abre el formulario de
+  // transacción en cuanto la app está lista, y se quita de la dirección para que recargar no lo repita.
+  const hasHandledQuickAction = useRef(false)
+  useEffect(() => {
+    if (hasHandledQuickAction.current || !isProfileReady || isLoading || isVaultLocked || needsAuth) return
+    hasHandledQuickAction.current = true
+    const url = new URL(window.location.href)
+    if (url.searchParams.get("accion") !== "nueva") return
+    url.searchParams.delete("accion")
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash)
+    setEditingTransaction(null)
+    setIsTransactionFormOpen(true)
+  }, [isProfileReady, isLoading, isVaultLocked, needsAuth])
+
   const canAutoStartTour =
     !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
 
