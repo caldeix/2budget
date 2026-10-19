@@ -73,59 +73,76 @@ const CARD_LIMIT = 4
 
 /**
  * @function BudgetsCard
- * @description Tarjeta del lateral: los presupuestos más ajustados del mes que se está viendo. Toda
- *              la tarjeta es un botón que abre la ventana con todos.
+ * @description Tarjeta del lateral: los presupuestos más ajustados del mes que se está viendo, de una
+ *              cuenta. En pareja (3.8.0), dos botones eligen cuál («Míos» o «Compartidos») para que no
+ *              salgan mezclados. El título y la lista abren la ventana con todos.
  */
-/** Un presupuesto de la tarjeta, con la cuenta a la que pertenece (en pareja se indica). */
-export interface BudgetEntry {
-  owner: BudgetOwner
-  label: string
-  status: BudgetStatus
-}
-
 export function BudgetsCard({
-  entries,
-  showOwner,
+  tabs,
+  owner,
+  onOwnerChange,
+  statuses,
   month,
   year,
   onOpen,
 }: {
-  entries: BudgetEntry[]
-  /** En pareja, cada línea dice de qué cuenta es. */
-  showOwner: boolean
+  tabs: { owner: BudgetOwner; label: string }[]
+  owner: BudgetOwner
+  onOwnerChange: (owner: BudgetOwner) => void
+  /** Los presupuestos de la cuenta elegida. */
+  statuses: BudgetStatus[]
   month: number
   year: number
   onOpen: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      data-tour="budgets"
-      className="w-full text-left bg-card rounded-2xl shadow-lg border p-6 space-y-4 hover:bg-muted/40 transition-colors"
-    >
-      <span className="flex items-center justify-between">
+    <div data-tour="budgets" className="bg-card rounded-2xl shadow-lg border p-6 space-y-4">
+      <button type="button" onClick={onOpen} className="w-full flex items-center justify-between text-left">
         <span className="text-lg font-semibold text-foreground flex items-center gap-2">
           <PiggyBank className="h-5 w-5" />
           Presupuestos
         </span>
         <ChevronRight className="h-5 w-5 text-muted-foreground" />
-      </span>
-      {entries.length === 0 ? (
-        <span className="block text-sm text-muted-foreground">
-          Pon un límite al mes a las categorías que quieras vigilar (supermercado, ocio...) y verás cuánto llevas.
-        </span>
-      ) : (
-        <span className="flex flex-col gap-3">
-          {entries.slice(0, CARD_LIMIT).map((e) => (
-            <BudgetLine key={`${e.owner}-${e.status.category.id}`} status={e.status} tag={showOwner ? e.label : undefined} />
+      </button>
+
+      {tabs.length > 1 && (
+        <div role="group" aria-label="Qué presupuestos ver" className="grid gap-1 rounded-xl bg-muted p-1" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.owner}
+              type="button"
+              aria-pressed={tab.owner === owner}
+              onClick={() => onOwnerChange(tab.owner)}
+              className={cn(
+                "rounded-lg px-2 py-1.5 text-sm truncate transition-colors",
+                tab.owner === owner ? "bg-card text-foreground shadow-sm font-medium" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
           ))}
-        </span>
+        </div>
       )}
-      <span className="block text-xs text-muted-foreground">
-        {formatMonthYear(month, year)} · {entries.length === 0 ? "pulsa para crearlos" : "pulsa para ver todos"}
-      </span>
-    </button>
+
+      <button type="button" onClick={onOpen} className="w-full text-left space-y-4 rounded-xl hover:bg-muted/40 transition-colors -m-2 p-2">
+        {statuses.length === 0 ? (
+          <span className="block text-sm text-muted-foreground">
+            {tabs.length > 1 && owner === "shared"
+              ? "Pon un límite al mes a los gastos compartidos que quieras vigilar (supermercado, casa...)."
+              : "Pon un límite al mes a las categorías que quieras vigilar (supermercado, ocio...) y verás cuánto llevas."}
+          </span>
+        ) : (
+          <span className="flex flex-col gap-3">
+            {statuses.slice(0, CARD_LIMIT).map((s) => (
+              <BudgetLine key={s.category.id} status={s} />
+            ))}
+          </span>
+        )}
+        <span className="block text-xs text-muted-foreground">
+          {formatMonthYear(month, year)} · {statuses.length === 0 ? "pulsa para crearlos" : "pulsa para ver todos"}
+        </span>
+      </button>
+    </div>
   )
 }
 
@@ -142,6 +159,7 @@ export function BudgetsModal({
   month,
   year,
   tabs,
+  initialOwner,
   onSave,
 }: {
   isOpen: boolean
@@ -151,9 +169,14 @@ export function BudgetsModal({
   month: number
   year: number
   tabs: { owner: BudgetOwner; label: string }[]
+  /** Cuenta con la que se abre (la elegida en la tarjeta). */
+  initialOwner: BudgetOwner
   onSave: (owner: BudgetOwner, budgets: Record<string, number>) => void
 }) {
-  const [owner, setOwner] = useState<BudgetOwner>(tabs[0]?.owner ?? "person1")
+  const [owner, setOwner] = useState<BudgetOwner>(initialOwner)
+  useEffect(() => {
+    if (isOpen) setOwner(initialOwner)
+  }, [isOpen, initialOwner])
   const active = tabs.some((t) => t.owner === owner) ? owner : (tabs[0]?.owner ?? "person1")
   const statuses = budgetStatuses(monthTransactions, config, active)
   const expenseCategories = categoriesOf(config).filter((c) => c.kind === "expense")

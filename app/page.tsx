@@ -32,6 +32,7 @@ import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
 import { BudgetsCard, BudgetsModal } from "@/components/budgets"
 import { AnnualSummaryModal } from "@/components/annual-summary-modal"
+import { CategoriesModal } from "@/components/categories-modal"
 import {
   belongsToBudget,
   budgetCrossing,
@@ -41,6 +42,7 @@ import {
   budgetTabsFor,
   countsForBudget,
   withBudgets,
+  type BudgetOwner,
 } from "@/lib/budgets"
 import { summarizeGoals } from "@/lib/goals"
 
@@ -78,6 +80,8 @@ import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
 import { FileText, Calendar, Heart, AlertTriangle, List, BarChart3 } from "lucide-react"
 
+// Cuenta de los presupuestos que enseña la tarjeta en este dispositivo (3.8.0).
+const BUDGETS_VIEW_KEY = "2budget:budgets-view"
 // Vista de la Evolución elegida en este dispositivo (3.4.0).
 const EVOLUTION_VIEW_KEY = "2budget:evolution-view"
 // En la tarjeta "Informes" solo se ven los últimos; el resto, en el modal con todos.
@@ -140,6 +144,7 @@ export default function HomePage() {
   const [isGoalsOpen, setIsGoalsOpen] = useState(false)
   const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
   const [isAnnualSummaryOpen, setIsAnnualSummaryOpen] = useState(false)
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -296,18 +301,27 @@ export default function HomePage() {
       }),
     [viewerRole, data.config.singleMode, data.config.person1Name, data.config.person2Name],
   )
-  const budgetEntries = useMemo(
-    () =>
-      budgetTabs
-        .flatMap((tab) =>
-          budgetStatuses(allTransactionsForSelectedMonth, data.config, tab.owner).map((status) => ({
-            owner: tab.owner,
-            label: tab.owner === "shared" ? "Compartido" : tab.label === "Mis presupuestos" ? "Mío" : tab.label,
-            status,
-          })),
-        )
-        .sort((a, b) => b.status.ratio - a.status.ratio),
-    [budgetTabs, allTransactionsForSelectedMonth, data.config],
+  // Cuenta que enseña la tarjeta (3.8.0): «Míos» o «Compartidos», recordada en este dispositivo.
+  const [budgetOwnerChoice, setBudgetOwnerChoice] = useState<BudgetOwner | null>(null)
+  useEffect(() => {
+    try {
+      setBudgetOwnerChoice(localStorage.getItem(BUDGETS_VIEW_KEY) as BudgetOwner | null)
+    } catch {
+      // Sin almacenamiento: la primera cuenta.
+    }
+  }, [])
+  const chooseBudgetOwner = useCallback((owner: BudgetOwner) => {
+    setBudgetOwnerChoice(owner)
+    try {
+      localStorage.setItem(BUDGETS_VIEW_KEY, owner)
+    } catch {
+      // Se elige de nuevo la próxima vez.
+    }
+  }, [])
+  const budgetCardOwner = budgetTabs.find((t) => t.owner === budgetOwnerChoice)?.owner ?? budgetTabs[0].owner
+  const budgetCardStatuses = useMemo(
+    () => budgetStatuses(allTransactionsForSelectedMonth, data.config, budgetCardOwner),
+    [allTransactionsForSelectedMonth, data.config, budgetCardOwner],
   )
   // El mes terminado sin informe más reciente, para el recordatorio de cierre.
   const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
@@ -592,6 +606,7 @@ export default function HomePage() {
     isGoalsOpen ||
     isBudgetsOpen ||
     isAnnualSummaryOpen ||
+    isCategoriesOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -796,8 +811,10 @@ export default function HomePage() {
             />
 
             <BudgetsCard
-              entries={budgetEntries}
-              showOwner={budgetTabs.length > 1}
+              tabs={budgetTabs}
+              owner={budgetCardOwner}
+              onOwnerChange={chooseBudgetOwner}
+              statuses={budgetCardStatuses}
               month={selectedMonth}
               year={selectedYear}
               onOpen={() => setIsBudgetsOpen(true)}
@@ -931,6 +948,7 @@ export default function HomePage() {
                 : "Copiar gastos fijos e ingresos del mes anterior"
         }
         onSettings={() => setIsSettingsModal(true)}
+        onCategories={() => setIsCategoriesOpen(true)}
         onHelp={() => setIsDocumentationModalOpen(true)}
         isTourActive={isTourActive}
       />
@@ -1016,6 +1034,13 @@ export default function HomePage() {
         onMoveToGoal={moveToGoal}
       />
 
+      <CategoriesModal
+        isOpen={isCategoriesOpen}
+        onClose={() => setIsCategoriesOpen(false)}
+        config={data.config}
+        onSave={(categories) => updateConfig({ ...data.config, categories })}
+      />
+
       <AnnualSummaryModal
         isOpen={isAnnualSummaryOpen}
         onClose={() => setIsAnnualSummaryOpen(false)}
@@ -1032,6 +1057,7 @@ export default function HomePage() {
         month={selectedMonth}
         year={selectedYear}
         tabs={budgetTabs}
+        initialOwner={budgetCardOwner}
         onSave={(owner, limits) => updateConfig(withBudgets(data.config, owner, limits))}
       />
 

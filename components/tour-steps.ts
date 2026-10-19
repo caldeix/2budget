@@ -189,7 +189,12 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
     isDesktop && {
       target: "fab-settings",
       title: "Configuración",
-      text: "Nombres, modo individual, la lista de categorías y las copias de seguridad (exportar e importar).",
+      text: "Nombres, modo individual y las copias de seguridad (exportar e importar).",
+    },
+    isDesktop && {
+      target: "fab-categories",
+      title: "Categorías",
+      text: "La lista de categorías de gastos e ingresos: añade, renombra o quita las que quieras.",
     },
     cloud && {
       target: "account",
@@ -209,7 +214,7 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
           title: "Más opciones",
           text:
             (singleMode ? "Aquí están copiar fijos e ingresos" : "Aquí están copiar fijos, ingresos y aportaciones") +
-            ", el modo claro u oscuro, la configuración y la ayuda. Desde el menú del navegador puedes instalar 2Budget como una app más. ¡Ya puedes empezar!",
+            ", el modo claro u oscuro, la configuración, las categorías y la ayuda. Desde el menú del navegador puedes instalar 2Budget como una app más. ¡Ya puedes empezar!",
         },
   ]
   return steps.filter((step): step is TourStep => step !== false)
