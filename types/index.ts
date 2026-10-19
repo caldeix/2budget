@@ -55,6 +55,11 @@ export interface Transaction {
   closingAdjustment?: boolean
   /** Categoría (Supermercado, Casa…): id de una de `AppConfig.categories`. Sin ella, "Sin categoría". */
   categoryId?: string
+  /**
+   * Etiqueta de evento (3.10.0, p. ej. «Lisboa 2026»): una por transacción, opcional. Agrupa gastos de
+   * distintas categorías y meses, individuales o compartidos. Nunca en gastos fijos ni aportaciones.
+   */
+  tag?: string
 }
 
 /**
@@ -206,4 +211,6 @@ export interface TransactionFormData {
   date: string
   nonComputable?: boolean
   categoryId?: string
+  /** Etiqueta de evento (ver `Transaction.tag`). */
+  tag?: string
 }
