@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.13.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.14.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,14 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.14.0 — Pendientes al cerrar el mes
+
+- **Paso de pendientes** — Al cerrar un mes terminado con gastos o aportaciones sin pagar, antes se elige para cada uno: ya pagado, pasar al mes siguiente (día 1, aún pendiente) o no se pagará
+- **No se pagará** — Un gasto fijo se queda a 0 € (sigue en el mes y se copia a los siguientes); un gasto variable o una aportación se borra, con confirmación
+- Así el ajuste de cierre no sale descuadrado por un cargo que aún no ha llegado. En el mes en curso no se pregunta
+- Ayuda actualizada
+- SemVer: 3.13.0 → 3.14.0 (MINOR)
 
 ### v3.13.0 — Búsqueda avanzada
 
