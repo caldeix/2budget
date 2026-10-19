@@ -645,6 +645,34 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 16. Búsqueda avanzada */}
+          <AccordionItem value="busqueda-avanzada">
+            <SectionTrigger>16. Búsqueda avanzada</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Bajo los filtros de la lista, <strong>Más filtros</strong> abre la búsqueda por fechas, importes y evento.
+                Con cualquiera de ellos, la lista busca en <strong>todos los meses</strong>, como al escribir en el
+                buscador, y los totales de arriba son los de lo encontrado.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Desde</strong> y <strong>Hasta</strong>: las dos fechas cuentan. Puedes poner solo una.
+                </li>
+                <li>
+                  <strong>Importe mínimo</strong> y <strong>máximo</strong>: por ejemplo, todo lo de más de 100 €.
+                </li>
+                <li>
+                  <strong>Evento</strong>: todo lo de una etiqueta, como al pulsarla en la lista.
+                </li>
+                <li>Se combinan con el texto, el tipo, la categoría y el pago.</li>
+                <li>
+                  «Quitar fechas e importes» los borra de una vez. Si tu pareja te oculta sus importes, esos
+                  movimientos no salen al buscar por importe.
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>
