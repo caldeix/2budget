@@ -35,5 +35,16 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: `${base}/icons/icon-maskable-192.png`, sizes: "192x192", type: "image/png", purpose: "maskable" },
       { src: `${base}/icons/icon-maskable-512.png`, sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
+    // Acceso rápido (3.11.0): al mantener pulsado el icono de la app instalada (Android) o con clic
+    // derecho (Chrome y Edge en el ordenador), «Nueva transacción» abre directamente el formulario.
+    shortcuts: [
+      {
+        name: "Nueva transacción",
+        short_name: "Nueva",
+        description: "Apuntar un gasto o un ingreso",
+        url: `${base}/?accion=nueva`,
+        icons: [{ src: `${base}/icons/icon-192.png`, sizes: "192x192", type: "image/png" }],
+      },
+    ],
   }
 }

@@ -599,6 +599,32 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 14. Acceso rápido */}
+          <AccordionItem value="acceso-rapido">
+            <SectionTrigger>14. Acceso rápido</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Con la app instalada puedes apuntar un gasto sin pasar por la pantalla principal: se abre directamente
+                el formulario de <strong>Nueva transacción</strong>.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>
+                  <strong>Android:</strong> mantén pulsado el icono de 2Budget y elige <strong>Nueva transacción</strong>.
+                  También puedes arrastrar esa opción a la pantalla de inicio.
+                </li>
+                <li>
+                  <strong>Ordenador:</strong> con la app instalada, clic derecho en su icono de la barra de tareas o del
+                  Dock.
+                </li>
+                <li>
+                  <strong>iPhone:</strong> no tiene accesos rápidos para apps web, pero la app <strong>Atajos</strong> puede
+                  abrir la dirección <strong className="break-all">https://caldeix.github.io/2budget/?accion=nueva</strong> y
+                  ponerla en la pantalla de inicio o en el botón de acción.
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>
