@@ -575,6 +575,30 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 13. Eventos */}
+          <AccordionItem value="eventos">
+            <SectionTrigger>13. Eventos y etiquetas</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Al apuntar una transacción puedes ponerle una <strong>etiqueta</strong> (opcional): por ejemplo «Lisboa
+                2026». Pon la misma a todos los gastos de ese viaje u ocasión, sean individuales o compartidos: la cena
+                de los dos y el desayuno al que invitas tú van juntos.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Una etiqueta por transacción. Al escribir te sugiere las que ya existen.</li>
+                <li>Los gastos fijos y las aportaciones no llevan etiqueta.</li>
+                <li>
+                  La tarjeta <strong>Eventos</strong> enseña cada uno con su total, sus fechas y cuánto puso cada uno (lo
+                  suyo más su parte de lo compartido).
+                </li>
+                <li>
+                  Al pulsar un evento, o la etiqueta de una transacción, la lista enseña todos sus movimientos de todos
+                  los meses. La «x» del filtro vuelve a la lista normal.
+                </li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>

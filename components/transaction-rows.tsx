@@ -14,7 +14,7 @@ import { formatCurrency, formatDate, cn } from "@/lib/utils"
 import { isClosingAdjustment, isContribution, isPayable } from "@/lib/aggregations"
 import { HIDDEN_AMOUNT } from "@/lib/privacy"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, CheckCircle2, Circle, MoreHorizontal } from "lucide-react"
+import { Edit, Trash2, CheckCircle2, Circle, MoreHorizontal, Tag as TagIcon } from "lucide-react"
 
 /** Los ajustes de cierre los gestiona el informe: no se editan ni se borran a mano. */
 const ADJUSTMENT_LOCKED_HINT = "Ajuste de cierre: se cambia con \"Actualizar mes\" o borrando el informe"
@@ -65,6 +65,24 @@ export interface RowContext {
   onEdit: (transaction: Transaction) => void
   onDelete: (id: string) => void
   onTogglePaid: (id: string, paid: boolean) => void
+  /** Al pulsar la etiqueta de una fila: ver todo ese evento (3.10.0). */
+  onTagClick: (tag: string) => void
+}
+
+/** Etiqueta de evento de una fila: al pulsarla, filtra la lista por ese evento. */
+function TagChip({ tag, onClick }: { tag: string; onClick: (tag: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(tag)}
+      className="inline-flex items-center gap-1 rounded-full bg-secondary/15 px-2 py-0.5 text-xs font-medium text-secondary hover:bg-secondary/25 whitespace-nowrap"
+      aria-label={`Ver todo lo de ${tag}`}
+      title="Ver todo lo de este evento"
+    >
+      <TagIcon className="h-3 w-3" />
+      {tag}
+    </button>
+  )
 }
 
 /**
@@ -80,7 +98,7 @@ export function TransactionRowDesktop({
   index: number
   ctx: RowContext
 }) {
-  const { singleMode, desktopGridCols, isOtherMonth, isRowLocked, isAmountHidden, getOwnerDisplay, getCategoryBadge, onEdit, onDelete, onTogglePaid } = ctx
+  const { singleMode, desktopGridCols, isOtherMonth, isRowLocked, isAmountHidden, getOwnerDisplay, getCategoryBadge, onEdit, onDelete, onTogglePaid, onTagClick } = ctx
   return (
     <div data-tour={index === 0 ? "tx-row" : undefined} className={cn(
       "hidden sm:grid items-center gap-4 px-6 py-4 hover:bg-muted/50 transition-colors",
@@ -102,10 +120,11 @@ export function TransactionRowDesktop({
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className={cn("text-sm font-medium", transaction.nonComputable && "text-muted-foreground")}>
           {transaction.name}
         </span>
+        {transaction.tag && <TagChip tag={transaction.tag} onClick={onTagClick} />}
         {/* Sin columna de propietario (modo individual), la etiqueta va junto al nombre si la hay. */}
         {singleMode && getOwnerDisplay(transaction) && (
           <span className="text-xs text-muted-foreground whitespace-pre-line">
@@ -211,7 +230,7 @@ export function TransactionRowMobile({
   onTouchStart: (e: React.TouchEvent) => void
   onTouchEnd: (e: React.TouchEvent) => void
 }) {
-  const { isOtherMonth, isRowLocked, isAmountHidden, getOwnerDisplay, getCategoryBadge, onEdit, onDelete, onTogglePaid } = ctx
+  const { isOtherMonth, isRowLocked, isAmountHidden, getOwnerDisplay, getCategoryBadge, onEdit, onDelete, onTogglePaid, onTagClick } = ctx
   return (
     <div data-tour={index === 0 ? "tx-row" : undefined} className="sm:hidden">
       <div className="p-0 relative overflow-hidden">
@@ -272,10 +291,11 @@ export function TransactionRowMobile({
             </div>
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               <span className={cn("font-medium", transaction.nonComputable ? "text-muted-foreground" : "text-foreground")}>
                 {transaction.name}
               </span>
+              {transaction.tag && <TagChip tag={transaction.tag} onClick={onTagClick} />}
             </div>
             {getOwnerDisplay(transaction) && (
               <span className={transaction.nonComputable ? "text-muted-foreground" : ""}>
