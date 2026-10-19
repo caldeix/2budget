@@ -30,7 +30,9 @@ import {
   Calendar,
   DollarSign,
   ArrowRightLeft,
+  X,
 } from "lucide-react" // Iconos.
+import { hasTag } from "@/lib/tags" // Etiquetas de evento.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 import { TransactionRowDesktop, TransactionRowMobile, type RowContext } from "@/components/transaction-rows" // Filas de PC y móvil.
 
@@ -78,6 +80,9 @@ interface TransactionsTableProps {
   isTransactionLocked?: (t: Transaction) => boolean
   isAmountHidden?: (t: Transaction) => boolean
   categories: Category[]
+  /** Evento por el que se filtra (3.10.0): con él, la lista busca en todos los meses. */
+  tagFilter: string | null
+  onTagFilterChange: (tag: string | null) => void
 }
 
 /** Sin privacidad activada, nada se oculta. */
@@ -129,6 +134,8 @@ export function TransactionsTable({
   isTransactionLocked,
   isAmountHidden = neverHidden,
   categories,
+  tagFilter,
+  onTagFilterChange,
 }: TransactionsTableProps) {
   // Nombre de la categoría de una transacción ("Sin categoría" si no tiene o se borró).
   const categoryName = (t: Transaction) =>
@@ -303,7 +310,7 @@ export function TransactionsTable({
    * Es la base tanto de la lista como de las tarjetas de resumen "Filtradas".
    */
   // Con texto en el buscador se busca en TODOS los meses (si se han pasado); si no, en el mes.
-  const isSearchingAll = searchTerm.trim() !== "" && allTransactions !== undefined
+  const isSearchingAll = (searchTerm.trim() !== "" || tagFilter !== null) && allTransactions !== undefined
   const searchBase = isSearchingAll ? allTransactions : transactions
   const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`
   const isOtherMonth = (t: Transaction) => isSearchingAll && t.date.slice(0, 7) !== selectedMonthKey
@@ -330,10 +337,12 @@ export function TransactionsTable({
         filterPaid === "all" ||
         (transaction.type !== "income" && (filterPaid === "paid") === isSettled(transaction))
 
-      return matchesSearch && matchesType && matchesCategory && matchesPaid
+      const matchesTag = tagFilter === null || hasTag(transaction, tagFilter)
+
+      return matchesSearch && matchesType && matchesCategory && matchesPaid && matchesTag
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid])
+  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid, tagFilter])
 
   /**
    * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
@@ -505,6 +514,7 @@ export function TransactionsTable({
     onEdit,
     onDelete,
     onTogglePaid,
+    onTagClick: onTagFilterChange,
   }
 
   // Calcula ingresos y gastos del conjunto FILTRADO (búsqueda/tipo/categoría), no de la lista completa,
@@ -560,6 +570,19 @@ export function TransactionsTable({
                 className="pl-10 w-full bg-input text-foreground border-border"
               />
             </div>
+
+            {/* Evento elegido (al pulsar una etiqueta o desde Eventos): todos sus movimientos. */}
+            {tagFilter !== null && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Evento:</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-secondary/15 px-3 py-1 font-medium text-secondary">
+                  {tagFilter}
+                  <button type="button" onClick={() => onTagFilterChange(null)} aria-label="Quitar el filtro del evento" className="ml-1 hover:opacity-70">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              </div>
+            )}
 
             {/* Tipo, categoría y pago en una línea (en móvil, uno debajo de otro: no caben) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
