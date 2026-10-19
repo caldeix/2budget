@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.7.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.8.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -55,6 +55,13 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.8.0 — Botones y categorías
+
+- **Presupuestos sin mezclar** — En la tarjeta de presupuestos, dos botones eligen qué ver: los tuyos o los compartidos (se recuerda en el dispositivo); el título y la lista siguen abriendo la ventana, en esa misma cuenta
+- **Botones con nombre** — En el ordenador, los botones flotantes de abajo a la izquierda se alargan con su nombre al pasar el ratón («Configuración», «Ayuda»...) o con el foco del teclado
+- **Categorías aparte** — Las categorías salen de Configuración y tienen su propio botón y ventana
+- SemVer: 3.7.0 → 3.8.0 (MINOR)
 
 ### v3.7.0 — Presupuestos por cuenta
 

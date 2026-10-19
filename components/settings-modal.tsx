@@ -14,8 +14,6 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import type { AppConfig, AppData } from "@/types"
 import { Modal } from "@/components/ui/modal"
-import { CategoriesEditor } from "@/components/categories-editor"
-import { categoriesOf, type Category } from "@/lib/categories" // Componente base del modal.
 import { Button } from "@/components/ui/button" // Componente de botón.
 import { Input } from "@/components/ui/input" // Componente de input.
 import { Label } from "@/components/ui/label" // Componente de etiqueta para inputs.
@@ -74,8 +72,6 @@ export function SettingsModal({
   const [person2Name, setPerson2Name] = useState(config.person2Name)
   // Estado local del modo individual; se guarda junto con los nombres.
   const [singleMode, setSingleMode] = useState(Boolean(config.singleMode))
-  // Copia editable de las categorías; se guarda con el resto de la configuración.
-  const [categories, setCategories] = useState<Category[]>(categoriesOf(config))
   // Archivo leído y pendiente de confirmar antes de importarlo.
   const [pendingImport, setPendingImport] = useState<{ name: string; content: string } | null>(null)
   // Estado para controlar la visibilidad del modal de confirmación de eliminación de datos.
@@ -92,7 +88,6 @@ export function SettingsModal({
     setPerson1Name(config.person1Name)
     setPerson2Name(config.person2Name)
     setSingleMode(Boolean(config.singleMode))
-    setCategories(categoriesOf(config))
   }, [isOpen, config])
 
   useEffect(() => {
@@ -118,7 +113,6 @@ export function SettingsModal({
       person1Name,
       person2Name,
       singleMode,
-      categories,
     })
     onClose()
   }
@@ -252,11 +246,9 @@ export function SettingsModal({
                 </div>
               )}
             </div>
-            {/* Categorías de las transacciones */}
-            <div className="space-y-3 rounded-2xl border p-4">
-              <h4 className="font-medium text-foreground">Categorías</h4>
-              <CategoriesEditor categories={categories} onChange={setCategories} />
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Las categorías se configuran en su propio botón, en los botones flotantes de abajo a la izquierda.
+            </p>
 
             <Button onClick={handleSaveConfig} className="w-full">
               Guardar configuración

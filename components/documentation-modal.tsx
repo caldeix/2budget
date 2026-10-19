@@ -197,7 +197,7 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 </li>
                 <li>
                   <strong>Categoría:</strong> en qué se va el dinero (Supermercado, Casa, Transporte…). Hay una lista
-                  para gastos y otra para ingresos, y se cambian desde Configuración. Puedes dejarla en «Sin
+                  para gastos y otra para ingresos, y se cambian con el botón Categorías. Puedes dejarla en «Sin
                   categoría». La app la usa para el gráfico por categoría del informe y para filtrar la lista.
                 </li>
                 <li>
@@ -378,9 +378,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   dinero real). No borra nada y se puede desactivar cuando quieras.
                 </li>
                 <li>
-                  <strong>Categorías:</strong> la lista que sale al añadir una transacción, en orden alfabético. Renombra
-                  en la propia fila, quita con la papelera o añade una nueva (de gasto o de ingreso). Al quitar una, sus
-                  transacciones pasan a «Sin categoría». Los cambios se aplican al pulsar «Guardar configuración».
+                  <strong>Categorías:</strong> tienen su propio botón (la etiqueta, en los botones de abajo a la
+                  izquierda). Es la lista que sale al añadir una transacción, en orden alfabético: renombra en la propia
+                  fila, quita con la papelera o añade una nueva (de gasto o de ingreso). Al quitar una, sus transacciones
+                  pasan a «Sin categoría». Los cambios se aplican al pulsar «Guardar categorías».
+                </li>
+                <li>
+                  En el ordenador, al pasar el ratón por los botones de abajo a la izquierda, cada uno muestra su nombre.
                 </li>
                 <li>
                   <strong>Exportar datos:</strong> descarga una copia en JSON, sin cifrar, con todas las transacciones,
