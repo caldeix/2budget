@@ -317,13 +317,12 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   informe del mes actual y del anterior; los más antiguos ya no se tocan.
                 </li>
                 <li>
-                  <strong>Pendientes:</strong> al cerrar un mes ya terminado con gastos o aportaciones sin pagar, antes
+                  <strong>Pendientes:</strong> al cerrar un mes (también el actual) con gastos o aportaciones sin pagar, antes
                   eliges qué pasa con cada uno: <strong>ya pagado</strong>; <strong>pasar al mes siguiente</strong> (llega
                   tarde: va al día 1, aún pendiente); o que no se pagará, y entonces un gasto fijo se{" "}
                   <strong>deja a 0 €</strong> (sigue en la lista de los meses siguientes) y un gasto variable o una
                   aportación se <strong>borra</strong>, tras confirmarlo. Así el ajuste no sale descuadrado por un cargo que
-                  aún no ha llegado. «Ahora no» vuelve sin cerrar. En el mes en curso no se pregunta: lo pendiente aún es
-                  normal.
+                  aún no ha llegado. «Ahora no» vuelve sin cerrar.
                 </li>
                 <li>
                   Escribe el <strong>dinero real</strong> que tiene cada uno al final del mes. La app lo compara con el

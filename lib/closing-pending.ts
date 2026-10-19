@@ -2,7 +2,7 @@
  * @file lib/closing-pending.ts
  * @description Pendientes al cerrar un mes (3.14.0). El cierre compara el dinero real con el balance del
  *              mes, que cuenta todos los gastos, pagados o no: un gasto aún sin cobrar haría salir un
- *              ajuste de más ese mes y uno de menos el siguiente. Antes de cerrar un mes terminado se
+ *              ajuste de más ese mes y uno de menos el siguiente. Antes de cerrar un mes (también el actual) se
  *              decide qué pasa con cada gasto o aportación sin pagar:
  *
  *              - «paid»: ya está pagado (se marca).

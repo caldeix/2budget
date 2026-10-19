@@ -463,13 +463,12 @@ export default function HomePage() {
     setEditingTransaction(null)
   }
 
-  // Abre el cierre de un mes. Si ya terminó y le queda algo sin pagar, antes se decide qué pasa con
-  // ello (3.14.0, ver `lib/closing-pending.ts`); el mes en curso se cierra tal cual (aún es pronto).
+  // Abre el cierre de un mes. Si le queda algo sin pagar, antes se decide qué pasa con ello (3.14.0,
+  // ver `lib/closing-pending.ts`); también en el mes en curso (3.14.1): si se cierra, es que ya acabó.
   const openReportModal = (month: number, year: number) => {
     setMonthToCloseReport(month)
     setYearToCloseReport(year)
-    const isEnded = year < actualCurrentYear || (year === actualCurrentYear && month < actualCurrentMonth)
-    const pending = isEnded ? pendingAtClose(getTransactionsForMonth(month, year)) : []
+    const pending = pendingAtClose(getTransactionsForMonth(month, year))
     if (pending.length > 0) setPendingToClose(pending)
     else setIsReportModalOpen(true)
   }
