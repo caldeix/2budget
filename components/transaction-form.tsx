@@ -25,6 +25,7 @@ import { DatePicker } from "@/components/ui/date-picker" // Calendario propio de
 import { ownerForShare } from "@/lib/storage" // El propietario sale del reparto.
 import { normalizeName, UNCATEGORIZED_LABEL, type Category } from "@/lib/categories" // Categorías.
 import { getTodayDate, formatDate, cn } from "@/lib/utils" // Fecha de hoy en local (no UTC), formato y unión de clases.
+import { cleanTag, TAG_MAX_LENGTH } from "@/lib/tags" // Etiquetas de evento.
 
 /**
  * Nombre ya usado en alguna transacción, con su tipo (las sugerencias se filtran por tipo) y la
@@ -76,6 +77,8 @@ interface TransactionFormProps {
   categories: Category[]
   minDate?: string
   viewerRole?: "person1" | "person2" | null
+  /** Etiquetas ya usadas, para sugerirlas (3.10.0, ver `lib/tags.ts`). */
+  tagSuggestions?: string[]
 }
 
 /**
@@ -97,6 +100,7 @@ export function TransactionForm({
   categories,
   minDate,
   viewerRole,
+  tagSuggestions = [],
 }: TransactionFormProps) {
   // Valores por defecto de una transacción nueva: en modo individual todo es de la Persona 1.
   const defaultOwner = singleMode ? "person1" : "both"
@@ -123,12 +127,15 @@ export function TransactionForm({
     date: transaction?.date || getTodayDate(),
     nonComputable: transaction?.nonComputable || false,
     categoryId: transaction?.categoryId,
+    tag: transaction?.tag ?? "",
   })
   // Si el usuario ha elegido la categoría a mano, no se le pisa al autocompletar el nombre.
   const [categoryTouched, setCategoryTouched] = useState(false)
 
   // Aportación a la cuenta compartida: un traspaso de una sola persona, sin categoría ni reparto.
   const isContributionForm = formData.type === "contribution"
+  // Gasto fijo: no lleva etiqueta de evento (se repite cada mes).
+  const isFixedForm = formData.type === "expense" && formData.category === "fixed"
   const nameOf = (person: "person1" | "person2") => (person === "person1" ? person1Name : person2Name)
   const contributionName = (person: "person1" | "person2") => `Aportación ${nameOf(person)}`
   // En modo individual no hay compartida: el tipo solo aparece al editar una aportación antigua.
@@ -257,6 +264,7 @@ export function TransactionForm({
       const contributor = formData.owner === "person2" ? "person2" : "person1"
       onSubmit({
         ...formData,
+        tag: undefined,
         category: "contribution",
         categoryId: undefined,
         nonComputable: false,
@@ -273,6 +281,8 @@ export function TransactionForm({
     onSubmit({
       ...formData,
       categoryId: categoryValue || undefined,
+      // Sin etiqueta si queda vacía o es un gasto fijo (ver `cleanTag`).
+      tag: cleanTag(formData),
       owner,
       person1Percentage: owner === "person1" ? 100 : owner === "person2" ? 0 : formData.person1Percentage,
       person2Percentage: owner === "person1" ? 0 : owner === "person2" ? 100 : formData.person2Percentage,
@@ -340,7 +350,10 @@ export function TransactionForm({
               className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-foreground"
             >
               <option value="variable">Gasto variable</option>
-              <option value="fixed">Gasto fijo</option>
+              {/* Un gasto con etiqueta (de un evento) no puede ser fijo. */}
+              <option value="fixed" disabled={Boolean(formData.tag?.trim())}>
+                Gasto fijo
+              </option>
               <option value="income">Ingreso</option>
               {offersContribution && <option value="contribution">Aportación a la compartida</option>}
             </select>
@@ -446,6 +459,29 @@ export function TransactionForm({
             </ul>
           )}
         </div>
+
+        {/* Etiqueta de evento (3.10.0): opcional; no en gastos fijos ni aportaciones. */}
+        {!isContributionForm && (
+          <div data-tour="form-tag">
+            <Label htmlFor="tag">Etiqueta (opcional)</Label>
+            <Input
+              id="tag"
+              list="tag-suggestions"
+              value={formData.tag ?? ""}
+              onChange={(e) => setFormData((prev) => ({ ...prev, tag: e.target.value }))}
+              placeholder={isFixedForm ? "Los gastos fijos no llevan etiqueta" : "Lisboa 2026, Navidad..."}
+              maxLength={TAG_MAX_LENGTH}
+              disabled={isFixedForm}
+              autoComplete="off"
+              className="mt-1"
+            />
+            <datalist id="tag-suggestions">
+              {tagSuggestions.map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
+          </div>
+        )}
 
         {/* Campos de Importe y Fecha */}
         <div data-tour="form-amount-date" className="grid grid-cols-2 gap-4">

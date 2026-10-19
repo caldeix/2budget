@@ -23,6 +23,7 @@ function transactionProblem(t: unknown): string | null {
   if (typeof t.date !== "string" || !DATE.test(t.date)) return "no tiene una fecha válida"
   if (!isAmount(t.amount)) return "no tiene un importe numérico"
   if (typeof t.owner !== "string" || !OWNERS.has(t.owner)) return "no tiene a quién corresponde"
+  if (t.tag !== undefined && typeof t.tag !== "string") return "tiene una etiqueta que no es texto"
   return null
 }
 

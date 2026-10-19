@@ -33,6 +33,8 @@ import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
 import { BudgetsCard, BudgetsModal } from "@/components/budgets"
 import { AnnualSummaryModal } from "@/components/annual-summary-modal"
 import { CategoriesModal } from "@/components/categories-modal"
+import { EventsCard, EventsModal } from "@/components/events"
+import { tagEvents, tagsInUse } from "@/lib/tags"
 import {
   belongsToBudget,
   budgetCrossing,
@@ -145,6 +147,9 @@ export default function HomePage() {
   const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
   const [isAnnualSummaryOpen, setIsAnnualSummaryOpen] = useState(false)
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false)
+  const [isEventsOpen, setIsEventsOpen] = useState(false)
+  // Evento por el que se filtra la lista de transacciones (3.10.0).
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -323,6 +328,15 @@ export default function HomePage() {
     () => budgetStatuses(allTransactionsForSelectedMonth, data.config, budgetCardOwner),
     [allTransactionsForSelectedMonth, data.config, budgetCardOwner],
   )
+  // Eventos (3.10.0): gastos agrupados por etiqueta, y las etiquetas para sugerir al escribir.
+  const events = useMemo(() => tagEvents(data.transactions), [data.transactions])
+  const tagSuggestions = useMemo(() => tagsInUse(data.transactions), [data.transactions])
+  // Elegir un evento: la lista enseña todo lo suyo (en todos los meses) y se lleva a la vista.
+  const showEvent = useCallback((tag: string) => {
+    setTagFilter(tag)
+    setIsEventsOpen(false)
+    window.setTimeout(() => document.getElementById("transactions-list")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50)
+  }, [])
   // El mes terminado sin informe más reciente, para el recordatorio de cierre.
   const latestUnclosed = goalsSummary.unclosedMonths.at(-1) ?? null
   const recentEvolution = useMemo(() => lastMonths(evolutionPoints, new Date(), 6), [evolutionPoints])
@@ -607,6 +621,7 @@ export default function HomePage() {
     isBudgetsOpen ||
     isAnnualSummaryOpen ||
     isCategoriesOpen ||
+    isEventsOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -820,6 +835,15 @@ export default function HomePage() {
               onOpen={() => setIsBudgetsOpen(true)}
             />
 
+            <EventsCard
+              events={events}
+              person1Name={data.config.person1Name}
+              person2Name={data.config.person2Name}
+              showPeople={!data.config.singleMode}
+              onSelect={showEvent}
+              onOpenAll={() => setIsEventsOpen(true)}
+            />
+
             <div data-tour="reports" className="bg-card rounded-2xl shadow-lg border">
               <div className="p-6 border-b border-border">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
@@ -906,9 +930,11 @@ export default function HomePage() {
           </aside>
 
           {/* `min-w-0`: sin él, la tabla ensancha la columna y la página entera se desplaza en horizontal. */}
-          <div className="flex-1 min-w-0 space-y-8">
+          <div id="transactions-list" className="flex-1 min-w-0 space-y-8 scroll-mt-4">
             <TransactionsTable
               transactions={allTransactionsForSelectedMonth}
+              tagFilter={tagFilter}
+              onTagFilterChange={setTagFilter}
               person1Name={data.config.person1Name}
               person2Name={data.config.person2Name}
               onEdit={handleEditTransaction}
@@ -998,6 +1024,7 @@ export default function HomePage() {
         categories={categoriesOf(data.config)}
         minDate={minTransactionDate}
         viewerRole={viewerRole}
+        tagSuggestions={tagSuggestions}
       />
 
       {isReportModalOpen && (
@@ -1032,6 +1059,16 @@ export default function HomePage() {
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
         onMoveToGoal={moveToGoal}
+      />
+
+      <EventsModal
+        isOpen={isEventsOpen}
+        onClose={() => setIsEventsOpen(false)}
+        events={events}
+        person1Name={data.config.person1Name}
+        person2Name={data.config.person2Name}
+        showPeople={!data.config.singleMode}
+        onSelect={showEvent}
       />
 
       <CategoriesModal

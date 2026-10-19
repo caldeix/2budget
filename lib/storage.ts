@@ -12,6 +12,7 @@ import { normalizePercentage, roundMoney } from "@/lib/money" // Normalización 
 import { createRoundingAdjustmentsForClosedReports } from "@/lib/utils" // Corrección de céntimos (v3).
 import { dedupeAppData } from "@/lib/dedupe" // Un informe por mes y una transacción por id.
 import { validateImportedData } from "@/lib/validate-data" // Comprobación de los archivos importados.
+import { cleanTag } from "@/lib/tags" // Etiquetas de evento.
 
 /**
  * @constant {string} STORAGE_KEY
@@ -77,7 +78,7 @@ export function normalizeTransaction(t: Transaction): Transaction {
   // Un "both" solo puede llegar de un JSON importado: se queda con quien tenga el % mayor.
   if (t.type === "contribution") {
     // Sin la clave `categoryId` (no un `undefined`): una aportación no tiene categoría.
-    const { categoryId: _categoryId, ...rest } = t
+    const { categoryId: _categoryId, tag: _tag, ...rest } = t
     const owner =
       t.owner === "person1" || t.owner === "person2"
         ? t.owner
@@ -103,8 +104,12 @@ export function normalizeTransaction(t: Transaction): Transaction {
   // y un individual lleva siempre el 100% (o el 0%): el reparto se guardaba a 50/50 en versiones antiguas.
   const owner = ownerForShare(t.owner, rawPercentage)
   const person1Percentage = owner === "person1" ? 100 : owner === "person2" ? 0 : rawPercentage
+  // Etiqueta de evento (3.10.0): limpia, y nunca en gastos fijos.
+  const { tag: _tag, ...withoutTag } = t
+  const tag = cleanTag(t)
   return {
-    ...t,
+    ...withoutTag,
+    ...(tag && { tag }),
     owner,
     amount: roundMoney(t.amount),
     person1Percentage,
