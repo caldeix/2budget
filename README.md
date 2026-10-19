@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.8.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.9.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -55,6 +55,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.9.0 — Presupuesto recomendado
+
+- **Recomendado por categoría** — Al editar los límites, cada categoría propone un importe: la media de lo gastado en los 3 meses anteriores (solo los que tuvieron gasto en ella) o, si no hay, lo gastado este mes, redondeado al euro. «Usar» lo pone como límite
+- Cuenta lo mismo que el presupuesto de esa pestaña: tus gastos individuales, los compartidos o, en modo individual, todos
+- SemVer: 3.8.0 → 3.9.0 (MINOR)
 
 ### v3.8.0 — Botones y categorías
 

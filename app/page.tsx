@@ -1054,6 +1054,7 @@ export default function HomePage() {
         onClose={() => setIsBudgetsOpen(false)}
         config={data.config}
         monthTransactions={allTransactionsForSelectedMonth}
+        allTransactions={data.transactions}
         month={selectedMonth}
         year={selectedYear}
         tabs={budgetTabs}
