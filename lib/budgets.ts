@@ -135,3 +135,47 @@ export function budgetCrossing(limit: number, before: number, after: number): Bu
   const rank = { ok: 0, warning: 1, over: 2 }
   return rank[to] > rank[from] ? to : null
 }
+
+/**
+ * @function recommendedLimits
+ * @description Límite recomendado por categoría para una cuenta (3.9.0): la media de lo gastado en los 3
+ *              meses anteriores al que se está viendo, contando solo los meses en que la categoría tuvo
+ *              gasto (antes de usar las categorías, los meses salen a 0 y no deben bajar la media). Si
+ *              ninguno de los 3 tiene, lo gastado en el propio mes. Se redondea al euro hacia arriba.
+ *              Cuenta lo mismo que el presupuesto de esa cuenta (ver `belongsToBudget`).
+ * @returns {Record<string, number>} id de la categoría → recomendado (sin entrada si no hay con qué).
+ */
+export function recommendedLimits(
+  transactions: Transaction[],
+  config: AppConfig,
+  owner: BudgetOwner,
+  month: number,
+  year: number,
+): Record<string, number> {
+  const singleMode = Boolean(config.singleMode)
+  const keyOf = (offset: number) => {
+    const date = new Date(year, month - 1 - offset, 1)
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+  }
+  const previous = [1, 2, 3].map(keyOf)
+  const current = keyOf(0)
+
+  // Céntimos gastados por categoría y mes (solo los meses que interesan).
+  const cents = new Map<string, Map<string, number>>()
+  for (const t of transactions) {
+    if (!countsForBudget(t) || !belongsToBudget(t, owner, singleMode)) continue
+    const key = t.date.slice(0, 7)
+    if (key !== current && !previous.includes(key)) continue
+    const byMonth = cents.get(t.categoryId!) ?? new Map<string, number>()
+    byMonth.set(key, (byMonth.get(key) ?? 0) + Math.round(t.amount * 100))
+    cents.set(t.categoryId!, byMonth)
+  }
+
+  const result: Record<string, number> = {}
+  for (const [categoryId, byMonth] of cents) {
+    const withSpending = previous.map((key) => byMonth.get(key) ?? 0).filter((value) => value > 0)
+    const average = withSpending.length > 0 ? withSpending.reduce((a, b) => a + b, 0) / withSpending.length : (byMonth.get(current) ?? 0)
+    if (average > 0) result[categoryId] = Math.ceil(average / 100)
+  }
+  return result
+}
