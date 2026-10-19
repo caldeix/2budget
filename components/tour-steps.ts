@@ -77,6 +77,11 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
         : "Pon un límite al mes a las categorías que quieras vigilar: los tuyos cuentan tus gastos individuales y los compartidos, los gastos «Ambos». Verde, bien; ámbar, cerca del límite; rojo, pasado. Al apuntar un gasto que te acerca al límite, te avisa.",
     },
     {
+      target: "events",
+      title: "Eventos",
+      text: "Los gastos con la misma etiqueta, juntos: el total, las fechas y cuánto puso cada uno. Al pulsar uno, la lista enseña todos sus movimientos, sean del mes que sean.",
+    },
+    {
       target: "reports",
       title: "Informes",
       text: "Aquí se ven los tres últimos informes. Cada uno guarda el resumen del mes, gráficos por persona, por tipo y por categoría, y los ajustes. Si cerraste un mes sin querer, desde el último informe puedes borrarlo.",
@@ -142,6 +147,12 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       open: "transaction-form",
       title: "Nombre",
       text: "Al escribir te sugiere los nombres que ya has usado. Al elegir uno, se rellena sola la categoría de la última vez.",
+    },
+    {
+      target: "form-tag",
+      open: "transaction-form",
+      title: "Etiqueta",
+      text: "Opcional: pon la misma etiqueta («Lisboa 2026», «Navidad») a los gastos de un viaje o una ocasión, individuales o compartidos, y verás cuánto costó en total. Los gastos fijos no llevan etiqueta.",
     },
     {
       target: "form-amount-date",
