@@ -31,8 +31,16 @@ import {
   DollarSign,
   ArrowRightLeft,
   X,
+  SlidersHorizontal,
 } from "lucide-react" // Iconos.
-import { hasTag } from "@/lib/tags" // Etiquetas de evento.
+import { hasTag, tagsInUse } from "@/lib/tags" // Etiquetas de evento.
+import { normalizeName } from "@/lib/categories" // Comparar nombres sin mayúsculas ni tildes.
+import {
+  EMPTY_ADVANCED_FILTERS,
+  activeAdvancedCount,
+  matchesAdvancedFilters,
+  type AdvancedFilters,
+} from "@/lib/search" // Búsqueda avanzada.
 import { TransactionMonthNavigator } from "@/components/transaction-month-navigator" // Navegador de mes.
 import { TransactionRowDesktop, TransactionRowMobile, type RowContext } from "@/components/transaction-rows" // Filas de PC y móvil.
 
@@ -162,6 +170,11 @@ export function TransactionsTable({
   const [filterCategory, setFilterCategory] = useState<string>("all")
   // Estado para el filtro por pago: solo gastos pagados o solo pendientes (los ingresos no se marcan).
   const [filterPaid, setFilterPaid] = useState<"all" | "paid" | "pending">("all")
+  // «Más filtros» (3.13.0): fechas e importes, en todos los meses.
+  const [isMoreFiltersOpen, setIsMoreFiltersOpen] = useState(false)
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(EMPTY_ADVANCED_FILTERS)
+  const setAdvancedFilter = (key: keyof AdvancedFilters, value: string) =>
+    setAdvancedFilters((current) => ({ ...current, [key]: value }))
   // Estado para el ID de la transacción con el menú de swipe abierto (en móvil).
   const [openSwipeId, setOpenSwipeId] = useState<string | null>(null)
 
@@ -309,8 +322,15 @@ export function TransactionsTable({
    * `useMemo` que filtra las transacciones por búsqueda, tipo y categoría (SIN paginar).
    * Es la base tanto de la lista como de las tarjetas de resumen "Filtradas".
    */
-  // Con texto en el buscador se busca en TODOS los meses (si se han pasado); si no, en el mes.
-  const isSearchingAll = (searchTerm.trim() !== "" || tagFilter !== null) && allTransactions !== undefined
+  // Con texto en el buscador, un evento o «Más filtros» se busca en TODOS los meses (si se han pasado);
+  // si no, en el mes.
+  const advancedCount = activeAdvancedCount(advancedFilters)
+  const isSearchingAll =
+    (searchTerm.trim() !== "" || tagFilter !== null || advancedCount > 0) && allTransactions !== undefined
+  // Eventos para elegir en «Más filtros», y el elegido tal como sale en la lista.
+  const tagOptions = useMemo(() => tagsInUse(allTransactions ?? transactions), [allTransactions, transactions])
+  const selectedTagOption =
+    tagFilter === null ? "" : (tagOptions.find((tag) => normalizeName(tag) === normalizeName(tagFilter)) ?? tagFilter)
   const searchBase = isSearchingAll ? allTransactions : transactions
   const selectedMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`
   const isOtherMonth = (t: Transaction) => isSearchingAll && t.date.slice(0, 7) !== selectedMonthKey
@@ -339,10 +359,17 @@ export function TransactionsTable({
 
       const matchesTag = tagFilter === null || hasTag(transaction, tagFilter)
 
-      return matchesSearch && matchesType && matchesCategory && matchesPaid && matchesTag
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesCategory &&
+        matchesPaid &&
+        matchesTag &&
+        matchesAdvancedFilters(transaction, advancedFilters, isAmountHidden)
+      )
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid, tagFilter])
+  }, [searchBase, searchTerm, filterType, filterCategory, filterPaid, tagFilter, advancedFilters, isAmountHidden])
 
   /**
    * `useMemo` que ordena el conjunto filtrado y aplica la paginación (carga infinita).
@@ -626,6 +653,93 @@ export function TransactionsTable({
                 <option value="pending">Pendientes de pago</option>
               </select>
             </div>
+
+            {/* Más filtros (3.13.0): fechas, importes y evento, buscando en todos los meses. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <button
+                type="button"
+                onClick={() => setIsMoreFiltersOpen((open) => !open)}
+                aria-expanded={isMoreFiltersOpen}
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                {isMoreFiltersOpen ? "Menos filtros" : "Más filtros"}
+                {advancedCount > 0 && ` (${advancedCount})`}
+              </button>
+              {advancedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAdvancedFilters(EMPTY_ADVANCED_FILTERS)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Quitar fechas e importes
+                </button>
+              )}
+            </div>
+            {isMoreFiltersOpen && (
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Desde
+                  <Input
+                    type="date"
+                    value={advancedFilters.from}
+                    onChange={(e) => setAdvancedFilter("from", e.target.value)}
+                    className="bg-input text-foreground border-border"
+                  />
+                </label>
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Hasta
+                  <Input
+                    type="date"
+                    value={advancedFilters.to}
+                    min={advancedFilters.from || undefined}
+                    onChange={(e) => setAdvancedFilter("to", e.target.value)}
+                    className="bg-input text-foreground border-border"
+                  />
+                </label>
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Importe mínimo (€)
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0"
+                    value={advancedFilters.min}
+                    onChange={(e) => setAdvancedFilter("min", e.target.value)}
+                    className="bg-input text-foreground border-border"
+                  />
+                </label>
+                <label className="space-y-1 text-xs text-muted-foreground">
+                  Importe máximo (€)
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Sin límite"
+                    value={advancedFilters.max}
+                    onChange={(e) => setAdvancedFilter("max", e.target.value)}
+                    className="bg-input text-foreground border-border"
+                  />
+                </label>
+                <label className="col-span-2 lg:col-span-1 space-y-1 text-xs text-muted-foreground">
+                  Evento
+                  <select
+                    value={selectedTagOption}
+                    onChange={(e) => onTagFilterChange(e.target.value || null)}
+                    disabled={tagOptions.length === 0 && tagFilter === null}
+                    className="w-full h-10 px-3 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-input text-sm text-foreground disabled:opacity-50"
+                  >
+                    <option value="">{tagOptions.length === 0 ? "Sin eventos" : "Todos"}</option>
+                    {tagFilter !== null && !tagOptions.includes(selectedTagOption) && (
+                      <option value={selectedTagOption}>{selectedTagOption}</option>
+                    )}
+                    {tagOptions.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
           </div>
         </div>
 
