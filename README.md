@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.10.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.11.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,13 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.11.0 — Acceso rápido
+
+- **Nueva transacción desde el icono** — Con la app instalada, mantener pulsado el icono (Android) o clic derecho (ordenador) ofrece «Nueva transacción», que abre directamente el formulario
+- **Dirección `?accion=nueva`** — Abre el formulario al entrar; en iPhone se puede usar desde la app Atajos
+- Sección de la Ayuda
+- SemVer: 3.10.0 → 3.11.0 (MINOR)
 
 ### v3.10.0 — Eventos y etiquetas
 
