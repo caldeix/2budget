@@ -68,6 +68,8 @@ import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
 import { PaidReconciliationModal } from "@/components/paid-reconciliation-modal"
+import { PendingAtCloseModal } from "@/components/pending-at-close-modal"
+import { pendingAtClose, planPending, type PendingDecision } from "@/lib/closing-pending"
 import { AccountModal } from "@/components/account-modal"
 import { CloudStatus } from "@/components/cloud-status"
 import { VaultUnlock } from "@/components/vault-unlock"
@@ -142,6 +144,8 @@ export default function HomePage() {
 
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  // Pendientes del mes que se va a cerrar (3.14.0): con ellos, la ventana de pendientes está abierta.
+  const [pendingToClose, setPendingToClose] = useState<Transaction[] | null>(null)
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null)
   const [isReportsListOpen, setIsReportsListOpen] = useState(false)
   const [isEvolutionOpen, setIsEvolutionOpen] = useState(false)
@@ -459,24 +463,34 @@ export default function HomePage() {
     setEditingTransaction(null)
   }
 
-  const handleOpenReportModalForCurrentMonth = () => {
-    setMonthToCloseReport(actualCurrentMonth)
-    setYearToCloseReport(actualCurrentYear)
-    setIsReportModalOpen(true)
-  }
-
-  // Recordatorio de cierre (3.4.1): abre el cierre del mes terminado sin informe más reciente.
-  const handleOpenReportModalForMonth = (month: number, year: number) => {
+  // Abre el cierre de un mes. Si ya terminó y le queda algo sin pagar, antes se decide qué pasa con
+  // ello (3.14.0, ver `lib/closing-pending.ts`); el mes en curso se cierra tal cual (aún es pronto).
+  const openReportModal = (month: number, year: number) => {
     setMonthToCloseReport(month)
     setYearToCloseReport(year)
+    const isEnded = year < actualCurrentYear || (year === actualCurrentYear && month < actualCurrentMonth)
+    const pending = isEnded ? pendingAtClose(getTransactionsForMonth(month, year)) : []
+    if (pending.length > 0) setPendingToClose(pending)
+    else setIsReportModalOpen(true)
+  }
+
+  const handlePendingConfirm = (decisions: Record<string, PendingDecision>) => {
+    const plan = planPending(pendingToClose ?? [], decisions)
+    if (plan.paid.length) setTransactionsPaid(plan.paid, true)
+    for (const { id, date } of plan.moved) updateTransaction(id, { date })
+    for (const id of plan.zeroed) updateTransaction(id, { amount: 0 })
+    if (plan.zeroed.length) setTransactionsPaid(plan.zeroed, true)
+    for (const id of plan.deleted) deleteTransaction(id)
+    setPendingToClose(null)
     setIsReportModalOpen(true)
   }
 
-  const handleOpenReportModalForSelectedMonth = () => {
-    setMonthToCloseReport(selectedMonth)
-    setYearToCloseReport(selectedYear)
-    setIsReportModalOpen(true)
-  }
+  const handleOpenReportModalForCurrentMonth = () => openReportModal(actualCurrentMonth, actualCurrentYear)
+
+  // Recordatorio de cierre (3.4.1): abre el cierre del mes terminado sin informe más reciente.
+  const handleOpenReportModalForMonth = (month: number, year: number) => openReportModal(month, year)
+
+  const handleOpenReportModalForSelectedMonth = () => openReportModal(selectedMonth, selectedYear)
 
   const handleReportSubmission = (
     reportDataFromModal: Omit<
@@ -637,6 +651,7 @@ export default function HomePage() {
     isAnnualSummaryOpen ||
     isCategoriesOpen ||
     isEventsOpen ||
+    pendingToClose !== null ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -1065,6 +1080,16 @@ export default function HomePage() {
         minDate={minTransactionDate}
         viewerRole={viewerRole}
         tagSuggestions={tagSuggestions}
+      />
+
+      <PendingAtCloseModal
+        isOpen={pendingToClose !== null}
+        month={monthToCloseReport}
+        year={yearToCloseReport}
+        pending={pendingToClose ?? []}
+        onCancel={() => setPendingToClose(null)}
+        onConfirm={handlePendingConfirm}
+        isAmountHidden={isAmountHidden}
       />
 
       {isReportModalOpen && (
