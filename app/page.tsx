@@ -32,6 +32,7 @@ import { EvolutionModal } from "@/components/evolution-modal"
 import { GoalsModal, goalTabsFor } from "@/components/goals-modal"
 import { BudgetsCard, BudgetsModal } from "@/components/budgets"
 import { AnnualSummaryModal } from "@/components/annual-summary-modal"
+import { CategoriesModal } from "@/components/categories-modal"
 import {
   belongsToBudget,
   budgetCrossing,
@@ -143,6 +144,7 @@ export default function HomePage() {
   const [isGoalsOpen, setIsGoalsOpen] = useState(false)
   const [isBudgetsOpen, setIsBudgetsOpen] = useState(false)
   const [isAnnualSummaryOpen, setIsAnnualSummaryOpen] = useState(false)
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSettingsModalOpen, setIsSettingsModal] = useState(false)
   const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false)
@@ -604,6 +606,7 @@ export default function HomePage() {
     isGoalsOpen ||
     isBudgetsOpen ||
     isAnnualSummaryOpen ||
+    isCategoriesOpen ||
     isSettingsModalOpen ||
     isDocumentationModalOpen ||
     copyPrevious.isConfirmOpen
@@ -945,6 +948,7 @@ export default function HomePage() {
                 : "Copiar gastos fijos e ingresos del mes anterior"
         }
         onSettings={() => setIsSettingsModal(true)}
+        onCategories={() => setIsCategoriesOpen(true)}
         onHelp={() => setIsDocumentationModalOpen(true)}
         isTourActive={isTourActive}
       />
@@ -1028,6 +1032,13 @@ export default function HomePage() {
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
         onMoveToGoal={moveToGoal}
+      />
+
+      <CategoriesModal
+        isOpen={isCategoriesOpen}
+        onClose={() => setIsCategoriesOpen(false)}
+        config={data.config}
+        onSave={(categories) => updateConfig({ ...data.config, categories })}
       />
 
       <AnnualSummaryModal

@@ -9,7 +9,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Settings, Info, Copy, MoreVertical, X } from "lucide-react"
+import { Plus, Settings, Info, Copy, MoreVertical, X, Tags } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { cn } from "@/lib/utils"
@@ -22,6 +22,8 @@ interface FloatingActionsProps {
   /** Explicación del botón de copiar (por qué no se puede, o qué copia). */
   copyTitle: string
   onSettings: () => void
+  /** Abre las categorías (3.8.0: antes estaban dentro de Configuración). */
+  onCategories: () => void
   onHelp: () => void
   /** Al empezar el tour, el menú del móvil se cierra (el tour parte siempre del mismo estado). */
   isTourActive: boolean
@@ -39,7 +41,7 @@ function FabLabel({ children }: { children: string }) {
   )
 }
 
-export function FloatingActions({ onAdd, onCopy, copyDisabled, copyTitle, onSettings, onHelp, isTourActive }: FloatingActionsProps) {
+export function FloatingActions({ onAdd, onCopy, copyDisabled, copyTitle, onSettings, onCategories, onHelp, isTourActive }: FloatingActionsProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   useEffect(() => {
     if (isTourActive) setIsMenuOpen(false)
@@ -79,6 +81,11 @@ export function FloatingActions({ onAdd, onCopy, copyDisabled, copyTitle, onSett
         <Button onClick={fromMenu(onSettings)} variant="outline" size="icon" className={FAB} data-tour="fab-settings" aria-label="Configuración">
           <Settings className="h-4 w-4 shrink-0" />
           <FabLabel>Configuración</FabLabel>
+        </Button>
+
+        <Button onClick={fromMenu(onCategories)} variant="outline" size="icon" className={FAB} data-tour="fab-categories" aria-label="Categorías">
+          <Tags className="h-4 w-4 shrink-0" />
+          <FabLabel>Categorías</FabLabel>
         </Button>
 
         <Button onClick={fromMenu(onHelp)} variant="outline" size="icon" className={FAB} data-tour="fab-info" aria-label="Ayuda">
