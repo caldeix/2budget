@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.12.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.13.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,14 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.13.0 — Búsqueda avanzada
+
+- **Más filtros** — En la lista de transacciones, búsqueda por fechas (desde/hasta), importe mínimo y máximo y evento, en todos los meses
+- Se combinan con el texto, el tipo, la categoría y el pago; los totales de la lista son los de lo encontrado
+- Con filtro de importe no salen los movimientos cuyo importe oculta la pareja
+- Sección de la Ayuda
+- SemVer: 3.12.0 → 3.13.0 (MINOR)
 
 ### v3.12.0 — Tendencias
 
