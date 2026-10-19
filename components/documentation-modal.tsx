@@ -625,6 +625,26 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </ul>
             </AccordionContent>
           </AccordionItem>
+
+          {/* 15. Tendencias */}
+          <AccordionItem value="tendencias">
+            <SectionTrigger>15. Tendencias</SectionTrigger>
+            <AccordionContent className="space-y-4 text-muted-foreground">
+              <p>
+                Bajo el resumen del mes aparece una franja cuando alguna categoría se aparta mucho de lo normal: por
+                ejemplo, «Supermercado (compartido): 380 € este mes, ya un 40 % más que lo normal (270 €)».
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Lo normal es la media de los 3 meses anteriores en que esa categoría tuvo gasto.</li>
+                <li>Solo avisa si la diferencia es de al menos un 25 % y 20 €, y enseña como mucho tres.</li>
+                <li>
+                  En el mes en curso solo avisa de lo que ya va por encima; en un mes terminado, también de lo que bajó.
+                </li>
+                <li>En pareja, lo tuyo y lo compartido por separado, como en los presupuestos.</li>
+                <li>La «x» la oculta para ese mes; si aparece una tendencia nueva, vuelve a salir.</li>
+              </ul>
+            </AccordionContent>
+          </AccordionItem>
         </Accordion>
       </div>
     </Modal>

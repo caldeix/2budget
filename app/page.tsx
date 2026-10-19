@@ -62,6 +62,8 @@ import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
 import { IosInstallNotice } from "@/components/ios-install-notice"
 import { ClosingReminder } from "@/components/closing-reminder"
+import { TrendsStrip } from "@/components/trends-strip"
+import { categoryTrends } from "@/lib/trends"
 import { FlashMessage, type Flash } from "@/components/flash-message"
 import { APP_VERSION, isOlderVersion } from "@/lib/app-version"
 import { ConfirmCopyModal } from "@/components/confirm-copy-modal"
@@ -331,6 +333,19 @@ export default function HomePage() {
   // Eventos (3.10.0): gastos agrupados por etiqueta, y las etiquetas para sugerir al escribir.
   const events = useMemo(() => tagEvents(data.transactions), [data.transactions])
   const tagSuggestions = useMemo(() => tagsInUse(data.transactions), [data.transactions])
+  // Tendencias (3.12.0): las categorías que más se apartan de lo normal, en las cuentas de los presupuestos.
+  const trends = useMemo(
+    () => categoryTrends(data.transactions, data.config, budgetTabs.map((t) => t.owner), selectedMonth, selectedYear),
+    [data.transactions, data.config, budgetTabs, selectedMonth, selectedYear],
+  )
+  const trendOwnerLabel = useCallback(
+    (owner: BudgetOwner) => {
+      if (data.config.singleMode) return null
+      if (owner === "shared") return "compartido"
+      return owner === viewerRole ? "tuyo" : owner === "person1" ? data.config.person1Name : data.config.person2Name
+    },
+    [data.config.singleMode, data.config.person1Name, data.config.person2Name, viewerRole],
+  )
   // Elegir un evento: la lista enseña todo lo suyo (en todos los meses) y se lleva a la vista.
   const showEvent = useCallback((tag: string) => {
     setTagFilter(tag)
@@ -817,6 +832,17 @@ export default function HomePage() {
           // "Hoy" solo tiene sentido si queda algo por pagar y el mes ya ha empezado.
           showToday={calculations.hasPendingExpenses && !isSelectedMonthFuture}
         />
+
+        {/* Tendencias del mes (3.12.0): solo si alguna categoría se aparta mucho de lo normal. */}
+        {!isTourActive && (
+          <TrendsStrip
+            trends={trends}
+            month={selectedMonth}
+            year={selectedYear}
+            isCurrentMonth={selectedMonth === actualCurrentMonth && selectedYear === actualCurrentYear}
+            ownerLabel={trendOwnerLabel}
+          />
+        )}
 
         {/* Desde 1280 px, el lateral mide lo mismo que una tarjeta del resumen (4 columnas con
             separación de 24 px): así la lista de transacciones empieza donde empieza la tarjeta de Ingresos. */}
