@@ -546,6 +546,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 <li>La barra es verde por debajo del 80 %, ámbar hasta el límite y roja si te has pasado.</li>
                 <li>Al apuntar un gasto que lleva su categoría al 80 % o por encima del límite, la app te avisa.</li>
                 <li>Los límites se cambian en la ventana, con «Editar límites»; sin importe, la categoría no tiene presupuesto.</li>
+                <li>
+                  Al editar, cada categoría propone un <strong>recomendado</strong>: la media de lo gastado en los 3 meses
+                  anteriores (solo los que tuvieron gasto en ella) o, si no hay, lo gastado este mes, redondeado al euro.
+                  «Usar» lo pone como límite.
+                </li>
               </ul>
             </AccordionContent>
           </AccordionItem>

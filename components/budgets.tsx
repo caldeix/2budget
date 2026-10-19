@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react"
 import { ChevronRight, PiggyBank } from "lucide-react"
 import type { AppConfig } from "@/types"
-import { budgetsOf, budgetStatuses, type BudgetLevel, type BudgetOwner, type BudgetStatus } from "@/lib/budgets"
+import { budgetsOf, budgetStatuses, recommendedLimits, type BudgetLevel, type BudgetOwner, type BudgetStatus } from "@/lib/budgets"
 import { categoriesOf } from "@/lib/categories"
 import { cn, formatCurrency, formatMonthYear } from "@/lib/utils"
 import { Modal } from "@/components/ui/modal"
@@ -156,6 +156,7 @@ export function BudgetsModal({
   onClose,
   config,
   monthTransactions,
+  allTransactions,
   month,
   year,
   tabs,
@@ -166,6 +167,8 @@ export function BudgetsModal({
   onClose: () => void
   config: AppConfig
   monthTransactions: Transaction[]
+  /** Todas las transacciones: con ellas se calcula el límite recomendado (3.9.0). */
+  allTransactions: Transaction[]
   month: number
   year: number
   tabs: { owner: BudgetOwner; label: string }[]
@@ -179,6 +182,8 @@ export function BudgetsModal({
   }, [isOpen, initialOwner])
   const active = tabs.some((t) => t.owner === owner) ? owner : (tabs[0]?.owner ?? "person1")
   const statuses = budgetStatuses(monthTransactions, config, active)
+  // Recomendado por categoría (media de los 3 meses anteriores con gasto o lo de este mes).
+  const recommended = isOpen ? recommendedLimits(allTransactions, config, active, month, year) : {}
   const expenseCategories = categoriesOf(config).filter((c) => c.kind === "expense")
   const [isEditing, setIsEditing] = useState(false)
   const [limits, setLimits] = useState<Record<string, number>>({})
@@ -234,9 +239,24 @@ export function BudgetsModal({
           <div className="space-y-3">
             {expenseCategories.map((c) => (
               <div key={c.id} className="flex items-center justify-between gap-3">
-                <label htmlFor={`budget-${c.id}`} className="text-sm text-foreground">
-                  {c.name}
-                </label>
+                <div className="min-w-0">
+                  <label htmlFor={`budget-${c.id}`} className="block text-sm text-foreground">
+                    {c.name}
+                  </label>
+                  {recommended[c.id] !== undefined && (
+                    <p className="text-xs text-muted-foreground">
+                      Recomendado: {formatCurrency(recommended[c.id])}{" "}
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => setLimits((prev) => ({ ...prev, [c.id]: recommended[c.id] }))}
+                        aria-label={`Usar ${formatCurrency(recommended[c.id])} para ${c.name}`}
+                      >
+                        Usar
+                      </button>
+                    </p>
+                  )}
+                </div>
                 <div className="w-36">
                   <AmountInput
                     id={`budget-${c.id}`}
