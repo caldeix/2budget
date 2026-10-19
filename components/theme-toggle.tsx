@@ -17,20 +17,21 @@ import { useTheme } from "@/components/theme-provider" // Hook personalizado par
  *              Muestra un icono de sol o luna dependiendo del tema actual.
  * @returns {JSX.Element} El botón de alternancia de tema.
  */
-export function ThemeToggle() {
+export function ThemeToggle({ className, label }: { className?: string; label?: string }) {
   // Obtiene el tema actual y la función para alternarlo del contexto.
   const { theme, toggleTheme } = useTheme()
+  const Icon = theme === "dark" ? Moon : Sun
 
   return (
-    <Button variant="outline" size="icon" onClick={toggleTheme}>
-      {/* Icono de sol: visible en tema claro, oculto y rotado en tema oscuro. */}
-      <Sun className={`h-[1.2rem] w-[1.2rem] transition-all ${theme === "dark" ? "-rotate-90 scale-0" : ""}`} />
-      {/* Icono de luna: visible en tema oscuro, oculto y rotado en tema claro. */}
-      <Moon
-        className={`absolute h-[1.2rem] w-[1.2rem] transition-all ${theme === "dark" ? "" : "rotate-90 scale-0"}`}
-      />
-      {/* Texto para lectores de pantalla, mejora la accesibilidad. */}
-      <span className="sr-only">Cambiar tema</span>
+    <Button variant="outline" size="icon" onClick={toggleTheme} className={className} aria-label="Cambiar tema">
+      {/* Sol en tema claro, luna en oscuro. */}
+      <Icon className="h-[1.2rem] w-[1.2rem] shrink-0" />
+      {/* Nombre que aparece al pasar el ratón en los botones flotantes (ver `FloatingActions`). */}
+      {label && (
+        <span aria-hidden className="hidden sm:group-hover:inline sm:group-focus-visible:inline whitespace-nowrap">
+          {label}
+        </span>
+      )}
     </Button>
   )
 }
