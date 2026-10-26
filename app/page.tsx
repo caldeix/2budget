@@ -295,7 +295,7 @@ export default function HomePage() {
   const evolutionView =
     evolutionViews.find((v) => v.value === evolutionViewChoice)?.value ?? evolutionViews[0].value
   const evolutionPoints = useMemo(() => monthlyEvolution(data.transactions, evolutionView), [data.transactions, evolutionView])
-  // Metas de ahorro (3.3.0): se calculan sobre los meses terminados y cerrados (ver `lib/goals.ts`).
+  // Metas de ahorro (3.3.0): se calculan sobre los meses cerrados, también el actual si ya se cerró (3.15.0) (ver `lib/goals.ts`).
   const goalsSummary = useMemo(
     () => summarizeGoals(data.transactions, data.reports, data.goals ?? []),
     [data.transactions, data.reports, data.goals],
