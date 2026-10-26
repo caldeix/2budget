@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.16.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.17.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.17.0 — No computables pagados, ya asignables
+
+- **Lo apartado se asigna enseguida** — Los gastos no computables ya pagados del mes en curso (lo que apartas a un ahorro, como el seguro de la moto) cuentan ya como «Sin asignar» de su cuenta, sin esperar a cerrar el mes, para pasarlos a su meta. Nunca más de lo que deja el mes: si el resto del mes va en negativo, no se cuentan. Los de meses que aún no han empezado tampoco
+- La ventana de metas dice cuánto de lo sin asignar viene de lo apartado este mes. Ayuda al día
+- SemVer: 3.16.0 → 3.17.0 (MINOR)
 
 ### v3.16.0 — Informe privado en pareja
 
