@@ -158,7 +158,7 @@ export type GoalOwner = "person1" | "person2" | "shared"
 /**
  * @interface Goal
  * @description Meta de ahorro (3.3.0, ver `lib/goals.ts`). El dinero asignado sale del ahorrado en los
- *              meses terminados y cerrados de su cuenta; lo que no se asigna queda «Sin asignar».
+ *              meses cerrados de su cuenta (también el actual, si ya se cerró); lo que no se asigna queda «Sin asignar».
  */
 export interface Goal {
   id: string

@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.14.2-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.15.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -44,7 +44,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 - **Presupuestos** — Límite al mes por categoría, tuyos y compartidos, con aviso al acercarse
 - **Metas de ahorro** — Reparte lo ahorrado de los meses cerrados en metas personales y compartidas
 - **Entrar con Google** — Además de email y contraseña; se puede unir a una cuenta existente sin perder el hogar
-- **Copia de gastos fijos, ingresos y aportaciones** — Duplica automáticamente los gastos fijos, los ingresos y las aportaciones a la compartida del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1
+- **Copia de gastos fijos, ingresos y aportaciones** — Duplica automáticamente los gastos fijos, los ingresos y las aportaciones a la compartida del mes anterior con un clic, con su categoría (sin los ajustes de cierre); si el mes ya tiene el informe cerrado, se pueden copiar al mes siguiente sin esperar al día 1. Va por persona: si tu pareja te oculta lo suyo, cada uno copia lo suyo y al otro le sale un aviso con lo que le falta
 - **Modo individual** — Desde Configuración, oculta la segunda persona para usar la app sin pareja: sin propietario ni repartos en el formulario, Ingresos y Gastos juntos en una sola tarjeta y un único dinero real en el cierre de mes
 - **Cuenta y hogar en la nube** — Cuenta obligatoria con email verificado. Los datos se guardan en un hogar compartido por la pareja (o "tu espacio" en modo individual), sincronizado al momento entre dispositivos y también sin conexión. Invitación a la pareja con un código de un solo uso
 - **Cifrado de extremo a extremo** — Cada transacción, informe y la configuración se cifran en el navegador (AES-256-GCM) con una clave del hogar protegida por la **contraseña maestra** de cada miembro (PBKDF2). La contraseña maestra no se guarda en ningún sitio
@@ -56,6 +56,14 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.15.0 — Metas con el mes cerrado y copia por persona
+
+- **Metas con el mes en curso cerrado** — Si cierras el mes antes de que acabe (por ejemplo, al preparar el siguiente), su dinero ya se puede repartir en las metas, también en las compartidas. Si después cambias algo de ese mes, se actualiza su informe y las metas bajan solas si hace falta
+- **Copia por persona** — Lo que falta por copiar del mes anterior se mira por tipo y por persona: una nómina apuntada a mano ya no impide copiar los ingresos de la pareja
+- **Cada uno copia lo suyo** — Si tu pareja te oculta sus transacciones individuales, al copiar solo se copian las tuyas y las compartidas. Cuando ella entra en ese mes ve un aviso con lo suyo que falta y un botón para copiarlo revisando sus importes. Igual al revés
+- Ayuda y tour al día
+- SemVer: 3.14.2 → 3.15.0 (MINOR)
 
 ### v3.14.2 — No computables en las metas
 
@@ -159,7 +167,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ### v3.3.0 — Metas de ahorro
 
 - **Metas desde el Total acumulado** — Al pulsarlo se abren las metas: cada uno ve las suyas (sobre su cuenta) y las compartidas (sobre la compartida); en modo individual, solo las tuyas
-- **Solo dinero de meses cerrados** — Se reparte lo ahorrado en los meses terminados y con el informe cerrado; lo que no se asigna queda en «Sin asignar». El mes en curso no se puede repartir hasta que acaba
+- **Solo dinero de meses cerrados** — Se reparte lo ahorrado en los meses con el informe cerrado, también el mes en curso si ya lo has cerrado; lo que no se asigna queda en «Sin asignar». El mes en curso sin cerrar no se puede repartir
 - **Objetivo y progreso** — Cada meta tiene un objetivo opcional con barra de progreso; quitar dinero o borrarla lo devuelve a Sin asignar
 - **Mes en negativo** — Si el mes en curso va en negativo con lo ya pagado, primero se gasta lo sin asignar y luego baja la última meta a la que se añadió dinero. Se calcula: si el mes se recupera, vuelven a su cifra. También avisa de lo que bajarían con lo previsto
 - **Cifradas y sincronizadas** — Una colección nueva en la nube, cifrada como el resto; las versiones anteriores a la 3.3.0 piden actualizar

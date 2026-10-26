@@ -3,6 +3,11 @@
  * @description Copiar al mes seleccionado los gastos fijos, los ingresos y las aportaciones del mes
  *              anterior (3.1.1: separado de `app/page.tsx`). Cada tipo se copia solo si el mes aún no
  *              lo tiene, para no duplicar; las copias se fechan el día 1 y conservan su categoría.
+ *
+ *              Por persona (3.15.0): lo que falta se mira por tipo Y por dueño (antes, una nómina apuntada
+ *              a mano impedía copiar los ingresos de la pareja), y lo que la pareja oculta no se copia:
+ *              se queda para ella, que al entrar ve un aviso con lo suyo que falta (`mineMissing`) y lo
+ *              copia revisando sus importes.
  */
 
 "use client"
@@ -13,12 +18,19 @@ import type { CopyAmounts } from "@/components/confirm-copy-modal"
 import type { Flash } from "@/components/flash-message"
 import { isClosingAdjustment, isContribution } from "@/lib/aggregations"
 import { getMonthName, getPreviousMonthYear } from "@/lib/utils"
+import { belongsOnlyTo, type Person } from "@/lib/privacy"
 
 export const isFixedExpense = (t: Transaction) => t.type === "expense" && t.category === "fixed"
 // Los ajustes de cierre de informe (ver monthly-report-modal) no se copian al mes siguiente.
 const isCopyableIncome = (t: Transaction) => t.type === "income" && !isClosingAdjustment(t)
 // Las aportaciones a la cuenta compartida se copian como los fijos y los ingresos.
 const isCopyableContribution = (t: Transaction) => isContribution(t)
+
+/** Tipo de copia de una transacción (o `null` si no se copia). */
+const copyKindOf = (t: Transaction) =>
+  isFixedExpense(t) ? "fixed" : isCopyableIncome(t) ? "income" : isCopyableContribution(t) ? "contribution" : null
+/** Hueco que ocupa en el mes: su tipo de copia y su dueño. Si el mes ya tiene uno igual, no se copia. */
+const copySlotOf = (t: Transaction) => `${copyKindOf(t)}:${t.owner}`
 
 interface UseCopyPreviousMonthOptions {
   selectedMonth: number
@@ -28,6 +40,10 @@ interface UseCopyPreviousMonthOptions {
   getTransactionsForMonth: (month: number, year: number) => Transaction[]
   addTransaction: (transaction: TransactionFormData) => void
   onFlash: (flash: Flash) => void
+  /** Si la pareja oculta el importe: esas transacciones no se copian, las copia ella. */
+  isAmountHidden?: (t: Transaction) => boolean
+  /** Mi rol en el hogar (`null` sin hogar en la nube): para saber qué falta de lo mío. */
+  viewer?: Person | null
 }
 
 export function useCopyPreviousMonth({
@@ -37,40 +53,52 @@ export function useCopyPreviousMonth({
   getTransactionsForMonth,
   addTransaction,
   onFlash,
+  isAmountHidden = () => false,
+  viewer = null,
 }: UseCopyPreviousMonthOptions) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [transactionsToCopy, setTransactionsToCopy] = useState<Transaction[]>([])
 
-  const hasFixedExpenses = monthTransactions.some(isFixedExpense)
-  const hasIncomes = monthTransactions.some(isCopyableIncome)
-  const hasContributions = monthTransactions.some(isCopyableContribution)
+  // Lo del mes anterior que aún falta en el mes seleccionado, por tipo y dueño.
+  const missing = useMemo(() => {
+    const { month, year } = getPreviousMonthYear(selectedMonth, selectedYear)
+    const present = new Set(monthTransactions.filter((t) => copyKindOf(t)).map(copySlotOf))
+    return getTransactionsForMonth(month, year).filter((t) => copyKindOf(t) && !present.has(copySlotOf(t)))
+  }, [selectedMonth, selectedYear, monthTransactions, getTransactionsForMonth])
+  // Lo que copio yo: todo lo que falta menos lo que mi pareja me oculta.
+  const copyable = useMemo(() => missing.filter((t) => !isAmountHidden(t)), [missing, isAmountHidden])
+  // Lo mío que falta cuando el mes ya está preparado: tiene algo copiable que no es solo mío (mi pareja
+  // copió lo suyo y lo compartido). Lo que apunto yo a mano no cuenta como «preparado».
+  const mineMissing = useMemo(
+    () =>
+      viewer && monthTransactions.some((t) => copyKindOf(t) && !belongsOnlyTo(t, viewer))
+        ? missing.filter((t) => belongsOnlyTo(t, viewer))
+        : [],
+    [viewer, monthTransactions, missing],
+  )
+
   // Las aportaciones solo faltan si el mes anterior las tenía (sin cuenta compartida no hay nada que copiar).
   const previousMonthHasContributions = useMemo(() => {
     const { month, year } = getPreviousMonthYear(selectedMonth, selectedYear)
     return getTransactionsForMonth(month, year).some(isCopyableContribution)
   }, [selectedMonth, selectedYear, getTransactionsForMonth])
-  // Cada tipo se copia solo si el mes seleccionado aún no lo tiene, para no duplicar.
-  const hasNothingToCopy = hasFixedExpenses && hasIncomes && (hasContributions || !previousMonthHasContributions)
+  const hasNothingToCopy = copyable.length === 0
+  // Lo que falta y no copio yo porque es de mi pareja y me lo oculta.
+  const leftForPartner = missing.length - copyable.length
 
   const prepare = useCallback(() => {
     // El origen es el mes ANTERIOR al mes seleccionado (no al mes real de hoy).
     const { month: sourceMonth, year: sourceYear } = getPreviousMonthYear(selectedMonth, selectedYear)
-    const toCopy = getTransactionsForMonth(sourceMonth, sourceYear).filter(
-      (t) =>
-        (!hasFixedExpenses && isFixedExpense(t)) ||
-        (!hasIncomes && isCopyableIncome(t)) ||
-        (!hasContributions && isCopyableContribution(t)),
-    )
-    if (toCopy.length === 0) {
+    if (copyable.length === 0) {
       onFlash({
         text: `No hay gastos fijos, ingresos ni aportaciones en ${getMonthName(sourceMonth)} ${sourceYear} para copiar.`,
         tone: "error",
       })
       return
     }
-    setTransactionsToCopy(toCopy)
+    setTransactionsToCopy(copyable)
     setIsConfirmOpen(true)
-  }, [selectedMonth, selectedYear, getTransactionsForMonth, hasFixedExpenses, hasIncomes, hasContributions, onFlash])
+  }, [selectedMonth, selectedYear, copyable, onFlash])
 
   const counts = {
     expenseCount: transactionsToCopy.filter(isFixedExpense).length,
@@ -120,6 +148,8 @@ export function useCopyPreviousMonth({
     transactionsToCopy,
     counts,
     hasNothingToCopy,
+    leftForPartner,
+    mineMissing,
     previousMonthHasContributions,
     prepare,
     confirm,

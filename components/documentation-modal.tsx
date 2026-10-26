@@ -246,8 +246,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
             <AccordionContent className="space-y-4 text-muted-foreground">
               <p>
                 El botón de copiar trae al mes que estás viendo los gastos fijos, los ingresos y las aportaciones a la
-                compartida del mes anterior (los ajustes de cierre no se copian), cada uno con su categoría. Si el mes
-                ya tiene alguno de esos tipos, ese tipo no se vuelve a copiar.
+                compartida del mes anterior (los ajustes de cierre no se copian), cada uno con su categoría. Se mira
+                por persona: si el mes ya tiene, por ejemplo, ingresos tuyos, los tuyos no se vuelven a copiar, pero
+                los de tu pareja sí.
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
@@ -257,6 +258,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 <li>
                   Para copiar a un mes futuro, el mes anterior tiene que estar cerrado: así puedes preparar el mes
                   siguiente sin esperar al día 1.
+                </li>
+                <li>
+                  Si tu pareja te oculta sus transacciones individuales, al copiar solo se copian las tuyas y las
+                  compartidas: las suyas las copia ella. Cuando entre en ese mes verá un aviso con lo suyo que falta y
+                  un botón para copiarlo revisando sus importes. Igual al revés.
                 </li>
               </ul>
             </AccordionContent>
@@ -513,8 +519,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Solo se reparte el dinero de los <strong>meses terminados y con el informe cerrado</strong>: octubre se
-                  puede repartir desde el 1 de noviembre, una vez cerrado. Lo que no asignas queda en{" "}
+                  Solo se reparte el dinero de los <strong>meses con el informe cerrado</strong>: octubre se puede
+                  repartir en cuanto lo cierres, aunque aún no haya acabado. Si después cambias algo de octubre,
+                  actualiza su informe. Lo que no asignas queda en{" "}
                   <strong>Sin asignar</strong>.
                 </li>
                 <li>
