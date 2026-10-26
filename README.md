@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.14.1-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.14.2-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.14.2 — No computables en las metas
+
+- Las metas ya no restan los gastos no computables del mes en curso, igual que en los meses cerrados: antes ese dinero bajaba las metas hasta cerrar el mes y luego salía como «Sin asignar» aunque ya estuviera en una meta
+- Al cerrar el mes se avisa de que el dinero real de cada uno va sin lo apartado como no computable
+- SemVer: 3.14.1 → 3.14.2 (PATCH)
 
 ### v3.14.1 — Pendientes también en el mes actual
 
