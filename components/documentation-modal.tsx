@@ -468,7 +468,8 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 En Cuenta &gt; Tu hogar, cada uno puede activar <strong>«Ocultar mis transacciones individuales a mi
                 pareja»</strong>. Tu pareja verá *** en lugar del importe de las transacciones que son 100% tuyas, y no
                 podrá editarlas. Las aportaciones a la cuenta compartida se ven siempre, porque es dinero de los dos.
-                Los totales, los balances y los informes no cambian. Solo se oculta en la app: los datos
+                En el informe de cada mes tu pareja solo ve lo suyo y lo compartido: ni tu tarjeta, ni tus ingresos ni
+                tus gastos por categoría. Los totales y los balances no cambian. Solo se oculta en la app: los datos
                 siguen compartidos y cifrados con la misma clave del hogar.
               </p>
               <Subtitle>Cifrado y contraseña maestra</Subtitle>

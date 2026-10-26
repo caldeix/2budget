@@ -21,7 +21,7 @@ import {
 } from "@/lib/storage"
 import { countPerson2OpenTransactions } from "@/lib/single-mode"
 import { isClosingAdjustment, isPayable } from "@/lib/aggregations"
-import { isHiddenFromViewer, type Person } from "@/lib/privacy"
+import { isHiddenFromViewer, partnerOf, type Person } from "@/lib/privacy"
 import { laterSharedClosings } from "@/lib/shared-account"
 import { addMoney, isZeroMoney, subtractMoney } from "@/lib/money"
 import { categoriesOf, categoryNameOf, normalizeName } from "@/lib/categories"
@@ -1207,6 +1207,9 @@ export default function HomePage() {
           person2Name={data.config.person2Name}
           singleMode={data.config.singleMode}
           config={data.config}
+          hiddenPerson={
+            viewerRole && data.config.hideIndividualFromPartner?.[partnerOf(viewerRole)] ? partnerOf(viewerRole) : null
+          }
           onDelete={
             selectedReport.id === latestReportId
               ? () => {
