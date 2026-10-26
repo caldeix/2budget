@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.15.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.16.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,12 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.16.0 — Informe privado en pareja
+
+- **Informe con privacidad** — Si tu pareja te oculta sus transacciones individuales, en el informe de cada mes solo ves lo tuyo y lo compartido: sin su tarjeta (ingresos, gastos, cuenta, dinero real y ajuste), sin el quesito de ingresos por persona y sin su pestaña en los gastos por categoría. Igual al revés. Los totales del mes no cambian
+- Ayuda al día
+- SemVer: 3.15.0 → 3.16.0 (MINOR)
 
 ### v3.15.0 — Metas con el mes cerrado y copia por persona
 
@@ -317,7 +323,7 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ### v2.6.0 — Filtro de pagados y privacidad en pareja
 
 - **Filtro por pago** — En las transacciones, un selector más para ver solo los gastos pagados o solo los pendientes
-- **Ocultar mis transacciones individuales a mi pareja** — Opción de cada miembro en Cuenta > Tu hogar. Con ella activada, la pareja ve *** en lugar del importe de las transacciones que son 100% de quien la activa (en la lista, en el aviso de gastos pagados y al revisar importes al copiar) y no puede editarlas. Los totales, balances e informes no cambian; los ajustes de cierre siempre se ven. Con un filtro o una búsqueda que incluya importes ocultos, los totales filtrados también se ocultan para no delatarlos. Es una ocultación en la app, no un cifrado aparte
+- **Ocultar mis transacciones individuales a mi pareja** — Opción de cada miembro en Cuenta > Tu hogar. Con ella activada, la pareja ve *** en lugar del importe de las transacciones que son 100% de quien la activa (en la lista, en el aviso de gastos pagados y al revisar importes al copiar) y no puede editarlas. Los totales y balances no cambian; en el informe de cada mes solo se ve lo propio y lo compartido (desde la 3.16.0); los ajustes de cierre siempre se ven. Con un filtro o una búsqueda que incluya importes ocultos, los totales filtrados también se ocultan para no delatarlos. Es una ocultación en la app, no un cifrado aparte
 - SemVer: 2.5.0 → 2.6.0 (MINOR)
 
 ### v2.5.0 — Menos lecturas de Firestore
