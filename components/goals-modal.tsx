@@ -118,6 +118,14 @@ function PoolView({
         </div>
       </dl>
 
+      {/* 3.17.0: lo apartado este mes como no computable ya se puede asignar. */}
+      {pool.setAside > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Más {formatCurrency(pool.setAside)} apartados este mes como gastos no computables ya pagados: se pueden
+          asignar sin esperar a cerrar el mes.
+        </p>
+      )}
+
       {unclosedMonths.length > 0 && (
         <p className="text-sm text-muted-foreground">
           {unclosedMonths.length === 1 ? "El mes de " : "Los meses de "}

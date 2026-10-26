@@ -526,6 +526,11 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                   <strong>Sin asignar</strong>.
                 </li>
                 <li>
+                  Los <strong>gastos no computables ya pagados</strong> del mes en curso (lo que apartas a un ahorro)
+                  cuentan enseguida como Sin asignar, sin esperar al cierre, para que los pases a su meta. Los de meses
+                  que aún no han empezado no cuentan.
+                </li>
+                <li>
                   Cada meta tiene un objetivo opcional con su barra de progreso. Quitar dinero de una meta o borrarla lo
                   devuelve a Sin asignar.
                 </li>
