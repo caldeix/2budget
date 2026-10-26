@@ -64,9 +64,15 @@ export interface GoalsSummary {
   usesShared: boolean
 }
 
-/** Resultado de un mes por cuenta, igual que las cifras «Hoy» y «Previsto» del Balance individual. */
-function monthResult(transactions: Transaction[]): Record<GoalOwner, MonthResult> {
-  const usesShared = usesSharedAccount(transactions)
+/**
+ * Resultado de un mes por cuenta, como las cifras «Hoy» y «Previsto» del Balance individual pero SIN los
+ * gastos no computables (3.14.2): el dinero de los meses cerrados (`calculateCumulativeBalances`) tampoco
+ * los resta. Si el mes en curso los restara, ese dinero bajaría las metas hasta cerrar el mes y luego
+ * volvería como «Sin asignar» aunque ya estuviera en una meta.
+ */
+function monthResult(all: Transaction[]): Record<GoalOwner, MonthResult> {
+  const usesShared = usesSharedAccount(all)
+  const transactions = all.filter((t) => !(t.type === "expense" && t.nonComputable))
   const totals = aggregateTransactions(transactions)
   const settled = transactions.filter(isSettled)
   const paid = aggregateTransactions(settled)

@@ -377,6 +377,13 @@ export function MonthlyReportModal({
               en el banco: lo que sobró otros meses sigue ahí.
             </p>
           )}
+          {/* 3.14.2: el acumulado vuelve a sumar los no computables, así que aquí no se cuentan. */}
+          {calculations.nonComputableExpenses > 0 && (
+            <p className="text-sm text-muted-foreground">
+              En la cuenta de cada uno, sin contar lo apartado este mes como gasto no computable ({formatCurrency(calculations.nonComputableExpenses)}
+              ): la app ya lo suma aparte al total acumulado.
+            </p>
+          )}
           <div
             className={`grid gap-4 ${
               // Con tres campos, alineados por abajo: la etiqueta de la compartida ocupa dos líneas.
