@@ -59,8 +59,8 @@ export function getTourSteps({ person1Name, person2Name, singleMode, cloud, isDe
       target: "cumulative",
       title: "Metas de ahorro",
       text: singleMode
-        ? "Pulsa el Total acumulado para repartir lo ahorrado en metas (un viaje, el coche...). Solo se reparte el dinero de los meses terminados y cerrados; lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero."
-        : "Pulsa el Total acumulado para repartir lo ahorrado en metas: las tuyas, sobre tu cuenta, y las compartidas, sobre la compartida. Solo se reparte el dinero de los meses terminados y cerrados; lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero.",
+        ? "Pulsa el Total acumulado para repartir lo ahorrado en metas (un viaje, el coche...). Solo se reparte el dinero de los meses cerrados (también el actual, si ya lo has cerrado); lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero."
+        : "Pulsa el Total acumulado para repartir lo ahorrado en metas: las tuyas, sobre tu cuenta, y las compartidas, sobre la compartida. Solo se reparte el dinero de los meses cerrados (también el actual, si ya lo has cerrado); lo que no asignes queda «Sin asignar». Si el mes en curso va en negativo, baja primero la última meta a la que añadiste dinero.",
     },
     {
       target: "evolution",

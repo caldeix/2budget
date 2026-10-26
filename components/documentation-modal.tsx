@@ -513,8 +513,9 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li>
-                  Solo se reparte el dinero de los <strong>meses terminados y con el informe cerrado</strong>: octubre se
-                  puede repartir desde el 1 de noviembre, una vez cerrado. Lo que no asignas queda en{" "}
+                  Solo se reparte el dinero de los <strong>meses con el informe cerrado</strong>: octubre se puede
+                  repartir en cuanto lo cierres, aunque aún no haya acabado. Si después cambias algo de octubre,
+                  actualiza su informe. Lo que no asignas queda en{" "}
                   <strong>Sin asignar</strong>.
                 </li>
                 <li>

@@ -2,7 +2,7 @@
  * @file components/goals-modal.tsx
  * @description Metas de ahorro (3.3.0), desde el Total acumulado. Cada uno ve sus metas (sobre su
  *              cuenta) y las compartidas (sobre la compartida); las de la pareja no se muestran (D-12).
- *              El dinero sale de los meses terminados y cerrados; lo que no se asigna queda en
+ *              El dinero sale de los meses cerrados (también el actual, si ya se cerró); lo que no se asigna queda en
  *              «Sin asignar». Si el mes en curso va en negativo, se ve cuánto baja cada meta.
  *              Los cálculos están en `lib/goals.ts`.
  */

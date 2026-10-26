@@ -5,8 +5,9 @@
  *              si el mes en curso va en negativo. Todo se calcula; lo único guardado es lo que se ha
  *              asignado a cada meta (ver plan, decisiones D-7 a D-11).
  *
- *              - Solo se reparte el dinero de los meses TERMINADOS y con el informe CERRADO: el mes en
- *                curso aún no se sabe cuánto dejará (D-7).
+ *              - Solo se reparte el dinero de los meses con el informe CERRADO: el mes en curso sin cerrar
+ *                aún no se sabe cuánto dejará (D-7). Desde la 3.15.0 también el mes en curso si ya se ha
+ *                cerrado (p. ej. al preparar el siguiente antes de que acabe).
  *              - Dinero de cada cuenta: el mismo reparto que el Total acumulado (`cumulativeAccountSplit`),
  *                sobre esos meses. Las metas personales salen de la cuenta de cada uno, sin su parte en
  *                la compartida, que es de las metas compartidas (D-11).
@@ -43,7 +44,7 @@ export interface GoalView {
 /** Situación de las metas de una cuenta. */
 export interface GoalPool {
   owner: GoalOwner
-  /** Dinero de la cuenta en los meses terminados y cerrados. */
+  /** Dinero de la cuenta en los meses cerrados (también el mes en curso, si ya está cerrado). */
   available: number
   /** Suma de lo asignado a sus metas (lo guardado). */
   allocated: number
@@ -124,8 +125,9 @@ export function summarizeGoals(transactions: Transaction[], reports: MonthlyRepo
   const unclosed = new Set<string>()
   for (const t of transactions) {
     const key = t.date.slice(0, 7)
-    if (key === currentKey) current.push(t)
-    else if (key < currentKey) {
+    // El mes en curso ya cerrado cuenta como cerrado (3.15.0): se puede repartir sin esperar a que acabe.
+    if (key === currentKey && !closed.has(key)) current.push(t)
+    else if (key <= currentKey) {
       if (closed.has(key)) counted.push(t)
       else unclosed.add(key)
     }
