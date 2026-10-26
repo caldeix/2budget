@@ -5,6 +5,9 @@
  *              Incluye gráficos de pastel para la distribución de gastos e ingresos,
  *              y un desglose de las finanzas por persona. En los meses con cuenta compartida
  *              (v3.0.0), cada persona muestra su cuenta y un bloque más muestra la compartida.
+ *              Privacidad en pareja (3.16.0): si la pareja oculta lo suyo, solo se ve lo propio y lo
+ *              compartido (sin su tarjeta, sin el quesito de ingresos por persona y sin su pestaña en
+ *              los gastos por categoría). Los totales del mes no cambian.
  *              Es un Client Component (`"use client"`) debido al uso de `PieChart`.
  */
 
@@ -35,6 +38,7 @@ import { shouldShowPerson2 } from "@/lib/single-mode" // Visibilidad de la Perso
  * @property {boolean} [singleMode] - Modo individual: oculta la Persona 2 si el informe no tiene cifras suyas.
  * @property {() => void} [onDelete] - Borra el informe y sus ajustes. Solo se pasa para el último informe.
  * @property {AppConfig} config - Configuración actual (nombres de las categorías).
+ * @property {"person1" | "person2" | null} [hiddenPerson] - La pareja que me oculta lo suyo (ver `lib/privacy.ts`).
  */
 interface ReportDetailModalProps {
   isOpen: boolean
@@ -45,6 +49,7 @@ interface ReportDetailModalProps {
   singleMode?: boolean
   onDelete?: () => void
   config: AppConfig
+  hiddenPerson?: "person1" | "person2" | null
 }
 
 /** Colores del quesito por categoría (se repiten si hay más de doce). */
@@ -79,6 +84,7 @@ export function ReportDetailModal({
   singleMode,
   onDelete,
   config,
+  hiddenPerson = null,
 }: ReportDetailModalProps) {
   // Gastos del mes por categoría (sin los ajustes de cierre).
   // Borrar pide una segunda confirmación dentro del propio modal.
@@ -92,6 +98,12 @@ export function ReportDetailModal({
     report.person2RealMoney,
     report.person2Adjustment,
   )
+
+  // Lo de cada persona que se enseña: con privacidad, la pareja que me oculta lo suyo no.
+  const showsPerson1 = hiddenPerson !== "person1"
+  const showsPerson2 = showPerson2 && hiddenPerson !== "person2"
+  // Con las dos personas a la vista (sin privacidad), el quesito de ingresos por persona.
+  const showsIncomeByPerson = showPerson2 && !hiddenPerson
 
   // Vista del quesito por categoría: de qué cuenta sale el gasto (la casa o cada uno). En modo
   // individual (sin Persona 2) no hay selector: se ve todo.
@@ -123,6 +135,8 @@ export function ReportDetailModal({
     shared ? (person === "person1" ? shared.split.person1Account : shared.split.person2Account) : 0
   const sharedPartOf = (person: "person1" | "person2") =>
     shared ? (person === "person1" ? shared.split.sharedPerson1 : shared.split.sharedPerson2) : 0
+  // Tarjetas de abajo: cada persona que se enseña y la compartida.
+  const cardColumns = [showsPerson1, showsPerson2, shared !== null].filter(Boolean).length
 
   /**
    * Datos para el gráfico de pastel de gastos.
@@ -196,9 +210,9 @@ export function ReportDetailModal({
         </div>
 
         {/* Sección de Gráficos: ingresos por persona y gastos por tipo en una fila; por categoría, a todo el ancho */}
-        <div className={`grid grid-cols-1 gap-8 ${showPerson2 ? "lg:grid-cols-2" : ""}`}>
-          {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2 no aporta nada) */}
-          {showPerson2 && (
+        <div className={`grid grid-cols-1 gap-8 ${showsIncomeByPerson ? "lg:grid-cols-2" : ""}`}>
+          {/* Gráfico de Distribución de Ingresos (por persona: sin Persona 2, o con privacidad, no se enseña) */}
+          {showsIncomeByPerson && (
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Distribución de Ingresos</h3>
               <PieChart data={incomeChartData} size={250} />
@@ -210,7 +224,7 @@ export function ReportDetailModal({
             <PieChart data={expenseChartData} size={250} />
           </div>
           {/* Gastos por categoría: ocupa la fila entera y la leyenda va en columnas */}
-          <div className={showPerson2 ? "lg:col-span-2" : ""}>
+          <div className={showsIncomeByPerson ? "lg:col-span-2" : ""}>
             <h3 className="text-lg font-semibold text-foreground mb-4 text-center">Gastos por categoría</h3>
             {showPerson2 && (
               <div className="mb-4 flex justify-center">
@@ -225,23 +239,25 @@ export function ReportDetailModal({
                       ["person1", person1Name],
                       ["person2", person2Name],
                     ] as [ExpenseScope, string][]
-                  ).map(([scope, label]) => (
-                    <button
-                      key={scope}
-                      type="button"
-                      role="tab"
-                      aria-selected={categoryScope === scope}
-                      onClick={() => setCategoryScope(scope)}
-                      className={cn(
-                        "px-3 py-1 rounded-full transition-colors",
-                        categoryScope === scope
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  )
+                    .filter(([scope]) => scope !== hiddenPerson)
+                    .map(([scope, label]) => (
+                      <button
+                        key={scope}
+                        type="button"
+                        role="tab"
+                        aria-selected={categoryScope === scope}
+                        onClick={() => setCategoryScope(scope)}
+                        className={cn(
+                          "px-3 py-1 rounded-full transition-colors",
+                          categoryScope === scope
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
                 </div>
               </div>
             )}
@@ -257,57 +273,59 @@ export function ReportDetailModal({
         </div>
 
         {/* Sección de Detalles por Persona */}
-        <div className={`grid grid-cols-1 gap-6 ${shared ? "md:grid-cols-3" : showPerson2 ? "md:grid-cols-2" : ""}`}>
+        <div className={`grid grid-cols-1 gap-6 ${cardColumns === 3 ? "md:grid-cols-3" : cardColumns === 2 ? "md:grid-cols-2" : ""}`}>
           {/* Detalles de Persona 1 */}
-          <div className="bg-muted rounded-2xl p-4">
-            <h3 className="font-semibold text-foreground mb-4">{person1Name}</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ingresos:</span>
-                <span className="font-medium text-green-600">{formatCurrency(report.person1Income)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Gastos:</span>
-                <span className="font-medium text-red-600">{formatCurrency(report.person1Expenses)}</span>
-              </div>
-              {shared ? (
-                <>
+          {showsPerson1 && (
+            <div className="bg-muted rounded-2xl p-4">
+              <h3 className="font-semibold text-foreground mb-4">{person1Name}</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ingresos:</span>
+                  <span className="font-medium text-green-600">{formatCurrency(report.person1Income)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Gastos:</span>
+                  <span className="font-medium text-red-600">{formatCurrency(report.person1Expenses)}</span>
+                </div>
+                {shared ? (
+                  <>
+                    <div className="flex justify-between border-t pt-2">
+                      <span className="text-muted-foreground">Parte en la compartida:</span>
+                      <span className="font-medium text-foreground">{formatCurrency(sharedPartOf("person1"))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cuenta calculada:</span>
+                      <span className={`font-medium ${accountOf("person1") >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {formatCurrency(accountOf("person1"))}
+                      </span>
+                    </div>
+                  </>
+                ) : (
                   <div className="flex justify-between border-t pt-2">
-                    <span className="text-muted-foreground">Parte en la compartida:</span>
-                    <span className="font-medium text-foreground">{formatCurrency(sharedPartOf("person1"))}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cuenta calculada:</span>
-                    <span className={`font-medium ${accountOf("person1") >= 0 ? "text-green-600" : "text-red-600"}`}>
-                      {formatCurrency(accountOf("person1"))}
+                    <span className="text-muted-foreground">Balance calculado:</span>
+                    <span
+                      className={`font-medium ${subtractMoney(report.person1Income, report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
+                      {formatCurrency(subtractMoney(report.person1Income, report.person1Expenses))}
                     </span>
                   </div>
-                </>
-              ) : (
-                <div className="flex justify-between border-t pt-2">
-                  <span className="text-muted-foreground">Balance calculado:</span>
-                  <span
-                    className={`font-medium ${subtractMoney(report.person1Income, report.person1Expenses) >= 0 ? "text-green-600" : "text-red-600"}`}
-                  >
-                    {formatCurrency(subtractMoney(report.person1Income, report.person1Expenses))}
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Dinero real:</span>
+                  <span className="font-medium text-foreground">{formatCurrency(report.person1RealMoney)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Ajuste:</span>
+                  <span className={`font-medium ${report.person1Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    {formatCurrency(report.person1Adjustment)}
                   </span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Dinero real:</span>
-                <span className="font-medium text-foreground">{formatCurrency(report.person1RealMoney)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ajuste:</span>
-                <span className={`font-medium ${report.person1Adjustment >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(report.person1Adjustment)}
-                </span>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Detalles de Persona 2 */}
-          {showPerson2 && (
+          {showsPerson2 && (
             <div className="bg-muted rounded-2xl p-4">
               <h3 className="font-semibold text-foreground mb-4">{person2Name}</h3>
               <div className="space-y-2 text-sm">
