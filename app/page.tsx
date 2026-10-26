@@ -62,6 +62,7 @@ import { UpdateNotice, UpdateRequired } from "@/components/update-notice"
 import { LocalStorageNotice } from "@/components/local-storage-notice"
 import { IosInstallNotice } from "@/components/ios-install-notice"
 import { ClosingReminder } from "@/components/closing-reminder"
+import { CopyReminder } from "@/components/copy-reminder"
 import { TrendsStrip } from "@/components/trends-strip"
 import { categoryTrends } from "@/lib/trends"
 import { FlashMessage, type Flash } from "@/components/flash-message"
@@ -209,17 +210,6 @@ export default function HomePage() {
     [getTransactionsForMonth, selectedMonth, selectedYear],
   )
 
-  // Copiar los fijos, ingresos y aportaciones del mes anterior (ver el hook).
-  const copyPrevious = useCopyPreviousMonth({
-    selectedMonth,
-    selectedYear,
-    monthTransactions: allTransactionsForSelectedMonth,
-    getTransactionsForMonth,
-    addTransaction,
-    onFlash: setFlash,
-  })
-  const { hasNothingToCopy, previousMonthHasContributions } = copyPrevious
-
   const actualCurrentMonth = getCurrentMonth()
   const actualCurrentYear = getCurrentYear()
 
@@ -366,6 +356,19 @@ export default function HomePage() {
     (t: Transaction) => isHiddenFromViewer(t, viewerRole, data.config),
     [viewerRole, data.config],
   )
+  // Copiar los fijos, ingresos y aportaciones del mes anterior (ver el hook). Lo que mi pareja me
+  // oculta no se copia: lo copia ella (3.15.0).
+  const copyPrevious = useCopyPreviousMonth({
+    selectedMonth,
+    selectedYear,
+    monthTransactions: allTransactionsForSelectedMonth,
+    getTransactionsForMonth,
+    addTransaction,
+    onFlash: setFlash,
+    isAmountHidden,
+    viewer: viewerRole,
+  })
+  const { hasNothingToCopy, leftForPartner, previousMonthHasContributions } = copyPrevious
   const handleHideOwnFromPartnerChange = (hidden: boolean) => {
     if (!viewerRole) return
     updateConfig({
@@ -818,6 +821,16 @@ export default function HomePage() {
         />
       )}
 
+      {/* Mi pareja ya preparó el mes y falta lo mío: lo que le oculto no lo copia ella (3.15.0). */}
+      {!isTourActive && !isSelectedMonthLocked && !isCopyBlockedByFuture && copyPrevious.mineMissing.length > 0 && (
+        <CopyReminder
+          month={selectedMonth}
+          year={selectedYear}
+          count={copyPrevious.mineMissing.length}
+          onCopy={copyPrevious.prepare}
+        />
+      )}
+
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
       {!cloudTarget && !isTourActive && <LocalStorageNotice />}
       {/* Con cuenta: cómo instalarla en iPhone (Safari no lo ofrece solo). */}
@@ -1018,7 +1031,9 @@ export default function HomePage() {
         copyDisabled={hasNothingToCopy || isCopyBlockedByFuture}
         copyTitle={
           hasNothingToCopy
-            ? previousMonthHasContributions
+            ? leftForPartner > 0 && viewerRole
+              ? `Lo tuyo y lo compartido ya está copiado; lo de ${viewerRole === "person1" ? data.config.person2Name : data.config.person1Name} lo copia al entrar`
+              : previousMonthHasContributions
               ? "Ya hay gastos fijos, ingresos y aportaciones este mes"
               : "Ya hay gastos fijos e ingresos este mes"
             : isCopyBlockedByFuture
