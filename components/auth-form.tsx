@@ -40,13 +40,15 @@ const ACCOUNT_PASSWORD_MIN = 8
 /**
  * @interface AuthFormProps
  * @property {Auth} auth - Instancia de Firebase Auth.
+ * @property {boolean} [startWithSignUp] - Empezar en «Crea tu cuenta» (al salir del emulador, 3.18.0).
  */
 interface AuthFormProps {
   auth: Auth
+  startWithSignUp?: boolean
 }
 
-export function AuthForm({ auth }: AuthFormProps) {
-  const [mode, setMode] = useState<AuthMode>("signIn")
+export function AuthForm({ auth, startWithSignUp = false }: AuthFormProps) {
+  const [mode, setMode] = useState<AuthMode>(startWithSignUp ? "signUp" : "signIn")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [passwordRepeat, setPasswordRepeat] = useState("")

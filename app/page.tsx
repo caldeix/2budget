@@ -82,6 +82,8 @@ import { recordMasterCheck, recordTourCompleted } from "@/lib/cloud/repository"
 import { AppTour, type TourStep, type TourWindow } from "@/components/app-tour"
 import { getTourSteps } from "@/components/tour-steps"
 import { createTourData } from "@/lib/tour-data"
+import { createDemoData } from "@/lib/demo-data"
+import { EmulatorBanner } from "@/components/emulator-banner"
 
 import { Button } from "@/components/ui/button"
 import { NonModalContext } from "@/components/ui/modal"
@@ -110,6 +112,11 @@ export default function HomePage() {
 
   // Tour de bienvenida: mientras dura, la app enseña datos ficticios (y no guarda nada).
   const [tourData, setTourData] = useState<AppData | null>(null)
+  // Emulador (3.18.0): desde la pantalla de acceso, la app con datos inventados, sin cuenta. Los
+  // cambios se ven pero no se guardan (ver `useFinancialData`). Al salir, el acceso abre «Crear cuenta».
+  const [emulatorData, setEmulatorData] = useState<AppData | null>(null)
+  const [authStartsWithSignUp, setAuthStartsWithSignUp] = useState(false)
+  const isEmulator = emulatorData !== null
   const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null)
 
   const {
@@ -133,15 +140,20 @@ export default function HomePage() {
     householdInfo,
     syncError,
     loadError,
-  } = useFinancialDataContext(cloudTarget, tourData)
+  } = useFinancialDataContext(cloudTarget, tourData, emulatorData)
   // La app exige cuenta verificada (si la build trae Firebase): hasta entonces no hay datos que usar.
   // Una entrada con Google pendiente de decidir (¿ya tienes cuenta?) sigue en la pantalla de acceso.
-  const needsAuth = session.enabled && (!session.user || !session.emailVerified || session.googleLink !== null)
+  // En el emulador no hay cuenta ni hogar.
+  const needsAuth =
+    !isEmulator && session.enabled && (!session.user || !session.emailVerified || session.googleLink !== null)
   // Con hogar, los datos solo valen cuando está desbloqueado (antes, el hook aún tiene los locales).
   const isLoading =
-    !session.ready || needsAuth || (session.householdId !== null && vault.status !== "unlocked") || isDataLoading
+    !session.ready ||
+    needsAuth ||
+    (!isEmulator && session.householdId !== null && vault.status !== "unlocked") ||
+    isDataLoading
   // Hogar en la nube pero sin la clave en este dispositivo: hay que escribir la contraseña maestra.
-  const isVaultLocked = session.ready && vault.status === "locked"
+  const isVaultLocked = !isEmulator && session.ready && vault.status === "locked"
 
   const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
@@ -592,7 +604,8 @@ export default function HomePage() {
   // Espera a que los datos estén cargados: en la nube llegan después del primer render.
   const hasCheckedMonthChange = useRef(false)
   useEffect(() => {
-    if (isLoading || hasCheckedMonthChange.current) return
+    // En el emulador no se pregunta por los pagos del mes anterior (ni se apunta el mes visto).
+    if (isLoading || isEmulator || hasCheckedMonthChange.current) return
     hasCheckedMonthChange.current = true
 
     const now = new Date()
@@ -637,7 +650,7 @@ export default function HomePage() {
   }, [isTourActive])
   const hasSeenTour = hasSeenTourOnDevice(uid) || Boolean(profile?.tourCompletedAt)
   // Con cuenta, hay que esperar al perfil para saber si ya lo vio.
-  const isProfileReady = !session.enabled || profile !== null
+  const isProfileReady = isEmulator || !session.enabled || profile !== null
   const isAnyModalOpen =
     isMasterCheckOpen ||
     recoveryCodeToShow !== null ||
@@ -671,8 +684,9 @@ export default function HomePage() {
     setIsTransactionFormOpen(true)
   }, [isProfileReady, isLoading, isVaultLocked, needsAuth])
 
+  // En el emulador, el tour no arranca solo (cambiaría sus datos por los del tour); está en la Ayuda.
   const canAutoStartTour =
-    !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
+    !isEmulator && !isTourActive && !hasSeenTour && isProfileReady && !isLoading && !isVaultLocked && !needsAuth && !isAnyModalOpen
 
   const startTour = useCallback(() => {
     // Siempre sobre el mes actual, con los nombres y el modo de la configuración real.
@@ -722,7 +736,18 @@ export default function HomePage() {
 
   // La app exige una cuenta con el email verificado (si la build trae Firebase; si no, es solo local).
   if (session.ready && needsAuth) {
-    return <AuthScreen session={session} />
+    return (
+      <AuthScreen
+        session={session}
+        startWithSignUp={authStartsWithSignUp}
+        onTryEmulator={() => {
+          setSelectedMonth(getCurrentMonth())
+          setSelectedYear(getCurrentYear())
+          setEmulatorData(createDemoData(new Date()))
+          window.scrollTo({ top: 0 })
+        }}
+      />
+    )
   }
 
   if (isVaultLocked) {
@@ -765,6 +790,15 @@ export default function HomePage() {
   return (
     <NonModalContext.Provider value={isTourActive}>
     <div ref={appRootRef} className="min-h-screen bg-background">
+      {isEmulator && (
+        <EmulatorBanner
+          onCreateAccount={() => {
+            setEmulatorData(null)
+            setAuthStartsWithSignUp(true)
+            window.scrollTo({ top: 0 })
+          }}
+        />
+      )}
       <header className="bg-card shadow-lg border-b border-border">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex justify-center items-center h-12 sm:h-16">
@@ -776,7 +810,7 @@ export default function HomePage() {
               </span>
             </h1>
             {/* Cuenta: nube con hogar, o modo local (solo si la build trae Firebase). */}
-            {session.enabled && (
+            {session.enabled && !isEmulator && (
               <CloudStatus
                 session={session}
                 singleMode={data.config.singleMode}
@@ -832,7 +866,7 @@ export default function HomePage() {
       )}
 
       {/* Modo local: los datos solo están en este navegador (ver `LocalStorageNotice`). */}
-      {!cloudTarget && !isTourActive && <LocalStorageNotice />}
+      {!cloudTarget && !isTourActive && !isEmulator && <LocalStorageNotice />}
       {/* Con cuenta: cómo instalarla en iPhone (Safari no lo ofrece solo). */}
       {cloudTarget && !isTourActive && <IosInstallNotice />}
 
