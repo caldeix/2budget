@@ -70,8 +70,14 @@ export interface CloudTarget {
  * @param {CloudTarget | null} cloud - Hogar en la nube (o `null` para guardar en local).
  * @param {AppData | null} demoData - Datos ficticios del tour de bienvenida. Mientras se pasan, la
  *        app los muestra en lugar de los reales y NO se guarda nada (ni en local ni en la nube).
+ * @param {AppData | null} emulatorData - Datos de partida del emulador (3.18.0). Con ellos, la app
+ *        trabaja en memoria: los cambios se ven pero no se guardan nunca (ni en local ni en la nube).
  */
-export function useFinancialData(cloud: CloudTarget | null = null, demoData: AppData | null = null) {
+export function useFinancialData(
+  cloud: CloudTarget | null = null,
+  demoData: AppData | null = null,
+  emulatorData: AppData | null = null,
+) {
   /**
    * `useState` para almacenar todos los datos de la aplicación.
    * Se arranca con los datos de localStorage; en modo nube los sustituye el primer snapshot.
@@ -94,9 +100,13 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
   // Origen de los datos que hay ahora mismo en `data` ("local" o el id del hogar).
   const dataSourceRef = useRef<string | null>(null)
 
-  const db = cloud?.db ?? null
-  const householdId = cloud?.householdId ?? null
-  const dek = cloud?.dek ?? null
+  // El emulador va siempre en memoria, aunque hubiera un hogar.
+  const db = emulatorData ? null : (cloud?.db ?? null)
+  const householdId = emulatorData ? null : (cloud?.householdId ?? null)
+  const dek = emulatorData ? null : (cloud?.dek ?? null)
+  // Copia síncrona para `commit` (estable): en el emulador, los cambios no se guardan.
+  const isEmulatorRef = useRef(false)
+  isEmulatorRef.current = emulatorData !== null
   // Dónde se guarda cada cambio; se actualiza al cambiar de modo.
   const targetRef = useRef<CloudTarget | null>(null)
 
@@ -110,7 +120,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
   // Origen pedido ("local" o el id del hogar) y origen cuyos datos ya están en `data`.
   // Se compara en el mismo render: al cambiar de origen, `isLoading` es `true` desde el primer
   // render, sin esperar a un efecto (así nadie trabaja con los datos del origen anterior).
-  const source = householdId ?? "local"
+  const source = emulatorData ? "emulator" : (householdId ?? "local")
   const [loadedSource, setLoadedSource] = useState<string | null>(null)
   const isLoading = loadedSource !== source
 
@@ -130,6 +140,17 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         loadErrorRef.current = message
         setLoadError(message)
       }
+    }
+
+    if (emulatorData) {
+      // Emulador: sus datos, en memoria. Ni se lee ni se escribe nada de este navegador ni de la nube.
+      targetRef.current = null
+      dataRef.current = emulatorData
+      dataSourceRef.current = "emulator"
+      setData(emulatorData)
+      setHouseholdInfo(null)
+      setLoadedSource("emulator")
+      return
     }
 
     if (!db || !householdId || !dek) {
@@ -183,7 +204,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
         setLoadedSource(householdId)
       },
     )
-  }, [db, householdId, dek])
+  }, [db, householdId, dek, emulatorData])
 
   // Versión mínima del hogar (3.1.0): si está por debajo de la que necesitan los datos actuales, la
   // sube (una vez por hogar). Una app que se ha quedado atrás no la toca: se bloquea en la página.
@@ -215,6 +236,7 @@ export function useFinancialData(cloud: CloudTarget | null = null, demoData: App
     if (next === prev) return
     dataRef.current = next
     setData(next)
+    if (isEmulatorRef.current) return // Emulador: el cambio se ve, pero no se guarda.
 
     const target = targetRef.current
     if (!target) {
