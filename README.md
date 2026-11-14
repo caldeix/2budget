@@ -9,7 +9,7 @@
 [![Autor: caldeix](https://img.shields.io/badge/autor-caldeix-181717?logo=github&logoColor=white)](https://github.com/caldeix)
 [![© 2026 Caldeix](https://img.shields.io/badge/%C2%A9_2026-Caldeix-D4AF37)](LICENSE)
 
-![Version](https://img.shields.io/badge/Version-3.17.0-gold.svg)
+![Version](https://img.shields.io/badge/Version-3.18.0-gold.svg)
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
@@ -56,6 +56,15 @@ Sin servidor propio: la web es estática (GitHub Pages) y los datos se guardan e
 ---
 
 ## Changelog
+
+### v3.18.0 — Emulador
+
+- **Probar sin cuenta** — En la pantalla de inicio de sesión, «Probar el emulador (datos de ejemplo)» entra en la app con una pareja inventada y 6 meses de datos: meses cerrados con informe, cuenta compartida, categorías, presupuestos, metas, un viaje con etiqueta y una tendencia
+- **No se guarda nada** — Todo se puede tocar, pero los cambios viven solo en memoria: nada va a la nube ni a este navegador, y al recargar vuelve a empezar
+- **Franja del emulador** — Arriba, el aviso de que los datos son de mentira y el botón «Crear mi cuenta», que abre el registro
+- Las fechas de los datos van relativas a hoy, para que nunca se queden viejas
+- Sección de la Ayuda
+- SemVer: 3.17.0 → 3.18.0 (MINOR)
 
 ### v3.17.0 — No computables pagados, ya asignables
 
