@@ -426,6 +426,13 @@ export function DocumentationModal({ isOpen, onClose, person1Name, person2Name, 
                 cambiar el email o eliminar la cuenta. Si olvidas la contraseña de la cuenta, recupérala desde la
                 pantalla de inicio de sesión.
               </p>
+              <Subtitle>Emulador</Subtitle>
+              <p>
+                Para probar la app sin cuenta, en la pantalla de inicio de sesión pulsa{" "}
+                <strong>Probar el emulador</strong>: entras con una pareja inventada y 6 meses de datos. Puedes tocarlo
+                todo, pero no se guarda nada (al recargar vuelve a empezar). La franja de arriba lo recuerda, y{" "}
+                <strong>Crear mi cuenta</strong> sale del emulador para registrarte; tu cuenta empieza vacía.
+              </p>
               <Subtitle>Entrar con Google</Subtitle>
               <ul className="list-disc list-inside space-y-1">
                 <li>
